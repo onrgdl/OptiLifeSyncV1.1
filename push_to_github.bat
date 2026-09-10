@@ -2,6 +2,9 @@
 chcp 65001 >nul
 title OptiLifeSync - GitHub Senkronizasyon Araci
 
+:: Calisma dizinini bat dosyasinin bulundugu klasore sabitle
+cd /d "%~dp0"
+
 echo ======================================================
 echo    OptiLifeSync - GitHub Senkronizasyon Araci
 echo ======================================================
@@ -20,24 +23,24 @@ if not exist "%GIT_CMD%" (
     )
 )
 
-"%GIT_CMD%" remote get-url origin >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [BILGI] Henuz bir GitHub deposu baglanmamis.
-    echo.
-    echo Lutfen GitHub'da olusturdugunuz deponun adresini yapistirin:
-    echo (Ornek: https://github.com/KULLANICI_ADINIZ/optilifesync.git)
-    echo.
-    set /p REPO_URL="GitHub Repo URL: "
-    if "%REPO_URL%"=="" (
-        echo [HATA] Gecerli bir repo URL'si girmediniz.
-        pause
-        exit /b 1
-    )
-    "%GIT_CMD%" remote add origin "%REPO_URL%"
-    echo [BASARILI] GitHub baglantisi eklendi: %REPO_URL%
+:: Git repository kontrolu
+if not exist ".git" (
+    echo [BILGI] Git deposu baslatiliyor...
+    "%GIT_CMD%" init
+    "%GIT_CMD%" branch -M main
 )
 
+:: Remote URL kontrolu ve otomatik tanimlama
+"%GIT_CMD%" remote get-url origin >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [BILGI] GitHub deposu baglaniyor...
+    "%GIT_CMD%" remote add origin "https://github.com/onrgdl/OptiLifeSyncV1.1.git"
+)
+
+echo Bagli GitHub Deposu:
+"%GIT_CMD%" remote get-url origin
 echo.
+
 echo [1/3] Degisiklikler taranip hazirlaniyor...
 "%GIT_CMD%" add .
 

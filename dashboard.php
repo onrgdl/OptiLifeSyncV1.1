@@ -458,6 +458,16 @@ button { cursor: pointer; border: none; background: none; }
     <!-- CONTENT -->
     <div class="content">
 
+        <!-- TEST BANNER -->
+        <div class="mb-4 p-4 text-center rounded-4 shadow" style="background: linear-gradient(135deg, #0284c7, #6366f1); border: 2px solid rgba(255,255,255,0.2);">
+            <h1 class="display-3 fw-bold text-white text-uppercase mb-1" style="letter-spacing: 2px; text-shadow: 0 4px 12px rgba(0,0,0,0.4);">
+                🔥 ONUR GÜDÜL 🔥
+            </h1>
+            <p class="text-light mb-0 fs-5 fw-semibold" style="opacity: 0.9;">
+                OptiLifeSync GitHub &amp; Vercel Senkronizasyon Testi
+            </p>
+        </div>
+
         <!-- ── KPI KARTLARI (4'lü üst satır) ─────────────── -->
         <div class="row g-3 mb-4">
             <!-- Kalori -->
