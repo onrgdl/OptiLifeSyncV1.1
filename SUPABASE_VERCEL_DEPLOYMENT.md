@@ -54,7 +54,9 @@ Projenizde hazır olarak bulunan `database/schema_supabase.sql` dosyası; 11 tab
 
 #### Yöntem A: GitHub ile (Önerilen & En Kolay)
 
-1. Proje klasörünüzü bir GitHub reposuna yükleyin (Private veya Public).
+1. Proje klasörünüzde hazır bulunan **`push_to_github.bat`** dosyasına çift tıklayın (veya terminalden çalıştırın).
+   - Sizden GitHub repository URL'nizi isteyecektir (Örn: `https://github.com/KULLANICI_ADINIZ/optilifesync.git`).
+   - URL'yi yapıştırıp `Enter`'a bastığınızda tüm dosyalar (`main` dalı) otomatik olarak GitHub'a yüklenecektir.
 2. [vercel.com](https://vercel.com) adresine gidin ve GitHub hesabınızla giriş yapın.
 3. **"Add New..."** $\rightarrow$ **"Project"** butonuna tıklayın ve GitHub deponuzu seçin (**Import**).
 4. **Environment Variables** (Ortam Değişkenleri) açılır kutusunu genişletin ve şu 2 değişkeni ekleyin:
