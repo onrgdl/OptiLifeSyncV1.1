@@ -23,9 +23,9 @@ class WorkoutService
 {
     private PDO $db;
 
-    // Dinamik makro ek değerleri
-    public const EXTRA_CALORIES = 400;
-    public const EXTRA_PROTEIN_G = 30.0;
+    // Spor takibi sadece takip amaçlıdır (beslenmeye ekstra kalori/protein eklenmez)
+    public const EXTRA_CALORIES = 0;
+    public const EXTRA_PROTEIN_G = 0.0;
 
     public function __construct(PDO $db)
     {
@@ -228,23 +228,7 @@ class WorkoutService
             }
         }
 
-        // 2. Takviye Tetikleyicisi: reminders tablosuna 15 dakika sonrasına alarm ekle
-        $label = '⚡ Antrenman Sonrası: Whey Protein ve Magnezyum Al';
-        $remStmt = $this->db->prepare("
-            INSERT INTO reminders (user_id, type, label, remind_at, days_of_week, is_active)
-            VALUES (:user_id, 'supplement', :label, :remind_at, :days, 1)
-        ");
-        $remStmt->execute([
-            ':user_id'   => $userId,
-            ':label'     => $label,
-            ':remind_at' => $reminderTime,
-            ':days'      => json_encode([$todayDayIndex]),
-        ]);
-        $reminderId = function_exists('dbLastInsertId')
-            ? dbLastInsertId($this->db, 'reminders')
-            : (int) $this->db->lastInsertId();
-
-        // 3. daily_logs tablosunu da senkronize et
+        // daily_logs senkronizasyonu
         $checkDate = $this->db->prepare("SELECT tarih FROM workouts WHERE id = ?");
         $checkDate->execute([$workoutId]);
         $wDate = $checkDate->fetchColumn() ?: date('Y-m-d');
@@ -255,14 +239,8 @@ class WorkoutService
             'workout_id'       => $workoutId,
             'tamamlandi_mi'    => true,
             'tamamlanma_saati' => substr($currentTime, 0, 5),
-            'reminder'         => [
-                'id'            => $reminderId,
-                'target_time'   => $shortRemindAt,
-                'full_time'     => $reminderTime,
-                'label'         => 'Whey Protein ve Magnezyum Al',
-                'delay_minutes' => 15,
-            ],
-            'message'          => "Tebrikler! Antrenman tamamlandı. Saat {$shortRemindAt}'de (15 dk sonra) 'Whey Protein ve Magnezyum Al' hatırlatıcısı oluşturuldu! 🥤💪",
+            'reminder'         => null,
+            'message'          => "Tebrikler! Antrenman başarıyla tamamlandı. Harika bir iş çıkardın! 💪🔥",
         ];
     }
 

@@ -8,3 +8,14 @@
 <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="assets/icons/icon-512.png">
+
+<script>
+    // Hem localhost/Gyp/ hem de Vercel/kök dizin uyumlu evrensel API yolu
+    window.API_BASE = (function() {
+        var p = (window.location.pathname || '').toLowerCase();
+        if (p.indexOf('/gyp') !== -1) {
+            return '/Gyp/api';
+        }
+        return '/api';
+    })();
+</script>

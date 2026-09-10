@@ -883,7 +883,7 @@ async function generateAiReport() {
     formData.append('week_end', weekEnd);
 
     try {
-        const res = await fetch('/api/reports.php', { method: 'POST', body: formData });
+        const res = await fetch(`${window.API_BASE}/reports.php`, { method: 'POST', body: formData });
         const data = await res.json();
 
         if (data.ok && data.advice) {

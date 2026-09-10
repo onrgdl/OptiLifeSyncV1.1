@@ -265,7 +265,7 @@ $activePage = 'workout';
             </button>
             <div>
                 <div class="topbar-title">Spor & Antrenman Planı</div>
-                <div class="topbar-sub">OptiLifeSync · Haftalık Program & Dinamik Makro Yönetimi</div>
+                <div class="topbar-sub">OptiLifeSync · Haftalık Program & Aktivite Takibi</div>
             </div>
         </div>
         <div class="topbar-right">
@@ -328,31 +328,31 @@ $activePage = 'workout';
                 </div>
             </div>
 
-            <!-- Dinamik Makro -->
+            <!-- Beslenme Etkisi -->
             <div class="col-sm-6 col-xl-3">
                 <div class="stat-card">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-secondary small fw-semibold">DİNAMİK MAKRO ETKİSİ</span>
-                        <div class="p-2 rounded-3" style="background:rgba(249,115,22,0.1);color:#f97316;">
-                            <i class="bi bi-fire"></i>
+                        <span class="text-secondary small fw-semibold">BESLENME ETKİSİ</span>
+                        <div class="p-2 rounded-3" style="background:rgba(16,185,129,0.1);color:#10b981;">
+                            <i class="bi bi-shield-check"></i>
                         </div>
                     </div>
-                    <div class="fs-4 fw-bold" style="color:#fdba74;" id="kpiMacroText">+400 kcal</div>
-                    <small class="text-secondary" id="kpiMacroSub">+30g Protein Hedefi</small>
+                    <div class="fs-5 fw-bold text-success" id="kpiMacroText">Sabit Hedef</div>
+                    <small class="text-secondary" id="kpiMacroSub">Kalori hedefleri sabit korunur</small>
                 </div>
             </div>
 
-            <!-- Takviye Hatırlatıcısı -->
+            <!-- Son Tamamlanan -->
             <div class="col-sm-6 col-xl-3">
                 <div class="stat-card">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-secondary small fw-semibold">SONRAKİ TAKVİYE TETİKLEYİCİ</span>
-                        <div class="p-2 rounded-3" style="background:rgba(168,85,247,0.1);color:#c084fc;">
-                            <i class="bi bi-capsule"></i>
+                        <span class="text-secondary small fw-semibold">SON TAMAMLANAN</span>
+                        <div class="p-2 rounded-3" style="background:rgba(245,158,11,0.1);color:#f59e0b;">
+                            <i class="bi bi-award"></i>
                         </div>
                     </div>
-                    <div class="fs-5 fw-bold text-light" id="kpiReminderTime">Beklemede</div>
-                    <small class="text-secondary">Antrenman bitiminde 15 dk alarmı</small>
+                    <div class="fs-5 fw-bold text-light" id="kpiLastCompleted">—</div>
+                    <small class="text-secondary" id="kpiLastCompletedSub">Aktivite takibi</small>
                 </div>
             </div>
         </div>
@@ -366,7 +366,7 @@ $activePage = 'workout';
                 </div>
                 <div class="d-flex align-items-center gap-3">
                     <div class="d-flex align-items-center gap-1 small text-secondary">
-                        <span class="badge rounded-circle p-1 bg-warning"> </span> Dinamik Makro Aktif
+                        <span class="badge rounded-circle p-1 bg-info"> </span> Planlanan Antrenman
                     </div>
                     <div class="d-flex align-items-center gap-1 small text-secondary">
                         <span class="badge rounded-circle p-1 bg-success"> </span> Tamamlandı
@@ -387,12 +387,12 @@ $activePage = 'workout';
         <!-- ── 3. BİLGİLENDİRME BANNERI ─────────────────────────── -->
         <div class="p-3 rounded-4 border border-secondary border-opacity-25 mb-4" style="background:rgba(17,24,39,0.7);">
             <div class="d-flex align-items-start gap-3">
-                <div class="fs-3 text-warning">💡</div>
+                <div class="fs-3 text-info">💡</div>
                 <div class="small text-secondary">
-                    <strong class="text-light">OptiLifeSync Spor Modülü Nasıl Çalışır?</strong>
+                    <strong class="text-light">OptiLifeSync Spor Takip Modülü</strong>
                     <ul class="mb-0 mt-1 ps-3">
-                        <li><strong>Dinamik Makro:</strong> Bir güne antrenman eklediğinizde günlük hedefinize otomatik olarak <span class="text-warning fw-bold">+400 kcal</span> ve <span class="text-info fw-bold">+30g protein</span> eklenir. Antrenmanı silerseniz hedef normale döner.</li>
-                        <li><strong>15 Dk Takviye Alarmı:</strong> Antrenmanı <em>'Antrenmanı Bitir'</em> butonuyla tamamladığınızda, sistem tam 15 dakika sonrasına <strong>'Whey Protein ve Magnezyum Al'</strong> uyarısı oluşturur ve hem sayfada hem tarayıcı bildirimlerinde sizi uyarır.</li>
+                        <li><strong>Aktivite Takibi:</strong> Planladığınız antrenmanları ve günlük spor disiplininizi haftalık takvim üzerinden kolayca kaydedebilir ve takip edebilirsiniz.</li>
+                        <li><strong>Sabit Beslenme Hedefleri:</strong> Antrenman kayıtları yalnızca spor takibi içindir; kalori ve makro hedefleriniz sabit kalarak diyet dengenizi korumanızı sağlar.</li>
                     </ul>
                 </div>
             </div>
@@ -445,21 +445,11 @@ $activePage = 'workout';
                         </select>
                     </div>
 
-                    <!-- Dinamik Makro Bilgilendirmesi -->
-                    <div class="p-3 rounded-3" style="background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.3);">
-                        <div class="d-flex align-items-center gap-2 text-warning small fw-bold mb-1">
-                            <i class="bi bi-lightning-charge-fill"></i> Dinamik Makro Otomasyonu
-                        </div>
-                        <div class="text-secondary small" style="font-size:0.8rem;">
-                            Bu antrenman kaydedildiğinde beslenme modülündeki günlük kalori hedefinize <strong class="text-light">+400 kcal</strong> ve protein hedefinize <strong class="text-light">+30g</strong> otomatik olarak yansıtılacaktır.
-                        </div>
-                    </div>
-
                 </div>
                 <div class="modal-footer border-secondary border-opacity-25">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Vazgeç</button>
                     <button type="submit" class="btn btn-info btn-sm fw-bold px-3" id="btnSaveWorkout">
-                        <i class="bi bi-check-lg me-1"></i> Kaydet & Hedefleri Güncelle
+                        <i class="bi bi-check-lg me-1"></i> Antrenmanı Kaydet
                     </button>
                 </div>
             </form>
@@ -504,7 +494,7 @@ async function loadWeekData(dateStr) {
         </div>`;
 
     try {
-        const res = await fetch(`/api/workout.php?action=get_week&date=${encodeURIComponent(dateStr)}`);
+        const res = await fetch(`${window.API_BASE}/workout.php?action=get_week&date=${encodeURIComponent(dateStr)}`);
         const data = await res.json();
 
         if (!data.ok) {
@@ -579,10 +569,9 @@ function renderCalendar(data) {
                         <span>${escapeHtml(w.antrenman_tipi)}</span>
                     </div>
 
-                    <!-- Dinamik Makro Rozeti -->
-                    <div class="macro-badge" title="Bu gün için beslenme hedefinize +400 kcal ve +30g protein eklenmiştir.">
-                        <i class="bi bi-fire text-warning"></i>
-                        <span>🔥 Dinamik Makro Aktif: +400 Kcal</span>
+                    <div class="macro-badge text-info" style="background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.2);">
+                        <i class="bi bi-activity text-info"></i>
+                        <span class="text-light">Planlanan Antrenman</span>
                     </div>
                 </div>
             `;
@@ -596,10 +585,6 @@ function renderCalendar(data) {
                         <div class="completed-pill">
                             <i class="bi bi-check-circle-fill"></i>
                             <span>Tamamlandı ${compTime ? '(' + compTime + ')' : ''}</span>
-                        </div>
-                        <div class="post-workout-alert">
-                            <i class="bi bi-bell-fill me-1 text-warning"></i>
-                            <strong>15 Dk Takviyesi:</strong> Whey Protein & Magnezyum
                         </div>
                     </div>
                 `;
@@ -622,8 +607,8 @@ function renderCalendar(data) {
                     <i class="bi bi-moon-stars fs-3 mb-1 text-secondary opacity-50"></i>
                     <div class="small fw-semibold text-secondary">Dinlenme Günü</div>
                     <div class="macro-badge inactive my-2">
-                        <i class="bi bi-shield-check"></i>
-                        <span>Normal Hedef</span>
+                        <i class="bi bi-moon-stars"></i>
+                        <span>Aktivite Yok</span>
                     </div>
                 </div>
                 <div class="mt-auto">
@@ -651,6 +636,21 @@ function updateSummaryKPIs(data) {
     document.getElementById('kpiProgressPct').textContent = `(%${pct})`;
     document.getElementById('kpiProgressBar').style.width = `${pct}%`;
 
+    // Son Tamamlanan Antrenman
+    const completedDays = data.days.filter(d => d.has_workout && d.workout.tamamlandi_mi);
+    const lastComp = completedDays.length > 0 ? completedDays[completedDays.length - 1] : null;
+    const lastEl = document.getElementById('kpiLastCompleted');
+    const lastSub = document.getElementById('kpiLastCompletedSub');
+    if (lastEl && lastSub) {
+        if (lastComp) {
+            lastEl.innerHTML = `<span class="text-info">${escapeHtml(lastComp.workout.antrenman_tipi)}</span>`;
+            lastSub.textContent = `${lastComp.day_name} (${lastComp.workout.tamamlanma_saati ? lastComp.workout.tamamlanma_saati.substring(0,5) : 'Tamamlandı'})`;
+        } else {
+            lastEl.textContent = '—';
+            lastSub.textContent = 'Bu hafta henüz yok';
+        }
+    }
+
     // Bugünün durumu
     const todayDay = data.days.find(d => d.is_today);
     if (todayDay && todayDay.has_workout) {
@@ -661,25 +661,20 @@ function updateSummaryKPIs(data) {
             : `<span class="text-warning"><i class="bi bi-lightning-charge me-1"></i>${escapeHtml(w.antrenman_tipi)}</span>`;
         document.getElementById('kpiTodaySub').textContent = isDone ? 'Harika iş çıkardın!' : 'Bugün antrenman günün!';
         
-        document.getElementById('kpiMacroText').textContent = '+400 kcal';
-        document.getElementById('kpiMacroSub').textContent = '+30g Protein Devrede 🔥';
-
-        if (isDone) {
-            document.getElementById('kpiReminderTime').innerHTML = '<span class="text-info"><i class="bi bi-check2"></i> Whey & Mg Kuruldu</span>';
-        }
+        document.getElementById('kpiMacroText').textContent = 'Sabit Hedef';
+        document.getElementById('kpiMacroSub').textContent = 'Diyet dengesi korunuyor';
     } else {
         document.getElementById('kpiTodayStatus').innerHTML = '<span class="text-secondary"><i class="bi bi-cup-hot me-1"></i>Dinlenme</span>';
         document.getElementById('kpiTodaySub').textContent = 'Bugün antrenman planlanmadı';
         
-        document.getElementById('kpiMacroText').textContent = 'Normal';
-        document.getElementById('kpiMacroSub').textContent = 'Dinamik makro pasif';
+        document.getElementById('kpiMacroText').textContent = 'Sabit Hedef';
+        document.getElementById('kpiMacroSub').textContent = 'Kalori korunuyor';
     }
 }
 
 /**
  * Antrenmanı Bitir butonu tetiklendiğinde çalışan AJAX / Fetch API fonksiyonu
  * - workouts.tamamlandi_mi = 1 yapar
- * - 15 dakika sonrasına "Whey Protein ve Magnezyum Al" hatırlatıcısı kurar
  */
 async function completeWorkout(workoutId, btnElem) {
     if (btnElem) {
@@ -692,7 +687,7 @@ async function completeWorkout(workoutId, btnElem) {
         formData.append('action', 'complete');
         formData.append('workout_id', workoutId);
 
-        const res = await fetch('/api/workout.php', {
+        const res = await fetch(`${window.API_BASE}/workout.php`, {
             method: 'POST',
             body: formData,
         });
@@ -702,43 +697,19 @@ async function completeWorkout(workoutId, btnElem) {
             throw new Error(data.error || 'İşlem tamamlanamadı.');
         }
 
-        // Başarı Mesajı & Takviye Tetikleyici Uyarısı (SweetAlert2)
+        // Başarı Mesajı (SweetAlert2)
         Swal.fire({
             icon: 'success',
-            title: 'Tebrikler! Antrenman Tamamlandı 🏆',
-            html: `
-                <div class="text-start">
-                    <p class="mb-3">Harika bir antrenmandı! Vücudunu tebrik ederiz.</p>
-                    <div class="p-3 rounded-3" style="background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.35);">
-                        <div class="fw-bold text-info mb-1">
-                            <i class="bi bi-capsule-pill me-1"></i> Antrenman Sonrası Takviye Hatırlatıcısı
-                        </div>
-                        <div class="small text-light">
-                            Saat <strong>${data.reminder.target_time}</strong> için (15 dakika sonra) 
-                            <strong class="text-warning">"Whey Protein ve Magnezyum Al"</strong> alarmı otomatik kuruldu!
-                        </div>
-                    </div>
-                </div>
-            `,
+            title: 'Tebrikler! 🏆',
+            text: 'Antrenman başarıyla tamamlandı olarak kaydedildi. Harika bir iş çıkardın!',
             background: '#111827',
             color: '#f8fafc',
             confirmButtonColor: '#10b981',
-            confirmButtonText: 'Anladım, Harika!',
+            confirmButtonText: 'Harika!',
             customClass: {
                 popup: 'border border-secondary'
             }
         });
-
-        // Tarayıcı Bildirimi Planla (Yerel)
-        if ('Notification' in window && Notification.permission === 'granted') {
-            setTimeout(() => {
-                new Notification('🥤 Takviye Zamanı! (OptiLifeSync)', {
-                    body: 'Antrenmandan 15 dakika geçti: Lütfen Whey Protein ve Magnezyum alımınızı yapın.',
-                    icon: 'favicon.ico',
-                    tag: 'workout-supp-alert'
-                });
-            }, 15 * 60 * 1000); // 15 dakika
-        }
 
         // Takvimi canlı güncelle
         loadWeekData(formatDateToIso(currentRefDate));
@@ -772,7 +743,7 @@ async function handleWorkoutSubmit(e) {
     formData.append('action', 'save');
 
     try {
-        const res = await fetch('/api/workout.php', {
+        const res = await fetch(`${window.API_BASE}/workout.php`, {
             method: 'POST',
             body: formData,
         });
@@ -837,7 +808,7 @@ async function confirmDeleteWorkout(workoutId) {
             formData.append('action', 'delete');
             formData.append('workout_id', workoutId);
 
-            const res = await fetch('/api/workout.php', {
+            const res = await fetch(`${window.API_BASE}/workout.php`, {
                 method: 'POST',
                 body: formData,
             });

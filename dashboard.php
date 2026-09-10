@@ -981,7 +981,7 @@ async function apiPost(action, extra = {}) {
     const fd = new FormData();
     fd.append('action', action);
     for (const [k, v] of Object.entries(extra)) fd.append(k, v);
-    const r = await fetch('/api/dashboard.php', { method:'POST', body:fd });
+    const r = await fetch(`${window.API_BASE}/dashboard.php`, { method:'POST', body:fd });
     return r.json();
 }
 
@@ -1146,7 +1146,7 @@ async function dismissDashboardAlarm(alarmId) {
         formData.append('action', 'delete_alarm');
         formData.append('alarm_id', alarmId);
 
-        const res = await fetch('/api/dashboard.php', { method: 'POST', body: formData });
+        const res = await fetch(`${window.API_BASE}/dashboard.php`, { method: 'POST', body: formData });
         const data = await res.json();
 
         if (data.ok) {
@@ -1229,7 +1229,7 @@ async function deleteDashboardMeal(mealId, foodName) {
         formData.append('meal_id', mealId);
 
         try {
-            const res = await fetch('/api/dashboard.php', { method: 'POST', body: formData });
+            const res = await fetch(`${window.API_BASE}/dashboard.php`, { method: 'POST', body: formData });
             const data = await res.json();
 
             if (data.ok) {
@@ -1355,7 +1355,7 @@ async function previewGemini() {
         fd.append('action',    'analyze_only');
         fd.append('meal_text', text);
 
-        const r    = await fetch('/api/analyze_food.php', { method:'POST', body:fd });
+        const r    = await fetch(`${window.API_BASE}/analyze_food.php`, { method:'POST', body:fd });
         const data = await r.json();
 
         document.getElementById('geminiLoading').classList.add('d-none');
@@ -1415,7 +1415,7 @@ async function searchLocalSupps(query) {
         const fd = new FormData();
         fd.append('action', 'quick_search');
         fd.append('q', q);
-        const r    = await fetch('/api/dashboard.php', { method:'POST', body:fd });
+        const r    = await fetch(`${window.API_BASE}/dashboard.php`, { method:'POST', body:fd });
         const data = await r.json();
         if (!data.ok) return;
         window._suppModalResults = data.supplements ?? [];
@@ -1465,7 +1465,7 @@ async function submitQuickAdd() {
             fd.append('action',    'analyze');
             fd.append('meal_text', selectedItem.mealText);
             fd.append('meal_type', document.getElementById('geminiMealType').value);
-            const r = await fetch('/api/analyze_food.php', { method:'POST', body:fd });
+            const r = await fetch(`${window.API_BASE}/analyze_food.php`, { method:'POST', body:fd });
             data = await r.json();
 
         } else {
@@ -1474,7 +1474,7 @@ async function submitQuickAdd() {
             fd.append('action',        'quick_add');
             fd.append('source',        'local');
             fd.append('supplement_id', selectedItem.data.id);
-            const r = await fetch('/api/dashboard.php', { method:'POST', body:fd });
+            const r = await fetch(`${window.API_BASE}/dashboard.php`, { method:'POST', body:fd });
             data = await r.json();
         }
 
@@ -1670,7 +1670,7 @@ async function analyzeSelectedPhoto() {
         fd.append('meal_type', document.getElementById('photoMealType').value);
         fd.append('notes', document.getElementById('photoUserNotes').value.trim());
 
-        const res = await fetch('/api/analyze_food.php', { method:'POST', body:fd });
+        const res = await fetch(`${window.API_BASE}/analyze_food.php`, { method:'POST', body:fd });
         const data = await res.json();
 
         document.getElementById('photoAnalyzingSpinner').classList.add('d-none');
@@ -1712,7 +1712,7 @@ async function confirmSavePhotoFood() {
         fd.append('carbs', document.getElementById('photoResultCarb').value);
         fd.append('fat', document.getElementById('photoResultFat').value);
 
-        const res = await fetch('/api/analyze_food.php', { method:'POST', body:fd });
+        const res = await fetch(`${window.API_BASE}/analyze_food.php`, { method:'POST', body:fd });
         const data = await res.json();
 
         saveBtn.disabled = false;
