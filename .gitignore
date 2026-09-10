@@ -1,0 +1,24 @@
+﻿# Ortam degiskenleri ve hassas bilgiler
+.env
+.env.local
+.env.*.local
+
+# Loglar ve gecici dosyalar
+logs/
+*.log
+
+# Sistem ve Editor dosyalari
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Capacitor & Android Derleme Ciktilari
+capacitor-app/android/.gradle/
+capacitor-app/android/build/
+capacitor-app/android/app/build/
+capacitor-app/android/captures/
+capacitor-app/android/.idea/
+capacitor-app/node_modules/
+node_modules/
+package-lock.json

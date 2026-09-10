@@ -1,0 +1,44 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# OptiLifeSync — Apache Güvenlik Kuralları
+# ─────────────────────────────────────────────────────────────────────────────
+
+# PHP hata çıktısını gizle (production modu)
+php_flag display_errors Off
+
+# ── Hassas Dosyalara Doğrudan Erişimi Engelle ───────────────────────────────
+<FilesMatch "^(\.env|\.env\.example|\.gitignore|composer\.json|composer\.lock|package\.json|package-lock\.json)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# ── Hassas Dizinlere Erişimi Engelle ─────────────────────────────────────────
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # config/ dizinini dışarıya kapat
+    RewriteRule ^config/ - [F,L]
+
+    # database/ dizinini dışarıya kapat
+    RewriteRule ^database/ - [F,L]
+
+    # app/ dizinini dışarıya kapat
+    RewriteRule ^app/ - [F,L]
+
+    # logs/ dizinini dışarıya kapat
+    RewriteRule ^logs/ - [F,L]
+
+    # example_usage.php'ye erişimi engelle
+    RewriteRule ^example_usage\.php$ - [F,L]
+</IfModule>
+
+# ── Dizin Listelemeyi Kapat ───────────────────────────────────────────────────
+Options -Indexes
+
+# ── Clickjacking Koruması ─────────────────────────────────────────────────────
+Header always set X-Frame-Options "SAMEORIGIN"
+
+# ── MIME Sniffing Koruması ────────────────────────────────────────────────────
+Header always set X-Content-Type-Options "nosniff"
+
+# ── XSS Koruması (eski tarayıcılar için) ──────────────────────────────────────
+Header always set X-XSS-Protection "1; mode=block"

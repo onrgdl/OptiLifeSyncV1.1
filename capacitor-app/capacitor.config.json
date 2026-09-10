@@ -1,0 +1,44 @@
+{
+  "appId": "com.optilifesync.app",
+  "appName": "OptiLifeSync",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "http://10.10.18.50/Gyp/dashboard.php",
+    "cleartext": true,
+    "allowNavigation": [
+      "10.10.18.50",
+      "localhost",
+      "127.0.0.1",
+      "*"
+    ]
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1800,
+      "launchAutoHide": true,
+      "backgroundColor": "#080f1e",
+      "androidScaleType": "CENTER_CROP",
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "StatusBar": {
+      "backgroundColor": "#080f1e",
+      "style": "DARK",
+      "overlaysWebView": false
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon_config_sample",
+      "iconColor": "#38bdf8",
+      "sound": "beep.wav"
+    }
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true,
+    "buildOptions": {
+      "signingType": "apksigner"
+    }
+  }
+}

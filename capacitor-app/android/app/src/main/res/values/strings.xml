@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">OptiLifeSync</string>
+    <string name="title_activity_main">OptiLifeSync</string>
+    <string name="package_name">com.optilifesync.app</string>
+    <string name="custom_url_scheme">com.optilifesync.app</string>
+</resources>

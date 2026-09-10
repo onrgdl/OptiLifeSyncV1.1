@@ -1,0 +1,64 @@
+{
+  "name": "OptiLifeSync — Kişisel Sağlık Takip Sistemi",
+  "short_name": "OptiLifeSync",
+  "description": "BMR, dinamik makro hedefleri, Gemini AI besin analizi, ilaç alarmları ve haftalık spor planı mobil sağlık asistanı.",
+  "start_url": "dashboard.php",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#080f1e",
+  "theme_color": "#080f1e",
+  "categories": ["health", "fitness", "lifestyle", "medical"],
+  "lang": "tr",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Günlük Dashboard",
+      "short_name": "Dashboard",
+      "description": "Günlük kalori ve sağlık özeti",
+      "url": "dashboard.php",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Yapay Zeka Besin Analizi",
+      "short_name": "Beslenme",
+      "description": "Gemini AI ile öğün ve kalori analizi",
+      "url": "nutrition.php",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Spor & Antrenman Planı",
+      "short_name": "Spor Planı",
+      "description": "Haftalık antrenman ve dinamik makro",
+      "url": "workout.php",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "İlaç & Takviye Alarmları",
+      "short_name": "İlaçlar",
+      "description": "Saatli ilaç ve takviye hatırlatıcıları",
+      "url": "reminders.php",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

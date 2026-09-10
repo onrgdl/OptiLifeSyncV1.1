@@ -1,0 +1,10 @@
+.git
+.env
+.env.example
+logs/*.log
+logs/*.txt
+capacitor-app/node_modules
+capacitor-app/android
+database/schema.sql
+tests/
+firewall_unblock.bat
