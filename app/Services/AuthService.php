@@ -141,6 +141,27 @@ class AuthService
             return ['ok' => false, 'error' => 'Kullanıcı adı ve PIN boş bırakılamaz.'];
         }
 
+        // Kaba Kuvvet (Brute-Force) Koruması: 5 hatalı denemede 60 saniye kilitleme
+        self::startSession();
+        $failedAttempts = (int)($_SESSION['login_failed_attempts'] ?? 0);
+        $lastFailedTime = (int)($_SESSION['login_last_failed_time'] ?? 0);
+        $lockoutSeconds = 60;
+
+        if ($failedAttempts >= 5) {
+            $elapsed = time() - $lastFailedTime;
+            if ($elapsed < $lockoutSeconds) {
+                $remaining = $lockoutSeconds - $elapsed;
+                return [
+                    'ok' => false,
+                    'error' => "Çok fazla hatalı PIN denemesi yapıldı. Güvenliğiniz için lütfen {$remaining} saniye bekleyin."
+                ];
+            } else {
+                // Kilit süresi doldu, sayacı sıfırla
+                $_SESSION['login_failed_attempts'] = 0;
+                $failedAttempts = 0;
+            }
+        }
+
         $stmt = $this->db->prepare("
             SELECT id, name, username, role, pin_hash, password_hash, email, recovery_code
             FROM users
@@ -168,7 +189,16 @@ class AuthService
         }
 
         if (!$valid) {
-            return ['ok' => false, 'error' => 'Hatalı PIN kodu girdiniz. Lütfen tekrar deneyin.'];
+            $_SESSION['login_failed_attempts'] = $failedAttempts + 1;
+            $_SESSION['login_last_failed_time'] = time();
+            $remainingAttempts = max(0, 5 - ($failedAttempts + 1));
+            $msg = 'Hatalı PIN kodu girdiniz.';
+            if ($remainingAttempts > 0 && $remainingAttempts <= 3) {
+                $msg .= " ({$remainingAttempts} deneme hakkınız kaldı)";
+            } elseif ($remainingAttempts === 0) {
+                $msg .= " Art arda 5 hatalı giriş nedeniyle sistem 60 saniye kilitlendi.";
+            }
+            return ['ok' => false, 'error' => $msg];
         }
 
         // Oturumu başlat
@@ -457,6 +487,12 @@ class AuthService
     private function setUserSession(array $user): void
     {
         self::startSession();
+        if (!headers_sent()) {
+            session_regenerate_id(true);
+        }
+        // Başarılı girişte kaba kuvvet sayacını sıfırla
+        unset($_SESSION['login_failed_attempts'], $_SESSION['login_last_failed_time']);
+
         $_SESSION['user'] = [
             'id' => (int)$user['id'],
             'name' => $user['name'],

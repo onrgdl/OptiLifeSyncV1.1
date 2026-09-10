@@ -13,6 +13,12 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/app.php';
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../app/Services/AuthService.php';
+
+use App\Services\AuthService;
+
+$authService = $pdo ? new AuthService($pdo) : null;
+$isCreator = AuthService::isCreator();
 
 $driver = $pdo ? $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) : 'none';
 $isPgsql = ($driver === 'pgsql');
@@ -63,8 +69,16 @@ $action = $_GET['action'] ?? $_POST['action'] ?? '';
 $installMessage = null;
 $installSuccess = false;
 
+$hasUsersTable = in_array('users', $existingTables, true);
+$hasUsersCount = $hasUsersTable ? ($tableCounts['users'] ?? 0) : 0;
+
 if (($action === 'install' || $action === 'migrate') && $pdo && $isPgsql) {
-    try {
+    if ($hasUsersTable && $hasUsersCount > 0 && !$isCreator) {
+        http_response_code(403);
+        $installSuccess = false;
+        $installMessage = "⛔ GÜVENLİK ENGELİ: Veritabanında aktif kullanıcılar bulunmaktadır. Yeniden kurulum veya şema güncellemesi yalnızca Creator (onrgdl) oturumu açıkken yapılabilir.";
+    } else {
+        try {
         if ($action === 'migrate') {
             $pdo->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(50) UNIQUE;");
             $pdo->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user';");
@@ -116,6 +130,7 @@ if (($action === 'install' || $action === 'migrate') && $pdo && $isPgsql) {
     } catch (\Throwable $e) {
         $installSuccess = false;
         $installMessage = "İşlem sırasında hata oluştu: " . $e->getMessage();
+    }
     }
 }
 
