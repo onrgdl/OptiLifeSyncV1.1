@@ -6,6 +6,9 @@ namespace App\Services;
 
 use PDO;
 use RuntimeException;
+use Config;
+
+require_once __DIR__ . '/../../config/app.php';
 
 /**
  * AuthService
@@ -23,6 +26,8 @@ use RuntimeException;
 class AuthService
 {
     private PDO $db;
+    private const AUTH_COOKIE_NAME = 'optilife_auth';
+    private const AUTH_COOKIE_DAYS = 30;
 
     public function __construct(PDO $db)
     {
@@ -31,7 +36,20 @@ class AuthService
     }
 
     /**
-     * Güvenli session başlatma
+     * Güvenli HMAC anahtarı döner
+     */
+    public static function getSecretKey(): string
+    {
+        $customKey = \Config::get('APP_SECRET');
+        if (!empty($customKey)) {
+            return (string)$customKey;
+        }
+        $dbUrl = \Config::get('DATABASE_URL') ?: 'optilife_local_salt_secret';
+        return hash('sha256', 'optilife_serverless_hmac_2026_' . $dbUrl);
+    }
+
+    /**
+     * Güvenli session başlatma ve çerezden otomatik oturum kurtarma (Vercel Stateless Serverless uyumlu)
      */
     public static function startSession(): void
     {
@@ -39,9 +57,95 @@ class AuthService
             if (!headers_sent()) {
                 ini_set('session.cookie_httponly', '1');
                 ini_set('session.use_only_cookies', '1');
+                ini_set('session.cookie_lifetime', (string)(self::AUTH_COOKIE_DAYS * 86400));
+                ini_set('session.gc_maxlifetime', (string)(self::AUTH_COOKIE_DAYS * 86400));
             }
             session_start();
         }
+
+        // Vercel Serverless ve çoklu cihaz uyumu:
+        // Eğer Session kaybolmuşsa (yeni Lambda instance veya tarayıcı yeniden açılması)
+        // Kriptografik imzalı optilife_auth çerezinden oturumu anında geri yükle:
+        if (empty($_SESSION['user']) && !empty($_COOKIE[self::AUTH_COOKIE_NAME])) {
+            self::restoreSessionFromCookie((string)$_COOKIE[self::AUTH_COOKIE_NAME]);
+        }
+    }
+
+    /**
+     * İmzalı çerezden kullanıcı oturumunu doğrular ve geri yükler
+     */
+    public static function restoreSessionFromCookie(string $token): bool
+    {
+        $parts = explode('.', $token, 2);
+        if (count($parts) !== 2) {
+            return false;
+        }
+        [$encoded, $sig] = $parts;
+
+        // HMAC imza doğrulaması
+        $expectedSig = hash_hmac('sha256', $encoded, self::getSecretKey());
+        if (!hash_equals($expectedSig, $sig)) {
+            return false;
+        }
+
+        $json = base64_decode($encoded);
+        if (!$json) {
+            return false;
+        }
+        $payload = json_decode($json, true);
+        if (!is_array($payload) || empty($payload['id']) || empty($payload['exp'])) {
+            return false;
+        }
+
+        // Süre kontrolü
+        if ($payload['exp'] < time()) {
+            return false;
+        }
+
+        // Oturumu güvenle geri yükle
+        $_SESSION['user'] = [
+            'id'       => (int)$payload['id'],
+            'name'     => $payload['name'] ?? $payload['username'],
+            'username' => $payload['username'],
+            'role'     => $payload['role'] ?? 'user',
+            'email'    => $payload['email'] ?? ($payload['username'] . '@optilifesync.local'),
+        ];
+        return true;
+    }
+
+    /**
+     * Kullanıcıya 30 günlük kalıcı ve kurcalanamaz imzalı auth çerezi üretir
+     */
+    public static function issueAuthCookie(array $user): string
+    {
+        $exp = time() + (self::AUTH_COOKIE_DAYS * 86400);
+        $payload = [
+            'id'       => (int)$user['id'],
+            'username' => $user['username'] ?? $user['name'],
+            'name'     => $user['name'] ?? $user['username'],
+            'role'     => $user['role'] ?? 'user',
+            'email'    => $user['email'] ?? '',
+            'exp'      => $exp,
+        ];
+
+        $encoded = base64_encode(json_encode($payload));
+        $sig     = hash_hmac('sha256', $encoded, self::getSecretKey());
+        $token   = "{$encoded}.{$sig}";
+
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || !empty($_SERVER['VERCEL']);
+
+        if (!headers_sent()) {
+            setcookie(self::AUTH_COOKIE_NAME, $token, [
+                'expires'  => $exp,
+                'path'     => '/',
+                'domain'   => '',
+                'secure'   => $isHttps,
+                'httponly' => true,
+                'samesite' => 'Lax'
+            ]);
+        }
+        $_COOKIE[self::AUTH_COOKIE_NAME] = $token;
+        return $token;
     }
 
     /**
@@ -478,11 +582,23 @@ class AuthService
                 $params["secure"], $params["httponly"]
             );
         }
+        // İmzalı kalıcı auth çerezini de sıfırla
+        if (!headers_sent()) {
+            setcookie(self::AUTH_COOKIE_NAME, '', [
+                'expires'  => time() - 42000,
+                'path'     => '/',
+                'domain'   => '',
+                'secure'   => false,
+                'httponly' => true,
+                'samesite' => 'Lax'
+            ]);
+        }
+        unset($_COOKIE[self::AUTH_COOKIE_NAME]);
         session_destroy();
     }
 
     /**
-     * Session'a kullanıcı bilgilerini yazar
+     * Session'a kullanıcı bilgilerini yazar ve kalıcı auth çerezi üretir
      */
     private function setUserSession(array $user): void
     {
@@ -493,12 +609,17 @@ class AuthService
         // Başarılı girişte kaba kuvvet sayacını sıfırla
         unset($_SESSION['login_failed_attempts'], $_SESSION['login_last_failed_time']);
 
-        $_SESSION['user'] = [
+        $userRecord = [
             'id' => (int)$user['id'],
             'name' => $user['name'],
             'username' => $user['username'] ?? $user['name'],
             'role' => $user['role'] ?? ((int)$user['id'] === 1 ? 'creator' : 'user'),
             'email' => $user['email'] ?? '',
         ];
+
+        $_SESSION['user'] = $userRecord;
+
+        // Vercel Serverless ve çoklu cihaz uyumlu 30 günlük imzalı auth çerezi ver
+        self::issueAuthCookie($userRecord);
     }
 }

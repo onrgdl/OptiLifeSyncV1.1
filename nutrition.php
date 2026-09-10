@@ -711,7 +711,7 @@ async function deleteNutritionFood(id, name) {
         formData.append('food_log_id', id);
 
         try {
-            const res = await fetch('api/analyze_food.php', { method: 'POST', body: formData });
+            const res = await fetch('/api/analyze_food.php', { method: 'POST', body: formData });
             const data = await res.json();
             if (data.ok) {
                 Swal.fire({
@@ -843,7 +843,7 @@ async function analyzeSelectedPhoto() {
         fd.append('meal_type', document.getElementById('photoMealType').value);
         fd.append('notes', document.getElementById('photoUserNotes').value.trim());
 
-        const res = await fetch('api/analyze_food.php', { method:'POST', body:fd });
+        const res = await fetch('/api/analyze_food.php', { method:'POST', body:fd });
         const data = await res.json();
 
         document.getElementById('photoAnalyzingSpinner').classList.add('d-none');
@@ -885,7 +885,7 @@ async function confirmSavePhotoFood() {
         fd.append('carbs', document.getElementById('photoResultCarb').value);
         fd.append('fat', document.getElementById('photoResultFat').value);
 
-        const res = await fetch('api/analyze_food.php', { method:'POST', body:fd });
+        const res = await fetch('/api/analyze_food.php', { method:'POST', body:fd });
         const data = await res.json();
 
         saveBtn.disabled = false;

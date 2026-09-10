@@ -573,7 +573,7 @@ async function pollForDueReminders() {
         const fd = new FormData();
         fd.append('action', 'check_due');
 
-        const response = await fetch('api/reminders.php', { method: 'POST', body: fd });
+        const response = await fetch('/api/reminders.php', { method: 'POST', body: fd });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = await response.json();
@@ -668,7 +668,7 @@ async function syncScheduleToApi(suppId) {
     fd.append('supplement_id',   suppId);
     fd.append('schedule_times',  JSON.stringify(times));
 
-    const res  = await fetch('api/reminders.php', { method: 'POST', body: fd });
+    const res  = await fetch('/api/reminders.php', { method: 'POST', body: fd });
     const data = await res.json();
 
     if (!data.ok) {

@@ -504,7 +504,7 @@ async function loadWeekData(dateStr) {
         </div>`;
 
     try {
-        const res = await fetch(`api/workout.php?action=get_week&date=${encodeURIComponent(dateStr)}`);
+        const res = await fetch(`/api/workout.php?action=get_week&date=${encodeURIComponent(dateStr)}`);
         const data = await res.json();
 
         if (!data.ok) {
@@ -692,7 +692,7 @@ async function completeWorkout(workoutId, btnElem) {
         formData.append('action', 'complete');
         formData.append('workout_id', workoutId);
 
-        const res = await fetch('api/workout.php', {
+        const res = await fetch('/api/workout.php', {
             method: 'POST',
             body: formData,
         });
@@ -772,7 +772,7 @@ async function handleWorkoutSubmit(e) {
     formData.append('action', 'save');
 
     try {
-        const res = await fetch('api/workout.php', {
+        const res = await fetch('/api/workout.php', {
             method: 'POST',
             body: formData,
         });
@@ -837,7 +837,7 @@ async function confirmDeleteWorkout(workoutId) {
             formData.append('action', 'delete');
             formData.append('workout_id', workoutId);
 
-            const res = await fetch('api/workout.php', {
+            const res = await fetch('/api/workout.php', {
                 method: 'POST',
                 body: formData,
             });

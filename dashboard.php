@@ -458,16 +458,6 @@ button { cursor: pointer; border: none; background: none; }
     <!-- CONTENT -->
     <div class="content">
 
-        <!-- TEST BANNER -->
-        <div class="mb-4 p-4 text-center rounded-4 shadow" style="background: linear-gradient(135deg, #0284c7, #6366f1); border: 2px solid rgba(255,255,255,0.2);">
-            <h1 class="display-3 fw-bold text-white text-uppercase mb-1" style="letter-spacing: 2px; text-shadow: 0 4px 12px rgba(0,0,0,0.4);">
-                🔥 ONUR GÜDÜL 🔥
-            </h1>
-            <p class="text-light mb-0 fs-5 fw-semibold" style="opacity: 0.9;">
-                OptiLifeSync GitHub &amp; Vercel Senkronizasyon Testi
-            </p>
-        </div>
-
         <!-- ── KPI KARTLARI (4'lü üst satır) ─────────────── -->
         <div class="row g-3 mb-4">
             <!-- Kalori -->
@@ -991,7 +981,7 @@ async function apiPost(action, extra = {}) {
     const fd = new FormData();
     fd.append('action', action);
     for (const [k, v] of Object.entries(extra)) fd.append(k, v);
-    const r = await fetch('api/dashboard.php', { method:'POST', body:fd });
+    const r = await fetch('/api/dashboard.php', { method:'POST', body:fd });
     return r.json();
 }
 
@@ -999,13 +989,21 @@ async function apiPost(action, extra = {}) {
 async function loadDashboard() {
     try {
         const data = await apiPost('load');
-        if (!data.ok) throw new Error(data.error);
+        if (!data.ok) {
+            if (data.require_login) {
+                window.location.href = 'login.php?redirect=dashboard.php';
+                return;
+            }
+            throw new Error(data.error || 'Veri yüklenemedi');
+        }
         dashData = data;
         renderDashboard(data);
         checkAlarms(data.upcoming_alarms ?? []);
     } catch(e) {
-        document.getElementById('pollLabel').textContent = '⚠️ Hata';
+        document.getElementById('pollLabel').textContent = '⚠️ Yeniden deneniyor…';
         console.error('Dashboard yüklenemedi:', e);
+        // Ağ gecikmesi veya soğuk başlangıçta 3 saniye sonra otomatik yeniden dene
+        setTimeout(loadDashboard, 3000);
     }
 }
 
@@ -1148,7 +1146,7 @@ async function dismissDashboardAlarm(alarmId) {
         formData.append('action', 'delete_alarm');
         formData.append('alarm_id', alarmId);
 
-        const res = await fetch('api/dashboard.php', { method: 'POST', body: formData });
+        const res = await fetch('/api/dashboard.php', { method: 'POST', body: formData });
         const data = await res.json();
 
         if (data.ok) {
@@ -1231,7 +1229,7 @@ async function deleteDashboardMeal(mealId, foodName) {
         formData.append('meal_id', mealId);
 
         try {
-            const res = await fetch('api/dashboard.php', { method: 'POST', body: formData });
+            const res = await fetch('/api/dashboard.php', { method: 'POST', body: formData });
             const data = await res.json();
 
             if (data.ok) {
@@ -1357,7 +1355,7 @@ async function previewGemini() {
         fd.append('action',    'analyze_only');
         fd.append('meal_text', text);
 
-        const r    = await fetch('api/analyze_food.php', { method:'POST', body:fd });
+        const r    = await fetch('/api/analyze_food.php', { method:'POST', body:fd });
         const data = await r.json();
 
         document.getElementById('geminiLoading').classList.add('d-none');
@@ -1417,7 +1415,7 @@ async function searchLocalSupps(query) {
         const fd = new FormData();
         fd.append('action', 'quick_search');
         fd.append('q', q);
-        const r    = await fetch('api/dashboard.php', { method:'POST', body:fd });
+        const r    = await fetch('/api/dashboard.php', { method:'POST', body:fd });
         const data = await r.json();
         if (!data.ok) return;
         window._suppModalResults = data.supplements ?? [];
@@ -1467,7 +1465,7 @@ async function submitQuickAdd() {
             fd.append('action',    'analyze');
             fd.append('meal_text', selectedItem.mealText);
             fd.append('meal_type', document.getElementById('geminiMealType').value);
-            const r = await fetch('api/analyze_food.php', { method:'POST', body:fd });
+            const r = await fetch('/api/analyze_food.php', { method:'POST', body:fd });
             data = await r.json();
 
         } else {
@@ -1476,7 +1474,7 @@ async function submitQuickAdd() {
             fd.append('action',        'quick_add');
             fd.append('source',        'local');
             fd.append('supplement_id', selectedItem.data.id);
-            const r = await fetch('api/dashboard.php', { method:'POST', body:fd });
+            const r = await fetch('/api/dashboard.php', { method:'POST', body:fd });
             data = await r.json();
         }
 
@@ -1672,7 +1670,7 @@ async function analyzeSelectedPhoto() {
         fd.append('meal_type', document.getElementById('photoMealType').value);
         fd.append('notes', document.getElementById('photoUserNotes').value.trim());
 
-        const res = await fetch('api/analyze_food.php', { method:'POST', body:fd });
+        const res = await fetch('/api/analyze_food.php', { method:'POST', body:fd });
         const data = await res.json();
 
         document.getElementById('photoAnalyzingSpinner').classList.add('d-none');
@@ -1714,7 +1712,7 @@ async function confirmSavePhotoFood() {
         fd.append('carbs', document.getElementById('photoResultCarb').value);
         fd.append('fat', document.getElementById('photoResultFat').value);
 
-        const res = await fetch('api/analyze_food.php', { method:'POST', body:fd });
+        const res = await fetch('/api/analyze_food.php', { method:'POST', body:fd });
         const data = await res.json();
 
         saveBtn.disabled = false;
