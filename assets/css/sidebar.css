@@ -542,3 +542,27 @@ div:where(.swal2-container) .swal2-title,
 div:where(.swal2-container) .swal2-html-container {
     color: var(--text) !important;
 }
+
+/* Haftanın Günlük Dökümü - Bugün Satırı & Açılan Öğün Detayları */
+.table-row-today,
+.table-row-today > td,
+.table-row-today > th {
+    background-color: #e6f4fe !important;
+    --bs-table-bg: #e6f4fe !important;
+    --bs-table-accent-bg: #e6f4fe !important;
+    color: #0f172a !important;
+}
+.table-row-today:hover > td,
+.table-row-today:hover > th {
+    background-color: #dbeafe !important;
+    --bs-table-bg: #dbeafe !important;
+}
+.table-row-meals-detail,
+.table-row-meals-detail > td {
+    background-color: #f6f3eb !important;
+    --bs-table-bg: #f6f3eb !important;
+    --bs-table-accent-bg: #f6f3eb !important;
+    --bs-table-hover-bg: #f6f3eb !important;
+    color: #000000 !important;
+}
+
