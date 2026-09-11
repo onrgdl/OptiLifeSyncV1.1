@@ -58,20 +58,22 @@ PROMPT;
 
     // Görsel yemek analizi system prompt'u — Gemini Multimodal Vision
     private const IMAGE_SYSTEM_PROMPT = <<<'PROMPT'
-Sen uzman bir klinik diyetisyen ve görsel besin analistisin. Kullanıcının gönderdiği yemek, tabak veya besin fotoğrafını detaylıca analiz et.
-Görseldeki tüm yiyecekleri tespit et, porsiyon büyüklüklerini tahmin et.
+Sen uzman bir klinik diyetisyen ve görsel besin analistisin. Kullanıcının gönderdiği yemek, tabak, içecek veya besin fotoğrafını analiz et.
+Görseldeki tüm yiyecekleri tespit et, porsiyon büyüklüklerini ve makro değerlerini tahmin et.
 
 KURALLAR:
 1. Besin Değerleri Tutarlılığı (Termodinamik Kuralı):
    Toplam Kalori (kcal) = (Protein x 4) + (Karbonhidrat x 4) + (Yağ x 9).
-   Makro toplamı ile kalori birbiriyle kesinlikle uyumlu olmalıdır.
+   Makro toplamı ile kalori birbiriyle tam uyumlu olmalıdır.
 2. Porsiyon ve Yağ Gerçekçiliği:
    Görseldeki porsiyonları gerçekçi tahmin et, pişirme yağını abartma.
 3. Kullanıcı ek not yazdıysa (örn: "yarısını yedim", "zeytinyağlı") bunu porsiyon ve makro hesabına dahil et.
-4. Fotoğrafta yiyecek/içecek bulunmuyorsa veya tespit edilemiyorsa kalori ve makroları 0 yap, aciklama kısmına "Fotoğrafta yiyecek tespit edilemedi." yaz.
-5. Cevabını SADECE geçerli JSON formatında ver. Markdown veya ek metin ekleme.
+4. Çıktı Biçimi:
+   Cevabını SADECE geçerli bir JSON nesnesi (Object) formatında ver, asla JSON dizisi (Array) veya ek metin/markdown kullanma.
+   Fotoğrafta birden fazla yiyecek varsa, yemek_adi alanında virgülle ayırarak listele ve kalori ile makroları tüm tabağın toplamı olarak hesapla.
+5. Görselde belirgin bir yiyecek yoksa ancak yenebilir bir içerik veya içecek görünüyorsa en yakın tahmini yap. Kesinlikle hiçbir şey tespit edilemiyorsa kalori ve makroları 0 yap, aciklama kısmına "Fotoğrafta yiyecek tespit edilemedi." yaz.
 
-Çıktı formatı (kesinlikle bu yapıda):
+Çıktı formatı (kesinlikle bu yapıda TEK bir JSON nesnesi):
 {"yemek_adi": "Izgara Tavuk & Mevsim Salata", "aciklama": "Yaklaşık 180g ızgara tavuk göğsü, çoban salata ve 1 dilim kepekli ekmek", "kalori": 418, "protein": 44, "karb": 24, "yag": 16}
 PROMPT;
 
@@ -231,7 +233,8 @@ PROMPT;
             ],
         ];
 
-        $candidateModels = array_unique([$this->model, 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite']);
+        // Görsel analizi için önce hızlı multimodal lite modelleri dene (1.5s - 3.5s), ardından fallback modeller
+        $candidateModels = array_unique(['gemini-2.5-flash-lite', 'gemini-3.1-flash-lite', $this->model, 'gemini-3.5-flash', 'gemini-flash-latest']);
         $lastException   = null;
 
         foreach ($candidateModels as $currentModel) {
@@ -407,23 +410,68 @@ PROMPT;
             throw new \RuntimeException('Gemini yanıtı geçerli JSON değil: ' . substr($jsonText, 0, 200));
         }
 
-        $foodLabel = trim((string)($data['yemek_adi'] ?? $data['food_name'] ?? $data['title'] ?? 'Fotoğraflı Öğün'));
-        if ($foodLabel === '') {
-            $foodLabel = 'Fotoğraflı Öğün';
+        // Eğer model bir liste (array of items) döndürdüyse veya foods listesi içeriyorsa:
+        $items = [];
+        if (array_is_list($data)) {
+            $items = $data;
+        } elseif (isset($data['foods']) && is_array($data['foods'])) {
+            $items = $data['foods'];
+        } elseif (isset($data['items']) && is_array($data['items'])) {
+            $items = $data['items'];
+        } elseif (isset($data['yemekler']) && is_array($data['yemekler'])) {
+            $items = $data['yemekler'];
         }
 
-        $desc = trim((string)($data['aciklama'] ?? $data['description'] ?? ''));
+        if (!empty($items)) {
+            $names = [];
+            $totalKalori = 0.0;
+            $totalProtein = 0.0;
+            $totalKarb = 0.0;
+            $totalYag = 0.0;
+            $descriptions = [];
 
-        $kalori  = round(min(5000.0, max(0.0, (float)($data['kalori'] ?? $data['calories'] ?? 0))), 1);
-        $protein = round(min(500.0, max(0.0, (float)($data['protein'] ?? 0))), 1);
-        $karb    = round(min(500.0, max(0.0, (float)($data['karb'] ?? $data['carbs'] ?? 0))), 1);
-        $yag     = round(min(500.0, max(0.0, (float)($data['yag'] ?? $data['fat'] ?? 0))), 1);
+            foreach ($items as $item) {
+                if (!is_array($item)) continue;
+                $name = trim((string)($item['yemek_adi'] ?? $item['food_name'] ?? $item['name'] ?? ''));
+                if ($name !== '') {
+                    $names[] = $name;
+                }
+                $totalKalori += (float)($item['kalori'] ?? $item['calories'] ?? 0);
+                $totalProtein += (float)($item['protein'] ?? 0);
+                $totalKarb += (float)($item['karb'] ?? $item['carbs'] ?? 0);
+                $totalYag += (float)($item['yag'] ?? $item['fat'] ?? 0);
+                $d = trim((string)($item['aciklama'] ?? $item['description'] ?? ''));
+                if ($d !== '') {
+                    $descriptions[] = $d;
+                }
+            }
 
-        // Atwater Termodinamik Kalibrasyonu:
-        // Toplam Kalori (kcal) = (Protein x 4) + (Karb x 4) + (Yağ x 9)
-        $exactKcal = round(($protein * 4.0) + ($karb * 4.0) + ($yag * 9.0), 1);
-        $statedKcal = round(min(5000.0, max(0.0, (float)($data['kalori'] ?? $data['calories'] ?? 0))), 1);
-        $kalori = ($exactKcal > 0) ? $exactKcal : $statedKcal;
+            $foodLabel = !empty($names) ? implode(' + ', $names) : 'Fotoğraflı Öğün';
+            $desc = !empty($descriptions) ? implode('; ', $descriptions) : '';
+            $protein = round(min(500.0, max(0.0, $totalProtein)), 1);
+            $karb    = round(min(500.0, max(0.0, $totalKarb)), 1);
+            $yag     = round(min(500.0, max(0.0, $totalYag)), 1);
+            $exactKcal = round(($protein * 4.0) + ($karb * 4.0) + ($yag * 9.0), 1);
+            $statedKcal = round(min(5000.0, max(0.0, $totalKalori)), 1);
+            $kalori = ($exactKcal > 0) ? $exactKcal : $statedKcal;
+        } else {
+            $foodLabel = trim((string)($data['yemek_adi'] ?? $data['food_name'] ?? $data['title'] ?? 'Fotoğraflı Öğün'));
+            if ($foodLabel === '') {
+                $foodLabel = 'Fotoğraflı Öğün';
+            }
+
+            $desc = trim((string)($data['aciklama'] ?? $data['description'] ?? ''));
+
+            $statedKcal = round(min(5000.0, max(0.0, (float)($data['kalori'] ?? $data['calories'] ?? 0))), 1);
+            $protein = round(min(500.0, max(0.0, (float)($data['protein'] ?? 0))), 1);
+            $karb    = round(min(500.0, max(0.0, (float)($data['karb'] ?? $data['carbs'] ?? 0))), 1);
+            $yag     = round(min(500.0, max(0.0, (float)($data['yag'] ?? $data['fat'] ?? 0))), 1);
+
+            // Atwater Termodinamik Kalibrasyonu:
+            // Toplam Kalori (kcal) = (Protein x 4) + (Karb x 4) + (Yağ x 9)
+            $exactKcal = round(($protein * 4.0) + ($karb * 4.0) + ($yag * 9.0), 1);
+            $kalori = ($exactKcal > 0) ? $exactKcal : $statedKcal;
+        }
 
         return [
             'food_label'  => mb_substr($foodLabel, 0, 150),
@@ -438,7 +486,7 @@ PROMPT;
 
     /**
      * Model yine de markdown kod bloğu döndürürse temizler.
-     * ```json ... ``` veya ``` ... ``` bloklarını soyar.
+     * ```json ... ``` veya ``` ... ``` bloklarını soyar ve JSON sınırlarını korur.
      */
     private function sanitizeJsonText(string $text): string
     {
@@ -449,11 +497,20 @@ PROMPT;
             $text = trim($matches[1]);
         }
 
-        // Başında/sonunda açık süslü parantez yoksa bul
-        $start = strpos($text, '{');
-        $end   = strrpos($text, '}');
-        if ($start !== false && $end !== false && $end > $start) {
-            $text = substr($text, $start, $end - $start + 1);
+        // Eğer bir JSON dizisi ile başlıyorsa ([ ... ])
+        $firstBracket = strpos($text, '[');
+        $firstBrace   = strpos($text, '{');
+
+        if ($firstBracket !== false && ($firstBrace === false || $firstBracket < $firstBrace)) {
+            $lastBracket = strrpos($text, ']');
+            if ($lastBracket !== false && $lastBracket > $firstBracket) {
+                return substr($text, $firstBracket, $lastBracket - $firstBracket + 1);
+            }
+        } elseif ($firstBrace !== false) {
+            $lastBrace = strrpos($text, '}');
+            if ($lastBrace !== false && $lastBrace > $firstBrace) {
+                return substr($text, $firstBrace, $lastBrace - $firstBrace + 1);
+            }
         }
 
         return $text;

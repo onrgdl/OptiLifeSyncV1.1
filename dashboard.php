@@ -985,47 +985,47 @@ button { cursor: pointer; border: none; background: none; }
             </div>
 
             <!-- Aşama 3: Analiz Sonucu ve Düzenleme / Onay Kartı -->
-            <div id="photoResultCard" class="d-none mt-3 p-3" style="background:rgba(255,255,255,.03);border:1px solid rgba(56,189,248,.3);border-radius:12px">
+            <div id="photoResultCard" class="d-none mt-3 p-3" style="background:#ffffff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.05)">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="badge" style="background:rgba(34,197,94,.2);color:var(--green);border:1px solid rgba(34,197,94,.3)">
+                    <span class="badge" style="background:rgba(34,197,94,.15);color:#15803d;border:1px solid rgba(34,197,94,.3);font-size:12px">
                         <i class="bi bi-check-circle me-1"></i> Analiz Tamamlandı
                     </span>
                     <small id="photoResultModel" class="text-muted d-none" style="font-size:11px"></small>
                 </div>
 
                 <div class="mb-2">
-                    <label class="form-label text-secondary small mb-1">Tespit Edilen Yemek Adı</label>
-                    <input type="text" id="photoResultFoodLabel" class="form-control form-control-sm text-light" style="background:var(--bg);border-color:var(--border)">
+                    <label class="form-label text-dark fw-semibold small mb-1">Tespit Edilen Yemek Adı</label>
+                    <input type="text" id="photoResultFoodLabel" class="form-control form-control-sm text-dark fw-semibold" style="background:#ffffff;border-color:var(--border);color:var(--text)">
                 </div>
 
-                <div id="photoResultDesc" class="small text-muted mb-3 p-2 rounded" style="background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.05)"></div>
+                <div id="photoResultDesc" class="small mb-3 p-2 rounded" style="background:#f8f6f0;border:1px solid var(--border);color:#334155"></div>
 
                 <div class="row g-2 mb-3">
                     <div class="col-3 text-center">
-                        <div class="p-2 rounded" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25)">
-                            <small class="text-danger fw-bold" style="font-size:11px">🔥 Kalori</small>
-                            <input type="number" id="photoResultCal" class="form-control form-control-sm text-center text-danger fw-bold mt-1" style="background:var(--bg);border-color:rgba(248,113,113,.3)" step="1">
+                        <div class="p-2 rounded" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25)">
+                            <small class="fw-bold" style="color:#dc2626;font-size:11px">🔥 Kalori</small>
+                            <input type="number" id="photoResultCal" class="form-control form-control-sm text-center fw-bold mt-1" style="background:#ffffff;border-color:rgba(239,68,68,.3);color:#dc2626" step="1">
                             <small class="text-muted" style="font-size:10px">kcal</small>
                         </div>
                     </div>
                     <div class="col-3 text-center">
-                        <div class="p-2 rounded" style="background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.25)">
-                            <small class="fw-bold" style="color:#60a5fa;font-size:11px">💪 Protein</small>
-                            <input type="number" id="photoResultProt" class="form-control form-control-sm text-center fw-bold mt-1" style="color:#60a5fa;background:var(--bg);border-color:rgba(96,165,250,.3)" step="0.1">
+                        <div class="p-2 rounded" style="background:rgba(2,132,199,.08);border:1px solid rgba(2,132,199,.25)">
+                            <small class="fw-bold" style="color:#0284c7;font-size:11px">💪 Protein</small>
+                            <input type="number" id="photoResultProt" class="form-control form-control-sm text-center fw-bold mt-1" style="color:#0284c7;background:#ffffff;border-color:rgba(2,132,199,.3)" step="0.1">
                             <small class="text-muted" style="font-size:10px">gram</small>
                         </div>
                     </div>
                     <div class="col-3 text-center">
-                        <div class="p-2 rounded" style="background:rgba(250,204,21,.1);border:1px solid rgba(250,204,21,.25)">
-                            <small class="text-warning fw-bold" style="font-size:11px">⚡ Karb</small>
-                            <input type="number" id="photoResultCarb" class="form-control form-control-sm text-center text-warning fw-bold mt-1" style="background:var(--bg);border-color:rgba(250,204,21,.3)" step="0.1">
+                        <div class="p-2 rounded" style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25)">
+                            <small class="fw-bold" style="color:#d97706;font-size:11px">⚡ Karb</small>
+                            <input type="number" id="photoResultCarb" class="form-control form-control-sm text-center fw-bold mt-1" style="color:#d97706;background:#ffffff;border-color:rgba(217,119,6,.3)" step="0.1">
                             <small class="text-muted" style="font-size:10px">gram</small>
                         </div>
                     </div>
                     <div class="col-3 text-center">
-                        <div class="p-2 rounded" style="background:rgba(192,132,252,.1);border:1px solid rgba(192,132,252,.25)">
-                            <small class="fw-bold" style="color:#c084fc;font-size:11px">💧 Yağ</small>
-                            <input type="number" id="photoResultFat" class="form-control form-control-sm text-center fw-bold mt-1" style="color:#c084fc;background:var(--bg);border-color:rgba(192,132,252,.3)" step="0.1">
+                        <div class="p-2 rounded" style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.25)">
+                            <small class="fw-bold" style="color:#7c3aed;font-size:11px">💧 Yağ</small>
+                            <input type="number" id="photoResultFat" class="form-control form-control-sm text-center fw-bold mt-1" style="color:#7c3aed;background:#ffffff;border-color:rgba(124,58,237,.3)" step="0.1">
                             <small class="text-muted" style="font-size:10px">gram</small>
                         </div>
                     </div>
@@ -1725,11 +1725,69 @@ function openPhotoModalFromQuickAdd() {
     openPhotoModal();
 }
 
-function handlePhotoSelected(input) {
+// Görseli tarayıcıda canvas ile sıkıştırıp boyutlandıran yardımcı fonksiyon (hızlı yükleme ve timeout engelleme)
+async function compressImageIfNeeded(file, maxDimension = 1400, quality = 0.82) {
+    if (!file || !file.type.startsWith('image/')) return file;
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+                if (width <= maxDimension && height <= maxDimension && file.size < 1024 * 1024) {
+                    resolve(file);
+                    return;
+                }
+                if (width > height) {
+                    if (width > maxDimension) {
+                        height = Math.round((height * maxDimension) / width);
+                        width = maxDimension;
+                    }
+                } else {
+                    if (height > maxDimension) {
+                        width = Math.round((width * maxDimension) / height);
+                        height = maxDimension;
+                    }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        resolve(compressedFile);
+                    } else {
+                        resolve(file);
+                    }
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = () => resolve(file);
+            img.src = e.target.result;
+        };
+        reader.onerror = () => resolve(file);
+        reader.readAsDataURL(file);
+    });
+}
+
+async function handlePhotoSelected(input) {
     if (!input.files || !input.files[0]) return;
-    const file = input.files[0];
+    const rawFile = input.files[0];
+
+    let file = rawFile;
+    try {
+        file = await compressImageIfNeeded(rawFile);
+    } catch(err) {
+        console.warn('Görsel sıkıştırma atlandı:', err);
+    }
+
     if (file.size > 10 * 1024 * 1024) {
-        Swal.fire({ icon:'error', title:'Dosya Çok Büyük', text:'Lütfen 10MB\'dan küçük bir fotoğraf seçin.', background:'#111827', color:'#f8fafc' });
+        Swal.fire({ icon:'error', title:'Dosya Çok Büyük', text:'Lütfen 10MB\'dan küçük bir fotoğraf seçin.', background:'#ffffff', color:'#1e293b' });
         input.value = '';
         return;
     }
@@ -1763,7 +1821,7 @@ function clearSelectedPhoto() {
 
 async function analyzeSelectedPhoto() {
     if (!selectedPhotoFile) {
-        Swal.fire({ icon:'warning', title:'Görsel Seçilmedi', text:'Lütfen analiz edilecek bir yemek fotoğrafı seçin.', background:'#111827', color:'#f8fafc' });
+        Swal.fire({ icon:'warning', title:'Görsel Seçilmedi', text:'Lütfen analiz edilecek bir yemek fotoğrafı seçin.', background:'#ffffff', color:'#1e293b' });
         return;
     }
 
@@ -1802,7 +1860,7 @@ async function analyzeSelectedPhoto() {
     } catch(e) {
         document.getElementById('photoAnalyzingSpinner').classList.add('d-none');
         btn.disabled = false;
-        Swal.fire({ icon:'error', title:'Analiz Hatası', text: e.message, background:'#111827', color:'#f8fafc' });
+        Swal.fire({ icon:'error', title:'Analiz Hatası', text: e.message, background:'#ffffff', color:'#1e293b' });
     }
 }
 
@@ -1838,13 +1896,13 @@ async function confirmSavePhotoFood() {
             text: 'Fotoğraftaki besin değerleri bugünkü makrolarınıza işlendi.',
             timer: 2000,
             showConfirmButton: false,
-            background: '#111827',
-            color: '#f8fafc'
+            background: '#ffffff',
+            color: '#1e293b'
         });
     } catch(e) {
         saveBtn.disabled = false;
         saveBtn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Onayla ve Günlüğüme Ekle';
-        Swal.fire({ icon:'error', title:'Hata', text: e.message, background:'#111827', color:'#f8fafc' });
+        Swal.fire({ icon:'error', title:'Hata', text: e.message, background:'#ffffff', color:'#1e293b' });
     }
 }
 
