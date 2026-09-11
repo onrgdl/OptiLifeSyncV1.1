@@ -452,7 +452,7 @@ button { cursor: pointer; border: none; background: none; }
                         <div class="d-flex justify-content-around mt-4 pt-3" style="border-top:1px solid var(--border)">
                             <div class="text-center">
                                 <div style="font-size:11px;color:var(--muted);margin-bottom:4px">BMR</div>
-                                <div style="font-size:18px;font-weight:700" id="bmrVal">—</div>
+                                <div style="font-size:18px;font-weight:700;color:#dc2626;" id="bmrVal">—</div>
                                 <div style="font-size:10px;color:var(--muted)">kcal/gün</div>
                             </div>
                             <div style="width:1px;background:var(--border)"></div>

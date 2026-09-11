@@ -228,40 +228,40 @@ try {
             <?php if ($summary && $activeMacros): ?>
                 <div class="card p-4 shadow-sm mb-4">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h4 class="card-title text-light mb-0"><i class="bi bi-speedometer2 me-2"></i>Günlük İstikrarlı Hedefleriniz</h4>
+                        <h4 class="card-title fw-bold mb-0" style="color:#0f172a;"><i class="bi bi-speedometer2 me-2 text-primary"></i>Günlük İstikrarlı Hedefleriniz</h4>
                         <span class="badge bg-success px-3 py-2"><i class="bi bi-shield-check me-1"></i>SABİT HEDEF</span>
                     </div>
 
                     <!-- METABOLİZMA TEMEL METRİKLERİ (3'LÜ KART SİSTEMİ) -->
                     <div class="row g-2 mb-4">
                         <div class="col-sm-4">
-                            <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                            <div class="p-3 rounded h-100" style="background:#f8fafc; border:1px solid var(--border);">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="text-secondary small fw-semibold">BMR (Bazal Metabolizma)</span>
+                                    <span class="small fw-semibold" style="color:#475569;">BMR (Bazal Metabolizma)</span>
                                     <i class="bi bi-heart-pulse text-danger small"></i>
                                 </div>
-                                <div class="fs-4 fw-bold text-light"><?= number_format($summary['bmr'], 1) ?> <small class="fs-6 fw-normal text-secondary">kcal</small></div>
+                                <div class="fs-4 fw-bold" style="color:#dc2626;"><?= number_format($summary['bmr'], 1) ?> <small class="fs-6 fw-normal text-secondary">kcal</small></div>
                                 <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">Dinlenme halinde organlarınızın yaktığı enerji</div>
                             </div>
                         </div>
                         <div class="col-sm-4">
-                            <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                            <div class="p-3 rounded h-100" style="background:#f8fafc; border:1px solid var(--border);">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="text-secondary small fw-semibold">TDEE (Bakım Kalorisi)</span>
+                                    <span class="small fw-semibold" style="color:#475569;">TDEE (Bakım Kalorisi)</span>
                                     <i class="bi bi-lightning-charge text-warning small"></i>
                                 </div>
-                                <div class="fs-4 fw-bold text-info"><?= number_format($summary['tdee'], 1) ?> <small class="fs-6 fw-normal text-secondary">kcal</small></div>
+                                <div class="fs-4 fw-bold text-info" style="color:#0284c7 !important;"><?= number_format($summary['tdee'], 1) ?> <small class="fs-6 fw-normal text-secondary">kcal</small></div>
                                 <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">Aktivitenizle kilonuzun sabit kaldığı toplam harcama</div>
                             </div>
                         </div>
                         <div class="col-sm-4">
-                            <div class="p-3 rounded bg-dark border border-info border-opacity-50 h-100" style="background: rgba(14, 165, 233, 0.05) !important;">
+                            <div class="p-3 rounded h-100" style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.3);">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="text-info small fw-bold">Günlük Hedef Kalori</span>
-                                    <i class="bi bi-bullseye text-info small"></i>
+                                    <span class="text-primary small fw-bold">Günlük Hedef Kalori</span>
+                                    <i class="bi bi-bullseye text-primary small"></i>
                                 </div>
-                                <div class="fs-4 fw-bold text-white"><?= $activeMacros['calories'] ?> <small class="fs-6 fw-normal text-info">kcal</small></div>
-                                <div style="font-size: 11px; color: #38bdf8; margin-top: 4px;">
+                                <div class="fs-4 fw-bold text-primary"><?= $activeMacros['calories'] ?> <small class="fs-6 fw-normal text-primary">kcal</small></div>
+                                <div style="font-size: 11px; color: #0284c7; margin-top: 4px;">
                                     <?php if ($summary['goal'] === 'lose'): ?>
                                         <i class="bi bi-arrow-down me-1"></i>Kilo verme (TDEE -500 kcal açık)
                                     <?php elseif ($summary['goal'] === 'gain'): ?>
@@ -282,7 +282,7 @@ try {
                                     <span class="text-danger fw-semibold">Kalori Hedefi</span>
                                     <i class="bi bi-fire text-danger fs-5"></i>
                                 </div>
-                                <h2 class="fw-bold my-1 text-light"><?= $activeMacros['calories'] ?> <span class="fs-6 fw-normal text-secondary">kcal</span></h2>
+                                <h2 class="fw-bold my-1 text-dark"><?= $activeMacros['calories'] ?> <span class="fs-6 fw-normal text-secondary">kcal</span></h2>
                                 <small class="text-secondary"><?= $summary['goal'] === 'lose' ? 'Sağlıklı kalori açığı dahil' : 'Net günlük hedef' ?></small>
                             </div>
                         </div>
@@ -292,7 +292,7 @@ try {
                                     <span class="text-primary fw-semibold">Protein Hedefi</span>
                                     <i class="bi bi-egg-fried text-primary fs-5"></i>
                                 </div>
-                                <h2 class="fw-bold my-1 text-light"><?= $activeMacros['protein_g'] ?> <span class="fs-6 fw-normal text-secondary">g</span></h2>
+                                <h2 class="fw-bold my-1 text-dark"><?= $activeMacros['protein_g'] ?> <span class="fs-6 fw-normal text-secondary">g</span></h2>
                                 <small class="text-secondary">Kas gelişimi & onarımı (%30 oran)</small>
                             </div>
                         </div>
@@ -302,17 +302,17 @@ try {
                                     <span class="text-warning fw-semibold">Karbonhidrat</span>
                                     <i class="bi bi-lightning text-warning fs-5"></i>
                                 </div>
-                                <h2 class="fw-bold my-1 text-light"><?= $activeMacros['carbs_g'] ?> <span class="fs-6 fw-normal text-secondary">g</span></h2>
+                                <h2 class="fw-bold my-1 text-dark"><?= $activeMacros['carbs_g'] ?> <span class="fs-6 fw-normal text-secondary">g</span></h2>
                                 <small class="text-secondary">Enerji & glikojen depoları (%45 oran)</small>
                             </div>
                         </div>
                         <div class="col-sm-6">
                             <div class="stat-card stat-fat">
                                 <div class="d-flex justify-content-between">
-                                    <span class="text-purple fw-semibold" style="color: #c084fc;">Sağlıklı Yağ</span>
-                                    <i class="bi bi-droplet-half fs-5" style="color: #c084fc;"></i>
+                                    <span class="fw-semibold" style="color: #9333ea;">Sağlıklı Yağ</span>
+                                    <i class="bi bi-droplet-half fs-5" style="color: #9333ea;"></i>
                                 </div>
-                                <h2 class="fw-bold my-1 text-light"><?= $activeMacros['fat_g'] ?> <span class="fs-6 fw-normal text-secondary">g</span></h2>
+                                <h2 class="fw-bold my-1 text-dark"><?= $activeMacros['fat_g'] ?> <span class="fs-6 fw-normal text-secondary">g</span></h2>
                                 <small class="text-secondary">Hormonal denge (%25 oran)</small>
                             </div>
                         </div>
