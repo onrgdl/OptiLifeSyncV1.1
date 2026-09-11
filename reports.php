@@ -52,8 +52,8 @@ $isCurrentWeek = ($today >= $weekStart && $today <= $weekEnd);
 
 // ── Kullanıcı Profili ────────────────────────────────────────────────
 $userProfile = [
-    'weight_kg' => 80.0, 'height_cm' => 175.0, 'birth_date' => '1996-01-01',
-    'gender' => 'male', 'activity_level' => 'moderately_active', 'goal' => 'gain',
+    'weight_kg' => 70.0, 'height_cm' => 170.0, 'birth_date' => '1996-01-01',
+    'gender' => 'male', 'activity_level' => 'moderately_active', 'goal' => 'maintain',
 ];
 if ($pdo) {
     $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");

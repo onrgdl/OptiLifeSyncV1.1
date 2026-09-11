@@ -104,9 +104,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['weight']) && $profile
         $userProfile = $profileService->getProfile($userId);
     } else {
         $userProfile = [
-            'weight'   => 80.0,
-            'height'   => 175.0,
-            'age'      => 28,
+            'weight'   => 70.0,
+            'height'   => 170.0,
+            'age'      => 30,
             'gender'   => 'male',
             'activity' => 'moderately_active',
             'goal'     => 'maintain',

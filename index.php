@@ -16,9 +16,9 @@ $profileService = $pdo ? new UserProfileService($pdo) : null;
 
 // Form değerlerini al ve kaydet / DB'den yükle
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $weightKg       = isset($_POST['weight']) ? (float)$_POST['weight'] : 80.0;
-    $heightCm       = isset($_POST['height']) ? (float)$_POST['height'] : 175.0;
-    $age            = isset($_POST['age']) ? (int)$_POST['age'] : 28;
+    $weightKg       = isset($_POST['weight']) ? (float)$_POST['weight'] : 70.0;
+    $heightCm       = isset($_POST['height']) ? (float)$_POST['height'] : 170.0;
+    $age            = isset($_POST['age']) ? (int)$_POST['age'] : 30;
     $gender         = isset($_POST['gender']) ? (string)$_POST['gender'] : 'male';
     $activityLevel  = isset($_POST['activity']) ? (string)$_POST['activity'] : 'moderately_active';
     $goal           = isset($_POST['goal']) ? (string)$_POST['goal'] : 'maintain';
@@ -55,9 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $activityLevel  = $storedProfile['activity'];
         $goal           = $storedProfile['goal'];
     } else {
-        $weightKg       = 80.0;
-        $heightCm       = 175.0;
-        $age            = 28;
+        $weightKg       = 70.0;
+        $heightCm       = 170.0;
+        $age            = 30;
         $gender         = 'male';
         $activityLevel  = 'moderately_active';
         $goal           = 'maintain';

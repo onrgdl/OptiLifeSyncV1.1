@@ -50,9 +50,9 @@ class UserProfileService
 
         if (!$user) {
             return [
-                'weight'     => 80.0,
-                'height'     => 175.0,
-                'age'        => 28,
+                'weight'     => 70.0,
+                'height'     => 170.0,
+                'age'        => 30,
                 'gender'     => 'male',
                 'activity'   => 'moderately_active',
                 'goal'       => 'maintain',
@@ -60,19 +60,19 @@ class UserProfileService
             ];
         }
 
-        $age = 28;
+        $age = 30;
         if (!empty($user['birth_date'])) {
             try {
                 $age = (int)(new DateTime($user['birth_date']))->diff(new DateTime())->y;
-                if ($age <= 0) $age = 28;
+                if ($age <= 0) $age = 30;
             } catch (\Throwable) {
-                $age = 28;
+                $age = 30;
             }
         }
 
         return [
-            'weight'     => (float)($user['weight_kg'] ?? 80.0),
-            'height'     => (float)($user['height_cm'] ?? 175.0),
+            'weight'     => (float)($user['weight_kg'] ?? 70.0),
+            'height'     => (float)($user['height_cm'] ?? 170.0),
             'age'        => $age,
             'gender'     => (string)($user['gender'] ?? 'male'),
             'activity'   => (string)($user['activity_level'] ?? 'moderately_active'),

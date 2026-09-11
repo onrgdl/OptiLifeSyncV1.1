@@ -31,9 +31,9 @@ CREATE TABLE IF NOT EXISTS `users` (
     `recovery_code`     VARCHAR(64)     NULL COMMENT 'PIN unutulursa sıfırlama kodu',
     -- Fiziksel Profil
     `gender`            ENUM('male','female','other') NOT NULL DEFAULT 'male',
-    `birth_date`        DATE            NOT NULL DEFAULT '2000-01-01' COMMENT 'Yaşı dinamik hesaplamak için tarih tutulur',
-    `height_cm`         DECIMAL(5,2)    NOT NULL DEFAULT 175.00 COMMENT 'Santimetre cinsinden boy',
-    `weight_kg`         DECIMAL(5,2)    NOT NULL DEFAULT 75.00 COMMENT 'Kilogram cinsinden güncel kilo',
+    `birth_date`        DATE            NOT NULL DEFAULT '1996-01-01' COMMENT 'Yaşı dinamik hesaplamak için tarih tutulur',
+    `height_cm`         DECIMAL(5,2)    NOT NULL DEFAULT 170.00 COMMENT 'Santimetre cinsinden boy',
+    `weight_kg`         DECIMAL(5,2)    NOT NULL DEFAULT 70.00 COMMENT 'Kilogram cinsinden güncel kilo',
     -- Hedef
     `goal`              ENUM('lose','gain','maintain') NOT NULL DEFAULT 'maintain'
                         COMMENT 'lose=kilo ver, gain=kilo al, maintain=koru',

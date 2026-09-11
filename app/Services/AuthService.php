@@ -354,7 +354,7 @@ class AuthService
                 gender, birth_date, height_cm, weight_kg, goal, activity_level
             ) VALUES (
                 :name, :username, :role, :email, :pin_hash, :recovery_code,
-                'male', '2000-01-01', 175.00, 75.00, 'maintain', 'moderately_active'
+                'male', '1996-01-01', 170.00, 70.00, 'maintain', 'moderately_active'
             )
         ");
         $stmt->execute([

@@ -24,8 +24,8 @@ class DashboardService
         $stmt->execute([$userId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: [
-            'weight_kg' => 80,
-            'height_cm' => 175,
+            'weight_kg' => 70.0,
+            'height_cm' => 170.0,
             'birth_date' => '1996-01-01',
             'gender' => 'male',
             'activity_level' => 'moderately_active',

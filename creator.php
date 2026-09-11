@@ -51,6 +51,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $error = $res['error'];
         }
+    } elseif ($action === 'purge_data') {
+        try {
+            $driver = $pdo ? $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) : '';
+            if ($driver === 'sqlite') {
+                $pdo->exec("DELETE FROM food_logs; DELETE FROM supplement_logs; DELETE FROM daily_logs; DELETE FROM reminders; DELETE FROM workouts; DELETE FROM supplements;");
+            } elseif ($driver === 'pgsql') {
+                $pdo->exec("TRUNCATE TABLE food_logs, supplement_logs, daily_logs, reminders, workouts, supplements CASCADE;");
+            } else {
+                $pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
+                $pdo->exec("TRUNCATE TABLE food_logs;");
+                $pdo->exec("TRUNCATE TABLE supplement_logs;");
+                $pdo->exec("TRUNCATE TABLE daily_logs;");
+                $pdo->exec("TRUNCATE TABLE reminders;");
+                $pdo->exec("TRUNCATE TABLE workouts;");
+                $pdo->exec("TRUNCATE TABLE supplements;");
+                $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
+            }
+
+            // Reset profile baseline to 70kg, 170cm, 30yo (1996-01-01), male
+            if ($pdo) {
+                $pdo->exec("UPDATE users SET weight_kg = 70.00, height_cm = 170.00, birth_date = '1996-01-01', gender = 'male', activity_level = 'moderately_active', goal = 'maintain'");
+            }
+            $success = "Tüm aktivite ve log verileri başarıyla temizlendi. Mevcut kullanıcılar korundu ve profil başlangıç değerleri (70 kg, 170 cm, 30 yaş, Erkek) olarak eşitlendi.";
+        } catch (\Throwable $e) {
+            $error = "Veri temizleme sırasında hata oluştu: " . $e->getMessage();
+        }
     }
 }
 
@@ -239,11 +265,18 @@ $activePage = 'creator';
                     Uygulamanın tüm yetkilerine sahipsiniz. Kullanıcıların verileri birbirine kapalıdır (izole), ancak yönetici olarak tüm hesapları yönetebilir, PIN'lerini sıfırlayabilir veya panellerine göz atabilirsiniz.
                 </div>
             </div>
-            <div class="d-flex gap-3 text-center">
-                <div class="bg-dark px-3 py-2 rounded-3 border border-secondary">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="bg-dark px-3 py-2 rounded-3 border border-secondary text-center">
                     <div class="fs-4 fw-bold text-info"><?= count($allUsers) ?></div>
                     <div class="small text-secondary" style="font-size:11px">Toplam Kullanıcı</div>
                 </div>
+                <form method="POST" action="creator.php" id="purgeDataForm" class="d-inline" onsubmit="return confirm('DİKKAT! Mevcut kullanıcı hesapları KORUNACAK, ancak sisteme bugüne kadar girilmiş tüm öğün, takviye, alarm ve antrenman verileri tamamen silinecektir. Ayrıca profiller 70 kg, 170 cm, 30 yaş, erkek olarak sıfırlanacaktır. Bu işlemi onaylıyor musunuz?');">
+                    <input type="hidden" name="action" value="purge_data">
+                    <button type="submit" class="btn btn-danger btn-sm px-3 py-2 fw-semibold d-flex align-items-center gap-2 shadow-sm rounded-3">
+                        <i class="bi bi-trash3-fill"></i>
+                        <span>Tüm Log Verilerini Sıfırla</span>
+                    </button>
+                </form>
             </div>
         </div>
 
