@@ -43,12 +43,12 @@ require_once __DIR__ . '/../app/Services/ReminderService.php';
 require_once __DIR__ . '/../app/Services/SupplementRepository.php';
 require_once __DIR__ . '/../app/Services/DailyNutritionTracker.php';
 require_once __DIR__ . '/../app/Services/MacroSaver.php';
-
+require_once __DIR__ . '/../app/Services/DashboardService.php';
 require_once __DIR__ . '/../app/Services/AuthService.php';
 
 use App\Services\{
     MetabolismCalculator, ReminderService,
-    SupplementRepository, DailyNutritionTracker, AuthService
+    SupplementRepository, DailyNutritionTracker, DashboardService, AuthService
 };
 
 if (!$pdo) {
@@ -103,132 +103,7 @@ try {
 
         // ── TAM DASHBOARD VERİSİ ──────────────────────────────────────
         'load' => (function () use ($pdo, $userId, $today): void {
-
-            $profile    = getUserProfile($pdo, $userId);
-            $age        = calcAge($profile['birth_date']);
-            $dailyLog   = getOrCreateDailyLog($pdo, $userId, $today);
-            $isTraining = (bool) $dailyLog['workout_done'];
-
-            // Sabit, istikrarlı ve net günlük makro hedefi
-            $calc = new MetabolismCalculator(
-                (float)$profile['weight_kg'], (float)$profile['height_cm'],
-                $age, $profile['gender'], $profile['activity_level'], $profile['goal']
-            );
-            $target = $calc->getDailyMacros();
-            $bmr    = $calc->getBMR();
-            $tdee   = $calc->getTDEE();
-
-            // Tüketilen (o günkü food_logs + supplement_logs toplamı)
-            $consumed = [
-                'calories'  => (float)$dailyLog['total_calories'],
-                'protein_g' => (float)$dailyLog['total_protein_g'],
-                'carbs_g'   => (float)$dailyLog['total_carbs_g'],
-                'fat_g'     => (float)$dailyLog['total_fat_g'],
-            ];
-
-            // Progress %
-            $pct = fn($c, $t) => $t > 0 ? min(999, round($c / $t * 100, 1)) : 0;
-
-            // Kalan
-            $remaining = [
-                'calories'  => round($target['calories']  - $consumed['calories'],  1),
-                'protein_g' => round($target['protein_g'] - $consumed['protein_g'], 1),
-                'carbs_g'   => round($target['carbs_g']   - $consumed['carbs_g'],   1),
-                'fat_g'     => round($target['fat_g']     - $consumed['fat_g'],     1),
-            ];
-
-            // Yaklaşan alarmlar (sonraki 3 saat)
-            $reminderSvc = new ReminderService($pdo);
-            // getDueReminders ±5dk, genişletilmiş versiyon için doğrudan SQL
-            $nowTime = date('H:i:s');
-            $futTime = date('H:i:s', strtotime('+180 minutes'));
-            $todayIdx = (int)date('w');
-
-            $todayDate = date('Y-m-d');
-            $rStmt = $pdo->prepare("
-                SELECT r.id, r.supplement_id, r.type, r.label, r.remind_at, r.days_of_week,
-                       s.dose_amount, s.dose_unit, s.form
-                FROM reminders r
-                LEFT JOIN supplements s ON s.id = r.supplement_id
-                WHERE r.user_id = ? AND r.is_active = 1
-                  AND (r.end_date IS NULL OR r.end_date >= ?)
-                  AND (s.id IS NULL OR (s.is_active = 1 AND (s.end_date IS NULL OR s.end_date >= ?)))
-                  AND r.remind_at BETWEEN ? AND ?
-                ORDER BY r.remind_at
-                LIMIT 10
-            ");
-            $rStmt->execute([$userId, $todayDate, $todayDate, $nowTime, $futTime]);
-            $allReminders = $rStmt->fetchAll();
-
-            $upcomingAlarms = [];
-            foreach ($allReminders as $r) {
-                $days = json_decode($r['days_of_week'] ?? '[]', true);
-                if (!in_array($todayIdx, $days, true)) continue;
-                $upcomingAlarms[] = [
-                    'id'        => (int)$r['id'],
-                    'type'      => $r['type'],
-                    'label'     => $r['label'],
-                    'remind_at' => substr($r['remind_at'], 0, 5),
-                    'dose'      => ($r['dose_amount'] ?? '') . ' ' . ($r['dose_unit'] ?? ''),
-                    'form'      => $r['form'] ?? 'tablet',
-                    'minutes_left' => max(0, (int)((strtotime(date('Y-m-d').' '.$r['remind_at']) - time()) / 60)),
-                ];
-            }
-
-            // Son öğünler (id dahil, silme işlemi için)
-            $fStmt = $pdo->prepare("
-                SELECT id, food_label, meal_type, calories, protein_g, carbs_g, fat_g, logged_at
-                FROM food_logs
-                WHERE daily_log_id = ?
-                ORDER BY logged_at DESC, id DESC LIMIT 15
-            ");
-            $fStmt->execute([$dailyLog['id']]);
-            $recentMeals = $fStmt->fetchAll();
-
-            // Bugünkü kilo
-            $weight = $dailyLog['weight_kg'] ?? $profile['weight_kg'];
-
-            // Akıllı Su Hesaplama (Kilo * 35 ml + Antrenman Bonusu 500 ml)
-            $userWeight      = (float)($weight ?? 80.0);
-            $baseWaterTarget = (int) round($userWeight * 35); // örn: 80 * 35 = 2800 ml
-            $waterBonus      = $isTraining ? 500 : 0;
-            $waterTarget     = $baseWaterTarget + $waterBonus;
-            $waterConsumed   = (int)($dailyLog['water_ml'] ?? 0);
-            $waterPct        = $waterTarget > 0 ? min(999, round(($waterConsumed / $waterTarget) * 100, 1)) : 0;
-            $waterRemaining  = max(0, $waterTarget - $waterConsumed);
-
-            $waterData = [
-                'consumed_ml'   => $waterConsumed,
-                'target_ml'     => $waterTarget,
-                'base_target'   => $baseWaterTarget,
-                'workout_bonus' => $waterBonus,
-                'pct'           => $waterPct,
-                'remaining_ml'  => $waterRemaining,
-                'glasses'       => round($waterConsumed / 250, 1),
-            ];
-
-            echo json_encode([
-                'ok'           => true,
-                'date'         => $today,
-                'day_name'     => ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'][date('w')],
-                'is_training'  => $isTraining,
-                'bmr'          => $bmr,
-                'tdee'         => $tdee,
-                'target'       => $target,
-                'consumed'     => $consumed,
-                'remaining'    => $remaining,
-                'progress_pct' => [
-                    'calories'  => $pct($consumed['calories'],  $target['calories']),
-                    'protein_g' => $pct($consumed['protein_g'], $target['protein_g']),
-                    'carbs_g'   => $pct($consumed['carbs_g'],   $target['carbs_g']),
-                    'fat_g'     => $pct($consumed['fat_g'],     $target['fat_g']),
-                ],
-                'water'           => $waterData,
-                'upcoming_alarms' => $upcomingAlarms,
-                'recent_meals'    => $recentMeals,
-                'weight_today'    => $weight,
-                'daily_log_id'    => (int)$dailyLog['id'],
-            ]);
+            echo json_encode(DashboardService::getDashboardData($pdo, $userId, $today));
         })(),
 
         // ── HIZLI ARAMA (Modal: Lokal Takviye) ───────────────────────

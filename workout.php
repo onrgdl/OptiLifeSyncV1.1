@@ -85,6 +85,17 @@ $activePage = 'workout';
             .calendar-grid {
                 grid-template-columns: 1fr;
             }
+            #btnCurrentWeek {
+                padding-left: 8px !important;
+                padding-right: 8px !important;
+                font-size: 11px !important;
+            }
+            .topbar-right .btn-group {
+                margin-right: 4px !important;
+            }
+            .topbar-right .btn-topbar {
+                padding: 6px 8px !important;
+            }
         }
 
         .day-card {

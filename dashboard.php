@@ -1,12 +1,24 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/app/Services/DashboardService.php';
+
+use App\Services\DashboardService;
+
+$initialDashboardData = null;
+if ($pdo && isset($userId) && $userId > 0) {
+    try {
+        $initialDashboardData = DashboardService::getDashboardData($pdo, (int)$userId);
+    } catch (\Throwable $e) {
+        $initialDashboardData = null;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OptiLifeSync — Dashboard</title>
 <?php require_once __DIR__ . '/includes/pwa-meta.php'; ?>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -34,97 +46,17 @@ require_once __DIR__ . '/includes/auth.php';
     --muted:       #64748b;
     --sidebar-w:   240px;
 }
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; }
+*, *::before, *::after { box-sizing: border-box; }
 body {
     background: var(--bg);
     color: var(--text);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     font-size: 14px;
-    display: flex;
+    max-width: 100vw;
+    overflow-x: hidden;
 }
 a { text-decoration: none; color: inherit; }
 button { cursor: pointer; border: none; background: none; }
-
-/* ═══════════════════════════════════════════════════════════
-   SIDEBAR
-═══════════════════════════════════════════════════════════ */
-.sidebar {
-    width: var(--sidebar-w);
-    min-height: 100vh;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    position: fixed;
-    top: 0; left: 0; bottom: 0;
-    z-index: 100;
-    transition: transform .25s;
-}
-.sidebar-logo {
-    padding: 20px 20px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 10px;
-}
-.sidebar-logo .logo-icon {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, #0ea5e9, #6366f1);
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
-}
-.sidebar-logo .logo-text { font-size: 18px; font-weight: 700; color: var(--text); }
-.sidebar-logo .logo-sub  { font-size: 10px; color: var(--muted); letter-spacing: .5px; }
-
-.nav-section {
-    padding: 16px 12px 4px;
-    font-size: 10px; font-weight: 600;
-    letter-spacing: .8px; color: var(--muted);
-    text-transform: uppercase;
-}
-.nav-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 16px; margin: 2px 8px;
-    border-radius: 10px;
-    color: var(--muted);
-    font-size: 13px; font-weight: 500;
-    transition: all .15s;
-}
-.nav-item:hover { background: var(--border); color: var(--text); }
-.nav-item.active { background: var(--accent-dim); color: var(--accent); }
-.nav-item i { font-size: 16px; width: 20px; text-align: center; }
-
-.sidebar-footer {
-    margin-top: auto;
-    padding: 16px;
-    border-top: 1px solid var(--border);
-}
-.user-pill {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px;
-    background: var(--surface-2);
-    border-radius: 12px;
-    border: 1px solid var(--border);
-}
-.avatar {
-    width: 34px; height: 34px;
-    background: linear-gradient(135deg,#6366f1,#8b5cf6);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 14px;
-    color: #fff; flex-shrink: 0;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   MAIN CONTENT
-═══════════════════════════════════════════════════════════ */
-.main {
-    margin-left: var(--sidebar-w);
-    flex: 1;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
 
 /* TOPBAR */
 .topbar {
@@ -386,27 +318,16 @@ button { cursor: pointer; border: none; background: none; }
 }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
 
-/* ═══════════════════════════════════════════════════════════
-   RESPONSIVE
-═══════════════════════════════════════════════════════════ */
-.hamburger { display: none; }
-
-@media (max-width: 900px) {
-    :root { --sidebar-w: 0px; }
-    .sidebar { transform: translateX(-240px); }
-    .sidebar.open { transform: translateX(0); width: 240px; }
-    .main { margin-left: 0; }
-    .hamburger { display: flex; }
+@media (max-width: 768px) {
+    #poll-dot {
+        bottom: 74px;
+        right: 12px;
+        font-size: 10px;
+        padding: 4px 10px;
+        gap: 6px;
+        z-index: 990;
+    }
 }
-
-.overlay {
-    display: none;
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,.5);
-    z-index: 99;
-    backdrop-filter: blur(2px);
-}
-.overlay.show { display: block; }
 
 /* Skeleton loader */
 .skeleton {
@@ -969,7 +890,8 @@ button { cursor: pointer; border: none; background: none; }
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 
 <script>
-// ─── STATE ────────────────────────────────────────────────────────────
+// ─── INITIAL HYDRATION & STATE ─────────────────────────────────────────
+window.__INITIAL_DASHBOARD__ = <?= $initialDashboardData ? json_encode($initialDashboardData, JSON_UNESCAPED_UNICODE) : 'null' ?>;
 let dashData     = null;    // Son API yanıtı
 let selectedItem = null;    // Modal'da seçilen öğe ('gemini' | 'local' tipi)
 let searchTimer  = null;    // Debounce
@@ -986,7 +908,16 @@ async function apiPost(action, extra = {}) {
 }
 
 // ─── DASHBOARD LOAD ───────────────────────────────────────────────────
-async function loadDashboard() {
+async function loadDashboard(forceFetch = false) {
+    // 1. İlk açılışta sunucudan gelen veriyi 0ms içinde anında ekrana bas
+    if (!forceFetch && window.__INITIAL_DASHBOARD__ && !dashData) {
+        dashData = window.__INITIAL_DASHBOARD__;
+        renderDashboard(dashData);
+        checkAlarms(dashData.upcoming_alarms ?? []);
+        window.__INITIAL_DASHBOARD__ = null;
+        return;
+    }
+
     try {
         const data = await apiPost('load');
         if (!data.ok) {
@@ -1003,7 +934,7 @@ async function loadDashboard() {
         document.getElementById('pollLabel').textContent = '⚠️ Yeniden deneniyor…';
         console.error('Dashboard yüklenemedi:', e);
         // Ağ gecikmesi veya soğuk başlangıçta 3 saniye sonra otomatik yeniden dene
-        setTimeout(loadDashboard, 3000);
+        setTimeout(() => loadDashboard(true), 3000);
     }
 }
 
@@ -1754,7 +1685,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadDashboard();
 
     // Her 30sn veri yenile
-    setInterval(loadDashboard, 30_000);
+    setInterval(() => loadDashboard(true), 30_000);
 
     // Bildirim izni
     if ('Notification' in window && Notification.permission === 'default') {

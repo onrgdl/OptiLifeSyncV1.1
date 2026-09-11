@@ -143,6 +143,15 @@ $typeLabels = [
             box-shadow: 0 4px 20px rgba(0,0,0,.4);
             transition: border-color .3s;
         }
+        @media (max-width: 768px) {
+            #polling-indicator {
+                bottom: 74px;
+                right: 12px;
+                padding: 6px 10px;
+                font-size: .75rem;
+                z-index: 990;
+            }
+        }
         #polling-indicator.active { border-color: #22c55e; }
 
         .dot {
