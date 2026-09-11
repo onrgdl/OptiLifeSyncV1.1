@@ -127,32 +127,10 @@ $typeLabels = [
             line-height: 1;
         }
 
-        /* Polling göstergesi */
+        /* Polling göstergesi (Kullanıcı talebiyle tamamen gizlendi) */
         #polling-indicator {
-            position: fixed;
-            bottom: 24px; right: 24px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 10px 16px;
-            z-index: 9999;
-            font-size: .82rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,.4);
-            transition: border-color .3s;
+            display: none !important;
         }
-        @media (max-width: 768px) {
-            #polling-indicator {
-                bottom: 74px;
-                right: 12px;
-                padding: 6px 10px;
-                font-size: .75rem;
-                z-index: 990;
-            }
-        }
-        #polling-indicator.active { border-color: #22c55e; }
 
         .dot {
             width: 8px; height: 8px;
@@ -420,11 +398,10 @@ $typeLabels = [
     </div><!-- /content -->
 </div><!-- /main -->
 
-<!-- Polling Göstergesi -->
-<div id="polling-indicator">
-    <div class="dot"></div>
-    <span id="poll-status">Alarm takibi aktif</span>
-    <span class="text-secondary ms-2 small" id="poll-time">—</span>
+<!-- Polling Göstergesi (gizlendi) -->
+<div id="polling-indicator" style="display:none !important">
+    <span id="poll-status"></span>
+    <span id="poll-time"></span>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
@@ -587,10 +564,10 @@ async function pollForDueReminders() {
 
         const data = await response.json();
 
-        // Polling göstergesi güncelle
-        indicator.classList.add('active');
-        timeEl.textContent = data.server_time ?? '';
-        statusEl.textContent = data.count > 0
+        // Polling göstergesi güncelle (gizli değilse veya varsa)
+        if (indicator) indicator.classList.add('active');
+        if (timeEl) timeEl.textContent = data.server_time ?? '';
+        if (statusEl) statusEl.textContent = data.count > 0
             ? `🔔 ${data.count} aktif alarm!`
             : 'Alarm takibi aktif';
 
@@ -618,8 +595,8 @@ async function pollForDueReminders() {
         }
 
     } catch (err) {
-        indicator.classList.remove('active');
-        statusEl.textContent = '⚠️ Bağlantı hatası';
+        if (indicator) indicator.classList.remove('active');
+        if (statusEl) statusEl.textContent = '⚠️ Bağlantı hatası';
         console.warn('Alarm polling hatası:', err);
     }
 }

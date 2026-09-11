@@ -41,6 +41,7 @@ if (!$pdo) {
 
 $authService = new AuthService($pdo);
 $userId = AuthService::requireAuth(true);
+AuthService::closeSession(); // Session kilidini hemen serbest bırak (Gemini AI isteği beklenirken session kilitlenmez)
 $today  = date('Y-m-d');
 
 if (!Config::hasGeminiKey()) {

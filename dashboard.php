@@ -300,33 +300,9 @@ button { cursor: pointer; border: none; background: none; }
 }
 .meal-select:focus { border-color: var(--accent); }
 
-/* Polling dot */
+/* Polling dot (Kullanıcı talebiyle tamamen gizlendi) */
 #poll-dot {
-    position: fixed; bottom: 20px; right: 20px;
-    display: flex; align-items: center; gap: 8px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 8px 14px; border-radius: 99px;
-    font-size: 12px; color: var(--muted);
-    z-index: 200;
-    transition: border-color .3s;
-}
-#poll-dot .dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--green);
-    animation: blink 1.8s infinite;
-}
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
-
-@media (max-width: 768px) {
-    #poll-dot {
-        bottom: 74px;
-        right: 12px;
-        font-size: 10px;
-        padding: 4px 10px;
-        gap: 6px;
-        z-index: 990;
-    }
+    display: none !important;
 }
 
 /* Skeleton loader */
@@ -596,10 +572,9 @@ button { cursor: pointer; border: none; background: none; }
     </div><!-- /content -->
 </div><!-- /main -->
 
-<!-- Polling göstergesi -->
-<div id="poll-dot">
-    <div class="dot"></div>
-    <span id="pollLabel">Senkronize</span>
+<!-- Polling göstergesi (gizlendi) -->
+<div id="poll-dot" style="display:none !important">
+    <span id="pollLabel"></span>
 </div>
 
 <!-- ═══════════════════ HIZLI EKLE MODAL (Gemini AI) ══════════════════ -->
@@ -898,12 +873,18 @@ let searchTimer  = null;    // Debounce
 let activeTab    = 'foods';
 const shownAlarms = new Set();
 
-// ─── API HELPER ───────────────────────────────────────────────────────
+// ─── API HELPER & AUTH FAILURE TOLERANCE ─────────────────────────────
+let authFailureStreak = 0;
+
 async function apiPost(action, extra = {}) {
     const fd = new FormData();
     fd.append('action', action);
     for (const [k, v] of Object.entries(extra)) fd.append(k, v);
-    const r = await fetch(`${window.API_BASE}/dashboard.php`, { method:'POST', body:fd });
+    const r = await fetch(`${window.API_BASE}/dashboard.php`, {
+        method: 'POST',
+        body: fd,
+        credentials: 'include'
+    });
     return r.json();
 }
 
@@ -922,19 +903,27 @@ async function loadDashboard(forceFetch = false) {
         const data = await apiPost('load');
         if (!data.ok) {
             if (data.require_login) {
-                window.location.href = 'login.php?redirect=dashboard.php';
+                authFailureStreak++;
+                console.warn(`Oturum uyarısı (${authFailureStreak}/3)`);
+                // Tek bir geçici gecikmede kullanıcıyı hemen atma; 3 kez üst üste başarısız olursa yönlendir
+                if (authFailureStreak >= 3) {
+                    window.location.href = 'login.php?redirect=dashboard.php';
+                    return;
+                }
+                setTimeout(() => loadDashboard(true), 4000);
                 return;
             }
             throw new Error(data.error || 'Veri yüklenemedi');
         }
+        authFailureStreak = 0; // Başarılı yanıtta sayacı sıfırla
         dashData = data;
         renderDashboard(data);
         checkAlarms(data.upcoming_alarms ?? []);
-    } catch(e) {
-        document.getElementById('pollLabel').textContent = '⚠️ Yeniden deneniyor…';
+        const pollLbl = document.getElementById('pollLabel');
+        if (pollLbl) pollLbl.textContent = '⚠️ Yeniden deneniyor…';
         console.error('Dashboard yüklenemedi:', e);
-        // Ağ gecikmesi veya soğuk başlangıçta 3 saniye sonra otomatik yeniden dene
-        setTimeout(() => loadDashboard(true), 3000);
+        // Ağ gecikmesi veya soğuk başlangıçta 4 saniye sonra otomatik yeniden dene
+        setTimeout(() => loadDashboard(true), 4000);
     }
 }
 
@@ -972,7 +961,8 @@ function renderDashboard(d) {
     if (d.water) renderWater(d.water);
 
     // ── Polling göstergesi ──
-    document.getElementById('pollLabel').textContent = 'Güncel · ' + now();
+    const pollLbl = document.getElementById('pollLabel');
+    if (pollLbl) pollLbl.textContent = 'Güncel · ' + now();
 }
 
 function setKPI(key, consumed, target, remaining, pct, unit) {

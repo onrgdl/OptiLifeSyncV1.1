@@ -40,12 +40,51 @@ class AuthService
      */
     public static function getSecretKey(): string
     {
-        $customKey = \Config::get('APP_SECRET');
-        if (!empty($customKey)) {
-            return (string)$customKey;
+        $customKey = (string)\Config::get('APP_SECRET', 'OptiLifeSync_HMAC_Secret_2026_d9e7a8f1b2c3e4a5');
+        return hash('sha256', 'optilife_hmac_secret_salt_2026_' . $customKey);
+    }
+
+    /**
+     * İsteğin HTTPS üzerinden gelip gelmediğini kapsamlı kontrol eder (Ters Proxy / Vercel Edge dahil)
+     */
+    public static function isHttps(): bool
+    {
+        if (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') {
+            return true;
         }
-        $dbUrl = \Config::get('DATABASE_URL') ?: 'optilife_local_salt_secret';
-        return hash('sha256', 'optilife_serverless_hmac_2026_' . $dbUrl);
+        if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
+            return true;
+        }
+        if (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_SSL']) === 'on') {
+            return true;
+        }
+        if (!empty($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) {
+            return true;
+        }
+        if (!empty($_SERVER['VERCEL']) || !empty(getenv('VERCEL'))) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * URL ve Çerez güvenli Base64 kodlayıcı (URL-safe, '+' ve '/' yerine '-' ve '_' kullanır)
+     */
+    public static function base64UrlEncode(string $data): string
+    {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+    }
+
+    /**
+     * URL ve Çerez güvenli Base64 çözücü
+     */
+    public static function base64UrlDecode(string $data): string
+    {
+        $remainder = strlen($data) % 4;
+        if ($remainder) {
+            $data .= str_repeat('=', 4 - $remainder);
+        }
+        return (string)base64_decode(strtr($data, '-_', '+/'));
     }
 
     /**
@@ -59,15 +98,29 @@ class AuthService
                 ini_set('session.use_only_cookies', '1');
                 ini_set('session.cookie_lifetime', (string)(self::AUTH_COOKIE_DAYS * 86400));
                 ini_set('session.gc_maxlifetime', (string)(self::AUTH_COOKIE_DAYS * 86400));
+                ini_set('session.cookie_path', '/');
+                ini_set('session.cookie_samesite', 'Lax');
+                if (self::isHttps()) {
+                    ini_set('session.cookie_secure', '1');
+                }
             }
             session_start();
         }
 
         // Vercel Serverless ve çoklu cihaz uyumu:
-        // Eğer Session kaybolmuşsa (yeni Lambda instance veya tarayıcı yeniden açılması)
-        // Kriptografik imzalı optilife_auth çerezinden oturumu anında geri yükle:
-        if (empty($_SESSION['user']) && !empty($_COOKIE[self::AUTH_COOKIE_NAME])) {
+        // Eğer Session kaybolmuşsa veya boşsa, imzalı optilife_auth çerezinden oturumu anında geri yükle:
+        if ((empty($_SESSION['user']) || empty($_SESSION['user']['id'])) && !empty($_COOKIE[self::AUTH_COOKIE_NAME])) {
             self::restoreSessionFromCookie((string)$_COOKIE[self::AUTH_COOKIE_NAME]);
+        }
+    }
+
+    /**
+     * Session dosya kilitlerini (lock) erken serbest bırakmak için yardımcı metot (API performansı için)
+     */
+    public static function closeSession(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
         }
     }
 
@@ -76,22 +129,32 @@ class AuthService
      */
     public static function restoreSessionFromCookie(string $token): bool
     {
+        $token = trim($token);
         $parts = explode('.', $token, 2);
         if (count($parts) !== 2) {
             return false;
         }
         [$encoded, $sig] = $parts;
 
-        // HMAC imza doğrulaması
+        // HMAC imza doğrulaması (Hem yeni sabit secret hem eski secret ile çift kontrol)
         $expectedSig = hash_hmac('sha256', $encoded, self::getSecretKey());
         if (!hash_equals($expectedSig, $sig)) {
-            return false;
+            $dbUrl = \Config::get('DATABASE_URL') ?: 'optilife_local_salt_secret';
+            $legacySecret = hash('sha256', 'optilife_serverless_hmac_2026_' . $dbUrl);
+            $legacySig = hash_hmac('sha256', $encoded, $legacySecret);
+            if (!hash_equals($legacySig, $sig)) {
+                return false;
+            }
         }
 
-        $json = base64_decode($encoded);
+        $json = self::base64UrlDecode($encoded);
+        if (!$json || !str_starts_with($json, '{')) {
+            $json = base64_decode($encoded);
+        }
         if (!$json) {
             return false;
         }
+
         $payload = json_decode($json, true);
         if (!is_array($payload) || empty($payload['id']) || empty($payload['exp'])) {
             return false;
@@ -110,11 +173,17 @@ class AuthService
             'role'     => $payload['role'] ?? 'user',
             'email'    => $payload['email'] ?? ($payload['username'] . '@optilifesync.local'),
         ];
+
+        // Kayan oturum süresi (Sliding expiration): Çerez süresine 15 günden az kaldıysa çerezi yenile
+        if (($payload['exp'] - time()) < (15 * 86400) && !headers_sent()) {
+            self::issueAuthCookie($_SESSION['user']);
+        }
+
         return true;
     }
 
     /**
-     * Kullanıcıya 30 günlük kalıcı ve kurcalanamaz imzalı auth çerezi üretir
+     * Kullanıcıya 30 günlük kalıcı, URL-safe ve kurcalanamaz imzalı auth çerezi üretir
      */
     public static function issueAuthCookie(array $user): string
     {
@@ -128,11 +197,11 @@ class AuthService
             'exp'      => $exp,
         ];
 
-        $encoded = base64_encode(json_encode($payload));
+        $encoded = self::base64UrlEncode(json_encode($payload));
         $sig     = hash_hmac('sha256', $encoded, self::getSecretKey());
         $token   = "{$encoded}.{$sig}";
 
-        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || !empty($_SERVER['VERCEL']);
+        $isHttps = self::isHttps();
 
         if (!headers_sent()) {
             setcookie(self::AUTH_COOKIE_NAME, $token, [
@@ -604,7 +673,8 @@ class AuthService
     {
         self::startSession();
         if (!headers_sent()) {
-            session_regenerate_id(true);
+            // false: Diğer cihazlardaki veya açık sekmelerdeki mevcut oturum dosyasını silmez
+            session_regenerate_id(false);
         }
         // Başarılı girişte kaba kuvvet sayacını sıfırla
         unset($_SESSION['login_failed_attempts'], $_SESSION['login_last_failed_time']);

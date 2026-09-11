@@ -21,4 +21,18 @@
         }
         return '/api';
     })();
+
+    // Evrensel güvenli fetch sarıcı: Çerezleri (HMAC auth çerezi ve session)
+    // mobil PWA, cross-origin veya yerel IP erişimlerinde her zaman isteğe ekler.
+    (function() {
+        if (typeof window.fetch === 'function') {
+            const _origFetch = window.fetch;
+            window.fetch = function(url, options = {}) {
+                if (!options.credentials) {
+                    options.credentials = 'include';
+                }
+                return _origFetch.call(this, url, options);
+            };
+        }
+    })();
 </script>

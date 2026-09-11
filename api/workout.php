@@ -53,6 +53,7 @@ if (!$pdo) {
 
 $authService = new AuthService($pdo);
 $userId = AuthService::requireAuth(true);
+AuthService::closeSession();
 
 $workoutService = new WorkoutService($pdo);
 

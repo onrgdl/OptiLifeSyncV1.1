@@ -27,10 +27,14 @@ header('Content-Type: application/json; charset=utf-8');
     ) {
         return;
     }
-    $allowedSubnets = ['127.', '::1', '10.10.18.', '192.168.', '172.16.'];
+    $allowedSubnets = ['127.', '::1', '10.', '192.168.', '172.'];
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
     foreach ($allowedSubnets as $s) {
         if (str_starts_with($ip, $s) || $ip === $s) return;
+    }
+    // PHP filter ile tüm RFC1918 özel ağlarını kabul et
+    if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+        return;
     }
     http_response_code(403);
     echo json_encode(['ok' => false, 'error' => 'Erişim reddedildi.']);
@@ -58,6 +62,7 @@ if (!$pdo) {
 
 $authService = new AuthService($pdo);
 $userId = AuthService::requireAuth(true);
+AuthService::closeSession(); // Session kilidini hemen serbest bırak (diğer istekleri bloklamaz)
 $today  = date('Y-m-d');
 
 $action = trim($_POST['action'] ?? $_GET['action'] ?? 'load');

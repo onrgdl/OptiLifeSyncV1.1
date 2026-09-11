@@ -73,6 +73,7 @@ final class Config
         'APP_ENV'       => 'production',
         'APP_DEBUG'     => 'false',
         'APP_TIMEZONE'  => 'Europe/Istanbul',
+        'APP_SECRET'    => 'OptiLifeSync_HMAC_Secret_2026_d9e7a8f1b2c3e4a5',
 
     ];
 

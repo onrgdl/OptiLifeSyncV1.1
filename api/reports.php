@@ -49,6 +49,7 @@ if (!$pdo) {
 
 $authService = new AuthService($pdo);
 $userId = AuthService::requireAuth(true);
+AuthService::closeSession();
 
 $action = trim($_POST['action'] ?? '');
 
