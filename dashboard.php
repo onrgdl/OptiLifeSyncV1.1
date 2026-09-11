@@ -37,18 +37,18 @@ if ($pdo && isset($userId) && $userId > 0) {
    GLOBAL RESET & TOKENS
 ═══════════════════════════════════════════════════════════ */
 :root {
-    --bg:          #0f172a;
-    --surface:     #1e293b;
-    --surface-2:   #283548;
-    --border:      rgba(255,255,255,.09);
-    --accent:      #38bdf8;
-    --accent-dim:  rgba(56,189,248,.12);
-    --green:       #22c55e;
-    --red:         #f87171;
-    --yellow:      #facc15;
-    --purple:      #c084fc;
-    --text:        #f8fafc;
-    --muted:       #94a3b8;
+    --bg:          #f6f3eb;
+    --surface:     #ffffff;
+    --surface-2:   #ede8de;
+    --border:      #e2ddd3;
+    --accent:      #0284c7;
+    --accent-dim:  rgba(2, 132, 199, 0.12);
+    --green:       #16a34a;
+    --red:         #dc2626;
+    --yellow:      #d97706;
+    --purple:      #9333ea;
+    --text:        #1e293b;
+    --muted:       #64748b;
     --sidebar-w:   240px;
 }
 *, *::before, *::after { box-sizing: border-box; }
@@ -66,8 +66,9 @@ button { cursor: pointer; border: none; background: none; }
 /* TOPBAR */
 .topbar {
     position: sticky; top: 0; z-index: 50;
-    background: rgba(8,15,30,.85);
+    background: rgba(246, 243, 235, 0.95);
     backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
     padding: 0 24px;
     height: 60px;
@@ -75,7 +76,7 @@ button { cursor: pointer; border: none; background: none; }
     gap: 12px;
 }
 .topbar-left { display: flex; align-items: center; gap: 12px; }
-.topbar-title { font-size: 16px; font-weight: 600; }
+.topbar-title { font-size: 16px; font-weight: 600; color: var(--text); }
 .topbar-sub   { font-size: 12px; color: var(--muted); }
 .topbar-right { display: flex; align-items: center; gap: 8px; }
 
@@ -87,9 +88,9 @@ button { cursor: pointer; border: none; background: none; }
     transition: all .15s;
 }
 .btn-accent {
-    background: var(--accent); color: #0c1a27;
+    background: var(--accent); color: #ffffff;
 }
-.btn-accent:hover { background: #7dd3fc; }
+.btn-accent:hover { background: #0369a1; color: #ffffff; }
 .btn-ghost  {
     background: var(--surface-2);
     border: 1px solid var(--border);
@@ -131,21 +132,21 @@ button { cursor: pointer; border: none; background: none; }
     overflow: hidden;
     transition: border-color .2s, transform .15s;
 }
-.kpi-tile:hover { border-color: rgba(255,255,255,.15); transform: translateY(-1px); }
+.kpi-tile:hover { border-color: rgba(2, 132, 199, 0.3); transform: translateY(-1px); }
 .kpi-tile .glow {
     position: absolute; top: -40px; right: -40px;
     width: 120px; height: 120px;
     border-radius: 50%;
-    opacity: .12;
+    opacity: .08;
     filter: blur(30px);
 }
 .kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 6px; }
-.kpi-value { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+.kpi-value { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; color: var(--text); }
 .kpi-sub   { font-size: 12px; color: var(--muted); }
 
 /* Progress Bar */
 .gyp-progress {
-    height: 8px; background: rgba(255,255,255,.06);
+    height: 8px; background: rgba(0, 0, 0, 0.06);
     border-radius: 99px; overflow: hidden; margin: 10px 0 6px;
 }
 .gyp-progress-fill {
@@ -171,20 +172,21 @@ button { cursor: pointer; border: none; background: none; }
     font-size: 12px; font-weight: 600;
     transition: all .2s;
 }
-.workout-badge.on  { background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.35); color: var(--green); }
-.workout-badge.off { background: rgba(100,116,139,.1); border: 1px solid rgba(100,116,139,.2); color: var(--muted); }
+.workout-badge.on  { background: rgba(22,163,74,.15); border: 1px solid rgba(22,163,74,.35); color: var(--green); }
+.workout-badge.off { background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); }
 
 /* Alarm item */
 .alarm-item {
     display: flex; align-items: center; gap: 14px;
     padding: 12px 16px;
     border-radius: 12px;
-    background: var(--surface-2);
+    background: #ffffff;
     border: 1px solid var(--border);
     margin-bottom: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     transition: border-color .15s;
 }
-.alarm-item:hover { border-color: rgba(255,255,255,.12); }
+.alarm-item:hover { border-color: rgba(2, 132, 199, 0.3); }
 .alarm-time {
     font-size: 14px; font-weight: 700;
     color: var(--accent); min-width: 40px;
@@ -194,15 +196,15 @@ button { cursor: pointer; border: none; background: none; }
     display: flex; align-items: center; justify-content: center;
     font-size: 16px; flex-shrink: 0;
 }
-.alarm-icon.med   { background: rgba(248,113,113,.15); color: var(--red);    }
-.alarm-icon.supp  { background: rgba(34,197,94,.15);   color: var(--green);  }
-.alarm-icon.vit   { background: rgba(250,204,21,.15);  color: var(--yellow); }
-.alarm-label  { font-size: 13px; font-weight: 500; }
+.alarm-icon.med   { background: rgba(220,38,38,.12); color: var(--red);    }
+.alarm-icon.supp  { background: rgba(22,163,74,.12);   color: var(--green);  }
+.alarm-icon.vit   { background: rgba(217,119,6,.12);  color: var(--yellow); }
+.alarm-label  { font-size: 13px; font-weight: 500; color: var(--text); }
 .alarm-dose   { font-size: 11px; color: var(--muted); }
 .alarm-badge  {
     margin-left: auto;
-    background: rgba(56,189,248,.1);
-    border: 1px solid rgba(56,189,248,.25);
+    background: var(--accent-dim);
+    border: 1px solid rgba(2, 132, 199, 0.25);
     color: var(--accent);
     border-radius: 99px; padding: 3px 10px;
     font-size: 11px; font-weight: 600; white-space: nowrap;
@@ -214,13 +216,14 @@ button { cursor: pointer; border: none; background: none; }
     padding: 10px 14px; gap: 12px;
     border-radius: 10px;
     border: 1px solid var(--border);
-    background: var(--surface-2);
+    background: #ffffff;
     margin-bottom: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
 .meal-dot {
     width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
 }
-.meal-name { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meal-name { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
 .meal-type { font-size: 11px; color: var(--muted); }
 .meal-cal  { font-size: 13px; font-weight: 600; color: var(--red); margin-left: auto; white-space: nowrap; }
 
@@ -244,7 +247,7 @@ button { cursor: pointer; border: none; background: none; }
 .modal-footer { border-top: 1px solid var(--border); padding: 14px 22px; }
 
 .search-input {
-    background: var(--bg);
+    background: #ffffff;
     border: 1px solid var(--border);
     border-radius: 12px;
     color: var(--text);
@@ -263,43 +266,43 @@ button { cursor: pointer; border: none; background: none; }
     color: var(--muted); font-size: 13px; font-weight: 500;
     transition: all .15s;
 }
-.result-tabs .tab-btn.active { background: var(--accent-dim); color: var(--accent); }
+.result-tabs .tab-btn.active { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
 
 .result-item {
     display: flex; align-items: center;
     padding: 12px 14px; gap: 12px;
     border-radius: 12px;
     border: 1px solid var(--border);
-    background: var(--surface-2);
+    background: #ffffff;
     margin-bottom: 6px;
     cursor: pointer;
     transition: border-color .15s, transform .1s;
 }
-.result-item:hover { border-color: rgba(56,189,248,.4); transform: translateX(2px); }
+.result-item:hover { border-color: var(--accent); transform: translateX(2px); }
 .result-item.selected { border-color: var(--accent); background: var(--accent-dim); }
 
 .result-icon {
     width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center; font-size: 18px;
 }
-.result-icon.food { background: rgba(250,204,21,.1); }
-.result-icon.supp { background: rgba(34,197,94,.1); }
+.result-icon.food { background: rgba(217,119,6,.12); }
+.result-icon.supp { background: rgba(22,163,74,.12); }
 
-.result-name  { font-size: 13px; font-weight: 500; }
+.result-name  { font-size: 13px; font-weight: 500; color: var(--text); }
 .result-meta  { font-size: 11px; color: var(--muted); }
 .result-kcal  { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--red); }
 
 /* Quantity row in modal */
 .qty-row { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
 .qty-input {
-    background: var(--bg); border: 1px solid var(--border);
+    background: #ffffff; border: 1px solid var(--border);
     border-radius: 10px; color: var(--text);
     padding: 9px 12px; width: 90px; outline: none;
     transition: border-color .2s;
 }
 .qty-input:focus { border-color: var(--accent); }
 .meal-select {
-    background: var(--bg); border: 1px solid var(--border);
+    background: #ffffff; border: 1px solid var(--border);
     border-radius: 10px; color: var(--text);
     padding: 9px 12px; flex:1; outline: none;
 }
@@ -312,7 +315,7 @@ button { cursor: pointer; border: none; background: none; }
 
 /* Skeleton loader */
 .skeleton {
-    background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface) 50%, var(--surface-2) 75%);
+    background: linear-gradient(90deg, var(--surface-2) 25%, #ffffff 50%, var(--surface-2) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.4s infinite;
     border-radius: 8px;
@@ -489,7 +492,7 @@ button { cursor: pointer; border: none; background: none; }
                             <div class="col-lg-5">
                                 <div class="d-flex align-items-center gap-3">
                                     <div class="position-relative" style="width:76px; height:76px; flex-shrink:0;">
-                                        <div id="waterPercentRing" style="width:76px; height:76px; border-radius:50%; background:conic-gradient(var(--accent) 0%, rgba(255,255,255,0.08) 0%); display:flex; align-items:center; justify-content:center; box-shadow:0 0 15px rgba(56,189,248,0.15); transition: background 0.5s ease;">
+                                        <div id="waterPercentRing" style="width:76px; height:76px; border-radius:50%; background:conic-gradient(var(--accent) 0%, var(--surface-2) 0%); display:flex; align-items:center; justify-content:center; box-shadow:0 0 15px rgba(2,132,199,0.15); transition: background 0.5s ease;">
                                             <div style="width:62px; height:62px; border-radius:50%; background:var(--surface); display:flex; flex-direction:column; align-items:center; justify-content:center;">
                                                 <span id="waterPercentText" style="font-weight:700; font-size:15px; color:var(--accent);">0%</span>
                                                 <small style="font-size:9px; color:var(--muted);">HEDEF</small>
@@ -509,7 +512,7 @@ button { cursor: pointer; border: none; background: none; }
                                         </div>
                                     </div>
                                 </div>
-                                <div class="gyp-progress mt-3 mb-0" style="height:10px; background:rgba(255,255,255,0.06);">
+                                <div class="gyp-progress mt-3 mb-0" style="height:10px; background:var(--surface-2);">
                                     <div id="waterProgressBar" class="gyp-progress-fill" style="width:0%; background:linear-gradient(90deg, #38bdf8, #0284c7);"></div>
                                 </div>
                             </div>
@@ -1086,10 +1089,10 @@ function setKPI(key, consumed, target, remaining, pct, unit) {
 // ── SVG Ring (donut) ─────────────────────────────────────────────────
 function renderRings(d) {
     const rings = [
-        { label:'Kalori',   consumed: d.consumed.calories,  target: d.target.calories,  pct: d.progress_pct.calories,  unit:'kcal', color:'#f87171' },
-        { label:'Protein',  consumed: d.consumed.protein_g, target: d.target.protein_g, pct: d.progress_pct.protein_g, unit:'g',    color:'#60a5fa' },
-        { label:'Karb',     consumed: d.consumed.carbs_g,   target: d.target.carbs_g,   pct: d.progress_pct.carbs_g,   unit:'g',    color:'#facc15' },
-        { label:'Yağ',      consumed: d.consumed.fat_g,     target: d.target.fat_g,     pct: d.progress_pct.fat_g,     unit:'g',    color:'#c084fc' },
+        { label:'Kalori',   consumed: d.consumed.calories,  target: d.target.calories,  pct: d.progress_pct.calories,  unit:'kcal', color:'#ef4444' },
+        { label:'Protein',  consumed: d.consumed.protein_g, target: d.target.protein_g, pct: d.progress_pct.protein_g, unit:'g',    color:'#2563eb' },
+        { label:'Karb',     consumed: d.consumed.carbs_g,   target: d.target.carbs_g,   pct: d.progress_pct.carbs_g,   unit:'g',    color:'#d97706' },
+        { label:'Yağ',      consumed: d.consumed.fat_g,     target: d.target.fat_g,     pct: d.progress_pct.fat_g,     unit:'g',    color:'#9333ea' },
     ];
 
     const container = document.getElementById('ringContainer');
@@ -1102,7 +1105,7 @@ function renderRings(d) {
         <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
             <div class="ring-wrap">
                 <svg width="72" height="72" viewBox="0 0 72 72">
-                    <circle cx="36" cy="36" r="${radius}" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="8"/>
+                    <circle cx="36" cy="36" r="${radius}" fill="none" stroke="var(--border)" stroke-width="8"/>
                     <circle cx="36" cy="36" r="${radius}" fill="none"
                         stroke="${isOver ? '#fb923c' : r.color}"
                         stroke-width="8"

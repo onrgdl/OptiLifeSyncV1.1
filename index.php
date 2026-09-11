@@ -101,33 +101,34 @@ try {
             border-radius: 12px;
         }
         .form-control, .form-select {
-            background-color: var(--bg);
+            background-color: #ffffff;
             border-color: var(--border);
-            color: #f8fafc;
+            color: var(--text);
         }
         .form-control:focus, .form-select:focus {
-            background-color: var(--bg);
+            background-color: #ffffff;
             border-color: var(--accent);
-            color: #f8fafc;
-            box-shadow: 0 0 0 0.25rem rgba(56, 189, 248, 0.25);
+            color: var(--text);
+            box-shadow: 0 0 0 0.25rem rgba(2, 132, 199, 0.15);
         }
         .stat-card {
             border-radius: 12px;
             padding: 1rem;
             transition: all 0.2s;
         }
-        .stat-calorie { background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05)); border: 1px solid rgba(239, 68, 68, 0.3); }
-        .stat-protein { background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05)); border: 1px solid rgba(59, 130, 246, 0.3); }
-        .stat-carb { background: linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(234, 179, 8, 0.05)); border: 1px solid rgba(234, 179, 8, 0.3); }
-        .stat-fat { background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(168, 85, 247, 0.05)); border: 1px solid rgba(168, 85, 247, 0.3); }
+        .stat-calorie { background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); color: #dc2626; }
+        .stat-protein { background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.25); color: #2563eb; }
+        .stat-carb { background: rgba(217, 119, 6, 0.08); border: 1px solid rgba(217, 119, 6, 0.25); color: #d97706; }
+        .stat-fat { background: rgba(147, 51, 234, 0.08); border: 1px solid rgba(147, 51, 234, 0.25); color: #9333ea; }
         .badge-training {
-            background: #22c55e;
-            color: #022c22;
+            background: #16a34a;
+            color: #ffffff;
             font-weight: 600;
         }
         .badge-rest {
-            background: #64748b;
-            color: #f8fafc;
+            background: var(--surface-2);
+            color: var(--text);
+            border: 1px solid var(--border);
             font-weight: 600;
         }
     </style>

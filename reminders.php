@@ -99,9 +99,9 @@ $typeLabels = [
     <style>
         .card           { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
         .form-control,
-        .form-select    { background: var(--bg); border-color: var(--border); color: #f8fafc; }
+        .form-select    { background: #ffffff; border-color: var(--border); color: var(--text); }
         .form-control:focus,
-        .form-select:focus { background: var(--bg); border-color: var(--accent); color: #f8fafc; box-shadow: 0 0 0 .25rem rgba(56,189,248,.2); }
+        .form-select:focus { background: #ffffff; border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 .25rem rgba(2,132,199,.15); }
         .table-dark td,
         .table-dark th  { background: transparent; }
 
@@ -110,9 +110,9 @@ $typeLabels = [
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            background: rgba(56, 189, 248, .12);
-            border: 1px solid rgba(56, 189, 248, .3);
-            color: #38bdf8;
+            background: var(--accent-dim);
+            border: 1px solid rgba(2, 132, 199, .25);
+            color: var(--accent);
             border-radius: 99px;
             padding: 2px 10px;
             font-size: .78rem;
@@ -120,9 +120,9 @@ $typeLabels = [
             cursor: pointer;
             transition: background .15s;
         }
-        .time-badge:hover { background: rgba(56,189,248,.25); }
+        .time-badge:hover { background: rgba(2,132,199,.2); }
         .time-badge .remove-time {
-            color: #f87171;
+            color: var(--red);
             font-size: .85rem;
             line-height: 1;
         }
@@ -135,7 +135,7 @@ $typeLabels = [
         .dot {
             width: 8px; height: 8px;
             border-radius: 50%;
-            background: #22c55e;
+            background: #16a34a;
             animation: pulse 1.5s infinite;
         }
         @keyframes pulse {
@@ -145,7 +145,7 @@ $typeLabels = [
 
         /* Notification izin banner */
         #notif-banner {
-            border-left: 4px solid #facc15;
+            border-left: 4px solid #d97706;
         }
 
         /* Saat inputu tag-box */
@@ -154,7 +154,7 @@ $typeLabels = [
             flex-wrap: wrap;
             gap: 6px;
             padding: 8px;
-            background: var(--bg);
+            background: #ffffff;
             border: 1px solid var(--border);
             border-radius: 8px;
             min-height: 46px;

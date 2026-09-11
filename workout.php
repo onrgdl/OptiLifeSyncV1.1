@@ -42,14 +42,14 @@ $activePage = 'workout';
 
     <style>
         :root {
-            --card-bg: #111827;
-            --card-hover: #162032;
-            --card-border: rgba(255, 255, 255, 0.08);
-            --accent-green: #10b981;
-            --accent-yellow: #f59e0b;
-            --accent-red: #ef4444;
-            --accent-blue: #38bdf8;
-            --accent-purple: #a855f7;
+            --card-bg: #ffffff;
+            --card-hover: #fdfbf7;
+            --card-border: #e2ddd3;
+            --accent-green: #16a34a;
+            --accent-yellow: #d97706;
+            --accent-red: #dc2626;
+            --accent-blue: #0284c7;
+            --accent-purple: #9333ea;
         }
 
         .stat-card {
@@ -61,7 +61,7 @@ $activePage = 'workout';
             transition: transform 0.2s ease, border-color 0.2s ease;
         }
         .stat-card:hover {
-            border-color: rgba(56, 189, 248, 0.3);
+            border-color: rgba(2, 132, 199, 0.3);
             transform: translateY(-2px);
         }
 
@@ -112,15 +112,15 @@ $activePage = 'workout';
         }
         .day-card:hover {
             background: var(--card-hover);
-            border-color: rgba(255, 255, 255, 0.16);
+            border-color: rgba(2, 132, 199, 0.3);
         }
         .day-card.is-today {
             border-color: var(--accent);
-            box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
-            background: linear-gradient(180deg, rgba(56, 189, 248, 0.04) 0%, rgba(17, 24, 39, 1) 100%);
+            box-shadow: 0 0 16px rgba(2, 132, 199, 0.12);
+            background: linear-gradient(180deg, rgba(2, 132, 199, 0.05) 0%, #ffffff 100%);
         }
         .day-card.has-workout {
-            border-top: 3px solid #f97316;
+            border-top: 3px solid #ea580c;
         }
         .day-card.is-completed {
             border-top: 3px solid var(--accent-green);
@@ -130,7 +130,7 @@ $activePage = 'workout';
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            border-bottom: 1px solid var(--border);
             padding-bottom: 0.6rem;
             margin-bottom: 0.75rem;
         }
@@ -139,19 +139,19 @@ $activePage = 'workout';
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: #94a3b8;
+            color: var(--muted);
         }
         .day-date {
             font-size: 1.15rem;
             font-weight: 800;
-            color: #f8fafc;
+            color: var(--text);
         }
 
         /* Dinamik Makro Rozeti */
         .macro-badge {
-            background: linear-gradient(135deg, rgba(249, 115, 22, 0.18), rgba(239, 68, 68, 0.12));
-            border: 1px solid rgba(249, 115, 22, 0.35);
-            color: #fdba74;
+            background: rgba(234, 88, 12, 0.12);
+            border: 1px solid rgba(234, 88, 12, 0.25);
+            color: #c2410c;
             font-size: 0.73rem;
             font-weight: 700;
             border-radius: 8px;
@@ -160,19 +160,19 @@ $activePage = 'workout';
             align-items: center;
             gap: 0.4rem;
             margin: 0.6rem 0;
-            box-shadow: 0 2px 6px rgba(249, 115, 22, 0.1);
+            box-shadow: 0 1px 4px rgba(234, 88, 12, 0.08);
         }
         .macro-badge.inactive {
-            background: rgba(255, 255, 255, 0.03);
-            border-color: rgba(255, 255, 255, 0.06);
-            color: #64748b;
+            background: var(--surface-2);
+            border-color: var(--border);
+            color: var(--muted);
         }
 
         /* Antrenman Tipi & Zorluk */
         .workout-type-tag {
             font-size: 0.92rem;
             font-weight: 700;
-            color: #f1f5f9;
+            color: var(--text);
             display: flex;
             align-items: center;
             gap: 0.4rem;
@@ -184,13 +184,13 @@ $activePage = 'workout';
             border-radius: 6px;
             font-weight: 600;
         }
-        .diff-kolay  { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-        .diff-orta   { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
-        .diff-zor    { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .diff-kolay  { background: rgba(22, 163, 74, 0.12); color: #16a34a; border: 1px solid rgba(22, 163, 74, 0.25); }
+        .diff-orta   { background: rgba(217, 119, 6, 0.12); color: #d97706; border: 1px solid rgba(217, 119, 6, 0.25); }
+        .diff-zor    { background: rgba(220, 38, 38, 0.12); color: #dc2626; border: 1px solid rgba(220, 38, 38, 0.25); }
 
         /* Butonlar */
         .btn-finish-workout {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
             color: #fff;
             font-weight: 700;
             font-size: 0.8rem;
@@ -198,19 +198,18 @@ $activePage = 'workout';
             border-radius: 8px;
             padding: 0.5rem 0.75rem;
             transition: all 0.2s ease;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+            box-shadow: 0 2px 8px rgba(22, 163, 74, 0.2);
         }
         .btn-finish-workout:hover {
-            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            background: linear-gradient(135deg, #15803d 0%, #166534 100%);
             transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
             color: #fff;
         }
 
         .completed-pill {
-            background: rgba(16, 185, 129, 0.12);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            color: #34d399;
+            background: rgba(22, 163, 74, 0.12);
+            border: 1px solid rgba(22, 163, 74, 0.25);
+            color: #16a34a;
             font-size: 0.76rem;
             font-weight: 700;
             border-radius: 8px;
@@ -222,9 +221,9 @@ $activePage = 'workout';
         }
 
         .post-workout-alert {
-            background: rgba(56, 189, 248, 0.1);
-            border: 1px dashed rgba(56, 189, 248, 0.4);
-            color: #7dd3fc;
+            background: rgba(2, 132, 199, 0.08);
+            border: 1px dashed rgba(2, 132, 199, 0.3);
+            color: #0369a1;
             font-size: 0.72rem;
             border-radius: 8px;
             padding: 0.4rem 0.55rem;
@@ -238,26 +237,26 @@ $activePage = 'workout';
             align-items: center;
             justify-content: center;
             height: 120px;
-            color: #475569;
+            color: var(--muted);
             text-align: center;
         }
 
         .modal-content {
-            background: #111827;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            color: #f8fafc;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
             border-radius: 16px;
         }
         .form-control, .form-select {
-            background-color: #0b1120;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            color: #f8fafc;
+            background-color: #ffffff;
+            border: 1px solid var(--border);
+            color: var(--text);
         }
         .form-control:focus, .form-select:focus {
-            background-color: #0b1120;
+            background-color: #ffffff;
             border-color: var(--accent);
-            color: #f8fafc;
-            box-shadow: 0 0 0 0.25rem rgba(56, 189, 248, 0.2);
+            color: var(--text);
+            box-shadow: 0 0 0 0.25rem rgba(2, 132, 199, 0.15);
         }
     </style>
 </head>

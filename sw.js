@@ -7,7 +7,7 @@
  * 3. Bildirim (Push Notification) olaylarını yönetir
  */
 
-const CACHE_NAME = 'optilifesync-cache-v1';
+const CACHE_NAME = 'optilifesync-cache-v2';
 
 // Önbelleğe alınacak statik kabuk dosyaları
 const STATIC_ASSETS = [

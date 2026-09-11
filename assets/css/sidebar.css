@@ -2,18 +2,18 @@
    OptiLifeSync - Global Sidebar & Ortak Layout Stilleri
 ═══════════════════════════════════════════════════════════ */
 :root {
-    --bg:          #0f172a;
-    --surface:     #1e293b;
-    --surface-2:   #283548;
-    --border:      rgba(255, 255, 255, 0.09);
-    --accent:      #38bdf8;
-    --accent-dim:  rgba(56, 189, 248, 0.12);
-    --green:       #22c55e;
-    --red:         #f87171;
-    --yellow:      #facc15;
-    --purple:      #c084fc;
-    --text:        #f8fafc;
-    --muted:       #94a3b8;
+    --bg:          #f6f3eb;
+    --surface:     #ffffff;
+    --surface-2:   #ede8de;
+    --border:      #e2ddd3;
+    --accent:      #0284c7;
+    --accent-dim:  rgba(2, 132, 199, 0.12);
+    --green:       #16a34a;
+    --red:         #dc2626;
+    --yellow:      #d97706;
+    --purple:      #9333ea;
+    --text:        #1e293b;
+    --muted:       #64748b;
     --sidebar-w:   240px;
 }
 
@@ -57,7 +57,7 @@ button, .btn, .nav-item, .bottom-nav-item, a {
 .sidebar {
     width: var(--sidebar-w);
     min-height: 100vh;
-    background: var(--surface);
+    background: #ffffff;
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
@@ -68,6 +68,7 @@ button, .btn, .nav-item, .bottom-nav-item, a {
     z-index: 1000;
     transition: transform 0.25s ease-in-out;
     user-select: none;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.03);
 }
 
 .sidebar-logo {
@@ -129,7 +130,7 @@ button, .btn, .nav-item, .bottom-nav-item, a {
 }
 
 .nav-item:hover {
-    background: var(--border);
+    background: var(--surface-2);
     color: var(--text);
 }
 
@@ -195,8 +196,9 @@ button, .btn, .nav-item, .bottom-nav-item, a {
     position: sticky;
     top: 0;
     z-index: 500;
-    background: rgba(8, 15, 30, 0.85);
+    background: rgba(246, 243, 235, 0.95);
     backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
     padding: 0 24px;
     height: 60px;
@@ -244,11 +246,12 @@ button, .btn, .nav-item, .bottom-nav-item, a {
 
 .btn-topbar.btn-accent {
     background: var(--accent);
-    color: #0c1a27;
+    color: #ffffff;
 }
 
 .btn-topbar.btn-accent:hover {
-    background: #7dd3fc;
+    background: #0369a1;
+    color: #ffffff;
 }
 
 .btn-topbar.btn-ghost {
@@ -363,14 +366,14 @@ button, .btn, .nav-item, .bottom-nav-item, a {
         right: 0;
         height: calc(62px + env(safe-area-inset-bottom, 0px));
         padding-bottom: env(safe-area-inset-bottom, 0px);
-        background: rgba(17, 24, 39, 0.96);
+        background: rgba(246, 243, 235, 0.96);
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        border-top: 1px solid var(--border);
         z-index: 1040;
         align-items: center;
         justify-content: space-around;
-        box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
     }
 
     .bottom-nav-item {
@@ -378,7 +381,7 @@ button, .btn, .nav-item, .bottom-nav-item, a {
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        color: var(--text-muted);
+        color: var(--muted);
         text-decoration: none;
         font-size: 10px;
         font-weight: 600;
@@ -399,7 +402,7 @@ button, .btn, .nav-item, .bottom-nav-item, a {
 
     .bottom-nav-item:hover,
     .bottom-nav-item:focus {
-        color: #f8fafc;
+        color: var(--text);
     }
 
     .bottom-nav-item.active {
@@ -409,7 +412,7 @@ button, .btn, .nav-item, .bottom-nav-item, a {
     .bottom-nav-item.active i {
         transform: translateY(-2px);
         color: var(--accent);
-        filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));
+        filter: drop-shadow(0 0 6px rgba(2, 132, 199, 0.4));
     }
 
     .bottom-nav-item.active::after {
@@ -428,15 +431,15 @@ button, .btn, .nav-item, .bottom-nav-item, a {
         top: 12px;
         left: 12px;
         right: 12px;
-        background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
-        border: 1px solid rgba(56, 189, 248, 0.4);
+        background: #ffffff;
+        border: 1px solid var(--border);
         border-radius: 16px;
         padding: 12px 16px;
         z-index: 9999;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
         animation: slideDown 0.35s ease;
     }
 }
@@ -444,4 +447,98 @@ button, .btn, .nav-item, .bottom-nav-item, a {
 @keyframes slideDown {
     from { transform: translateY(-100%); opacity: 0; }
     to   { transform: translateY(0); opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GLOBAL LIGHT & CREAM THEME ENFORCEMENT & OVERRIDES
+   ═══════════════════════════════════════════════════════════ */
+.card {
+    background-color: var(--surface) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.text-light {
+    color: var(--text) !important;
+}
+
+.text-white:not(.btn):not(.badge):not(.btn-topbar):not(.alert) {
+    color: var(--text) !important;
+}
+
+.table-dark {
+    --bs-table-bg: transparent !important;
+    --bs-table-color: var(--text) !important;
+    --bs-table-border-color: var(--border) !important;
+    --bs-table-hover-bg: rgba(0, 0, 0, 0.02) !important;
+    --bs-table-hover-color: var(--text) !important;
+    color: var(--text) !important;
+}
+
+.table-dark th {
+    color: var(--muted) !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+
+.table-dark td {
+    color: var(--text) !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+
+.form-control, .form-select {
+    background-color: #ffffff !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: #ffffff !important;
+    color: var(--text) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 0.25rem rgba(2, 132, 199, 0.15) !important;
+}
+
+.form-control::placeholder, .form-select::placeholder {
+    color: var(--muted) !important;
+}
+
+.modal-content {
+    background-color: var(--surface) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12) !important;
+}
+
+.modal-header, .modal-footer {
+    border-color: var(--border) !important;
+}
+
+.btn-close.btn-close-white {
+    filter: none !important;
+}
+
+.btn-outline-light {
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+    background: var(--surface) !important;
+}
+
+.btn-outline-light:hover {
+    background: var(--surface-2) !important;
+    color: var(--text) !important;
+    border-color: var(--accent) !important;
+}
+
+/* SweetAlert2 Light Cream Overrides */
+div:where(.swal2-container) div:where(.swal2-popup) {
+    background: #ffffff !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12) !important;
+}
+
+div:where(.swal2-container) .swal2-title,
+div:where(.swal2-container) .swal2-html-container {
+    color: var(--text) !important;
 }

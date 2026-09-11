@@ -278,25 +278,25 @@ $deficits = $tracker->getDeficits($macroTarget);
     <link rel="stylesheet" href="assets/css/sidebar.css">
     <style>
         .card       { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
-        .form-control, .form-select { background: var(--bg); border-color: var(--border); color: #f8fafc; }
-        .form-control:focus, .form-select:focus { background: var(--bg); border-color: var(--accent); color: #f8fafc; box-shadow: 0 0 0 .25rem rgba(56,189,248,.2); }
-        .progress   { height: 10px; background: rgba(255,255,255,.07); border-radius: 99px; }
+        .form-control, .form-select { background: #ffffff; border-color: var(--border); color: var(--text); }
+        .form-control:focus, .form-select:focus { background: #ffffff; border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 .25rem rgba(2,132,199,.15); }
+        .progress   { height: 10px; background: rgba(0,0,0,.06); border-radius: 99px; }
         .badge-ai   { background: linear-gradient(135deg, #0284c7, #6366f1); color: #fff; }
-        .badge-local{ background: #10b981; color: #fff; }
+        .badge-local{ background: #16a34a; color: #fff; }
 
         /* Makro renk sistemi */
-        .m-calorie  { color: #f87171; }
-        .m-protein  { color: #60a5fa; }
-        .m-carb     { color: #facc15; }
-        .m-fat      { color: #c084fc; }
-        .bg-calorie { background: rgba(248,113,113,.15); border: 1px solid rgba(248,113,113,.3); }
-        .bg-protein { background: rgba(96,165,250,.15);  border: 1px solid rgba(96,165,250,.3); }
-        .bg-carb    { background: rgba(250,204,21,.15);  border: 1px solid rgba(250,204,21,.3); }
-        .bg-fat     { background: rgba(192,132,252,.15); border: 1px solid rgba(192,132,252,.3); }
+        .m-calorie  { color: #ef4444; }
+        .m-protein  { color: #2563eb; }
+        .m-carb     { color: #d97706; }
+        .m-fat      { color: #9333ea; }
+        .bg-calorie { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.25); }
+        .bg-protein { background: rgba(37,99,235,.12);  border: 1px solid rgba(37,99,235,.25); }
+        .bg-carb    { background: rgba(217,119,6,.12);  border: 1px solid rgba(217,119,6,.25); }
+        .bg-fat     { background: rgba(147,51,234,.12); border: 1px solid rgba(147,51,234,.25); }
 
-        .status-deficit  { color: #f87171; }
-        .status-on_track { color: #4ade80; }
-        .status-over     { color: #fb923c; }
+        .status-deficit  { color: #ef4444; }
+        .status-on_track { color: #16a34a; }
+        .status-over     { color: #ea580c; }
     </style>
 </head>
 <body>

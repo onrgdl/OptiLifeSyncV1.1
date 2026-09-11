@@ -97,17 +97,17 @@ $activePage = 'creator';
 
     <style>
         :root {
-            --bg: #0f172a;
-            --surface: #1e293b;
-            --surface-2: #283548;
-            --border: rgba(255,255,255,.09);
-            --accent: #38bdf8;
-            --green: #22c55e;
-            --yellow: #facc15;
-            --red: #f87171;
-            --purple: #c084fc;
-            --text: #f8fafc;
-            --muted: #94a3b8;
+            --bg: #f6f3eb;
+            --surface: #ffffff;
+            --surface-2: #ede8de;
+            --border: #e2ddd3;
+            --accent: #0284c7;
+            --green: #16a34a;
+            --yellow: #d97706;
+            --red: #dc2626;
+            --purple: #9333ea;
+            --text: #1e293b;
+            --muted: #64748b;
             --sidebar-w: 240px;
         }
 
@@ -136,7 +136,7 @@ $activePage = 'creator';
         }
 
         .top-bar {
-            background: var(--surface);
+            background: rgba(246, 243, 235, 0.95);
             border-bottom: 1px solid var(--border);
             padding: 16px 28px;
             display: flex;
@@ -385,16 +385,16 @@ $activePage = 'creator';
 <!-- PIN Sıfırlama Modalı -->
 <div class="modal fade" id="resetPinModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-dark text-light border border-secondary">
+        <div class="modal-content">
             <form method="POST" action="creator.php">
                 <input type="hidden" name="action" value="reset_pin">
                 <input type="hidden" name="target_user_id" id="modal_target_user_id" value="">
 
-                <div class="modal-header border-secondary">
+                <div class="modal-header">
                     <h5 class="modal-title fw-bold">
                         <i class="bi bi-key-fill text-warning me-2"></i>PIN Sıfırla — <span id="modal_target_name"></span>
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <p class="text-secondary small">
@@ -402,10 +402,10 @@ $activePage = 'creator';
                     </p>
                     <div class="mb-3">
                         <label class="form-label text-secondary small fw-bold">Yeni PIN Kodu</label>
-                        <input type="text" name="new_pin" class="form-control bg-secondary bg-opacity-25 text-light border-secondary" placeholder="Örn: 1234" minlength="4" required autofocus>
+                        <input type="text" name="new_pin" class="form-control" placeholder="Örn: 1234" minlength="4" required autofocus>
                     </div>
                 </div>
-                <div class="modal-footer border-secondary">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Vazgeç</button>
                     <button type="submit" class="btn btn-warning btn-sm fw-bold">PIN'i Güncelle</button>
                 </div>

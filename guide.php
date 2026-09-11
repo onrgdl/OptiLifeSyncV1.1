@@ -30,12 +30,12 @@ $activePage = 'guide';
 
     <style>
         :root {
-            --surface-hover: #1e293b;
+            --surface-hover: #fdfbf7;
         }
 
         .guide-hero {
-            background: linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(99, 102, 241, 0.08) 50%, rgba(16, 185, 129, 0.06) 100%);
-            border: 1px solid rgba(56, 189, 248, 0.25);
+            background: linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(99, 102, 241, 0.05) 50%, rgba(22, 163, 74, 0.05) 100%);
+            border: 1px solid rgba(2, 132, 199, 0.2);
             border-radius: 20px;
             padding: 2.2rem;
             position: relative;
@@ -49,14 +49,14 @@ $activePage = 'guide';
             right: -10%;
             width: 320px;
             height: 320px;
-            background: radial-gradient(circle, rgba(56, 189, 248, 0.15) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(2, 132, 199, 0.1) 0%, transparent 70%);
             pointer-events: none;
         }
 
         .nav-pill-btn {
             background: var(--surface);
             border: 1px solid var(--border);
-            color: #94a3b8;
+            color: var(--muted);
             padding: 0.55rem 1.1rem;
             border-radius: 99px;
             font-size: 13px;
@@ -70,7 +70,7 @@ $activePage = 'guide';
         }
         .nav-pill-btn:hover {
             background: var(--surface-hover);
-            color: #f8fafc;
+            color: var(--accent);
             border-color: var(--accent);
             transform: translateY(-2px);
         }
@@ -85,8 +85,8 @@ $activePage = 'guide';
             scroll-margin-top: 80px;
         }
         .module-section:hover {
-            border-color: rgba(255, 255, 255, 0.16);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+            border-color: rgba(2, 132, 199, 0.3);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
         }
 
         .module-header {
@@ -112,8 +112,8 @@ $activePage = 'guide';
         }
 
         .feature-card {
-            background: rgba(0, 0, 0, 0.28);
-            border: 1px solid rgba(255, 255, 255, 0.06);
+            background: var(--surface-2);
+            border: 1px solid var(--border);
             border-radius: 14px;
             padding: 1.25rem;
             height: 100%;
@@ -125,7 +125,7 @@ $activePage = 'guide';
         .feature-title {
             font-size: 14px;
             font-weight: 700;
-            color: #f8fafc;
+            color: var(--text);
             margin-bottom: 0.45rem;
             display: flex;
             align-items: center;
@@ -134,18 +134,18 @@ $activePage = 'guide';
 
         .feature-desc {
             font-size: 13px;
-            color: #94a3b8;
+            color: var(--muted);
             line-height: 1.6;
             margin: 0;
         }
 
         .tip-box {
-            background: rgba(56, 189, 248, 0.08);
+            background: rgba(2, 132, 199, 0.07);
             border-left: 4px solid var(--accent);
             border-radius: 0 12px 12px 0;
             padding: 0.9rem 1.2rem;
             font-size: 13px;
-            color: #cbd5e1;
+            color: var(--text);
             margin-top: 1.3rem;
             display: flex;
             align-items: flex-start;
@@ -159,11 +159,11 @@ $activePage = 'guide';
         }
 
         .search-bar-wrap input {
-            background: #0b1329;
+            background: #ffffff;
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 0.7rem 1.1rem 0.7rem 2.6rem;
-            color: #f8fafc;
+            color: var(--text);
             font-size: 14px;
             width: 100%;
             outline: none;
@@ -172,7 +172,7 @@ $activePage = 'guide';
 
         .search-bar-wrap input:focus {
             border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
         }
 
         .search-bar-wrap i {

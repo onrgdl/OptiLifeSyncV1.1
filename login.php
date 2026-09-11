@@ -80,20 +80,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <style>
         :root {
-            --bg: #0f172a;
-            --surface: #1e293b;
-            --surface-2: #283548;
-            --border: rgba(255,255,255,.09);
-            --accent: #38bdf8;
-            --green: #22c55e;
-            --yellow: #facc15;
-            --red: #f87171;
-            --text: #f8fafc;
-            --muted: #94a3b8;
+            --bg: #f6f3eb;
+            --surface: #ffffff;
+            --surface-2: #ede8de;
+            --border: #e2ddd3;
+            --accent: #0284c7;
+            --green: #16a34a;
+            --yellow: #d97706;
+            --red: #dc2626;
+            --text: #1e293b;
+            --muted: #64748b;
         }
 
         body {
-            background: radial-gradient(circle at 50% 20%, #1e293b 0%, var(--bg) 70%);
+            background: radial-gradient(circle at 50% 20%, #ffffff 0%, var(--bg) 80%);
             min-height: 100vh;
             color: var(--text);
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -106,13 +106,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .auth-card {
             width: 100%;
             max-width: 440px;
-            background: rgba(17, 24, 39, 0.85);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
+            background: #ffffff;
             border: 1px solid var(--border);
             border-radius: 24px;
             padding: 32px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 30px rgba(56, 189, 248, 0.08);
+            box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.08);
         }
 
         .auth-logo {
@@ -139,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 22px;
             font-weight: 800;
             letter-spacing: -0.5px;
-            background: linear-gradient(90deg, #38bdf8, #4ade80);
+            background: linear-gradient(90deg, #0284c7, #16a34a);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -162,37 +160,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .nav-link:hover {
             color: var(--text);
-            background: rgba(255,255,255,0.03);
+            background: var(--surface-2);
         }
 
         .nav-link.active {
-            color: #38bdf8 !important;
-            background: rgba(56, 189, 248, 0.12) !important;
-            border: 1px solid rgba(56, 189, 248, 0.25) !important;
+            color: #0284c7 !important;
+            background: rgba(2, 132, 199, 0.1) !important;
+            border: 1px solid rgba(2, 132, 199, 0.25) !important;
         }
 
         .form-label {
             font-size: 13px;
             font-weight: 600;
-            color: var(--muted);
+            color: var(--text);
             margin-bottom: 6px;
         }
 
         .form-control {
-            background: var(--surface-2);
+            background: #ffffff;
             border: 1px solid var(--border);
             border-radius: 12px;
-            color: #fff;
+            color: var(--text);
             padding: 12px 16px;
             font-size: 14px;
             transition: all .2s;
         }
 
         .form-control:focus {
-            background: var(--surface-2);
+            background: #ffffff;
             border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
-            color: #fff;
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2);
+            color: var(--text);
         }
 
         .btn-auth {
@@ -206,7 +204,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             width: 100%;
             transition: all .2s;
             margin-top: 12px;
-            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.25);
         }
 
         .btn-auth:hover {
@@ -216,8 +214,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .recovery-box {
-            background: rgba(250, 204, 21, 0.08);
-            border: 1px dashed rgba(250, 204, 21, 0.4);
+            background: rgba(217, 119, 6, 0.08);
+            border: 1px dashed rgba(217, 119, 6, 0.4);
             border-radius: 14px;
             padding: 16px;
             margin: 16px 0;
@@ -228,7 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-family: monospace;
             font-size: 20px;
             font-weight: 800;
-            color: #facc15;
+            color: #d97706;
             letter-spacing: 2px;
             user-select: all;
         }

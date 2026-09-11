@@ -293,7 +293,7 @@ $chartFat         = array_map(fn($d) => $d['consumed']['fat_g'], $days);
 
     <style>
         :root {
-            --surface-hover: #1e293b;
+            --surface-hover: #fdfbf7;
         }
 
         .report-card {
@@ -306,7 +306,7 @@ $chartFat         = array_map(fn($d) => $d['consumed']['fat_g'], $days);
             transition: transform .2s ease, border-color .2s ease;
         }
         .report-card:hover {
-            border-color: rgba(56, 189, 248, 0.3);
+            border-color: rgba(2, 132, 199, 0.3);
         }
 
         .kpi-title {
@@ -639,13 +639,13 @@ new Chart(ctxCal, {
         maintainAspectRatio: false,
         plugins: {
             legend: {
-                labels: { color: '#94a3b8', font: { size: 12 } }
+                labels: { color: '#64748b', font: { size: 12 } }
             },
             tooltip: {
-                backgroundColor: '#111827',
-                titleColor: '#f8fafc',
-                bodyColor: '#e2e8f0',
-                borderColor: '#334155',
+                backgroundColor: '#ffffff',
+                titleColor: '#0f172a',
+                bodyColor: '#334155',
+                borderColor: '#e2ddd3',
                 borderWidth: 1,
                 callbacks: {
                     afterBody: function(items) {
@@ -660,12 +660,12 @@ new Chart(ctxCal, {
         },
         scales: {
             x: {
-                ticks: { color: '#94a3b8' },
-                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                ticks: { color: '#64748b' },
+                grid: { color: 'rgba(0, 0, 0, 0.06)' }
             },
             y: {
-                ticks: { color: '#94a3b8' },
-                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                ticks: { color: '#64748b' },
+                grid: { color: 'rgba(0, 0, 0, 0.06)' },
                 suggestedMin: 1500
             }
         }
@@ -680,8 +680,8 @@ new Chart(ctxMacro, {
         labels: ['Protein (%<?= $pctProt ?>)', 'Karbonhidrat (%<?= $pctCarb ?>)', 'Yağ (%<?= $pctFat ?>)'],
         datasets: [{
             data: [<?= $pctProt ?: 30 ?>, <?= $pctCarb ?: 45 ?>, <?= $pctFat ?: 25 ?>],
-            backgroundColor: ['#60a5fa', '#facc15', '#c084fc'],
-            borderColor: '#111827',
+            backgroundColor: ['#2563eb', '#d97706', '#9333ea'],
+            borderColor: '#ffffff',
             borderWidth: 3,
             hoverOffset: 6
         }]
@@ -692,7 +692,7 @@ new Chart(ctxMacro, {
         plugins: {
             legend: {
                 position: 'bottom',
-                labels: { color: '#94a3b8', font: { size: 11 }, padding: 14 }
+                labels: { color: '#64748b', font: { size: 11 }, padding: 14 }
             }
         },
         cutout: '70%'
