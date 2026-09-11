@@ -119,7 +119,7 @@ self.addEventListener('notificationclick', (event) => {
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
             for (let client of windowClients) {
-                if (client.url.includes('OptiLifeSync') || client.url.includes(urlToOpen)) {
+                if (client.url.includes('OptiLifeSync') || client.url.includes(urlToOpen) || client.url.includes('dashboard') || client.url.includes('reminders')) {
                     return client.focus();
                 }
             }

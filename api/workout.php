@@ -158,21 +158,59 @@ try {
 
         // ── 2. ANTRENMAN KAYDET / GÜNCELLE ─────────────────────────────
         'save' => (function () use ($workoutService, $userId): void {
-            $date       = trim($_POST['tarih'] ?? '');
+            $rawDates = $_POST['tarihler'] ?? $_POST['tarih'] ?? [];
+            if (!is_array($rawDates)) {
+                if (strpos((string)$rawDates, ',') !== false) {
+                    $dates = array_filter(array_map('trim', explode(',', (string)$rawDates)));
+                } else {
+                    $trimmed = trim((string)$rawDates);
+                    $dates = $trimmed !== '' ? [$trimmed] : [];
+                }
+            } else {
+                $dates = array_filter(array_map('trim', $rawDates));
+            }
+            $dates = array_values(array_unique(array_filter($dates)));
+
             $type       = trim($_POST['antrenman_tipi'] ?? '');
             $difficulty = trim($_POST['zorluk_seviyesi'] ?? 'Orta');
 
-            if (empty($date) || empty($type)) {
+            if (empty($dates) || empty($type)) {
                 http_response_code(422);
                 echo json_encode([
                     'ok'    => false,
-                    'error' => 'Tarih ve antrenman tipi zorunludur.',
+                    'error' => 'En az bir tarih ve antrenman tipi seçilmelidir.',
                 ], JSON_UNESCAPED_UNICODE);
                 return;
             }
 
-            $res = $workoutService->saveWorkout($userId, $date, $type, $difficulty);
-            echo json_encode($res, JSON_UNESCAPED_UNICODE);
+            $savedCount = 0;
+            $lastRes = null;
+            foreach ($dates as $date) {
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+                    $lastRes = $workoutService->saveWorkout($userId, $date, $type, $difficulty);
+                    if (!empty($lastRes['ok'])) {
+                        $savedCount++;
+                    }
+                }
+            }
+
+            if ($savedCount === 0) {
+                http_response_code(500);
+                echo json_encode([
+                    'ok'    => false,
+                    'error' => 'Antrenman planı kaydedilemedi.',
+                ], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+
+            echo json_encode([
+                'ok'      => true,
+                'message' => $savedCount > 1 
+                    ? "{$savedCount} antrenman günü başarıyla planlandı." 
+                    : ($lastRes['message'] ?? 'Antrenman planı başarıyla kaydedildi.'),
+                'count'   => $savedCount,
+                'dates'   => $dates,
+            ], JSON_UNESCAPED_UNICODE);
         })(),
 
         // ── 3. ANTRENMANI TAMAMLA (BİTİR) + 15 DK ALARMI ──────────────

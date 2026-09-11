@@ -273,6 +273,115 @@ class OptiAlarmEngine {
         if ('vibrate' in navigator) {
             try { navigator.vibrate(0); } catch (_) {}
         }
+        // Alarm durdurulduğunda medya oturumu başlığını nöbetçi moduna döndür
+        if (this.isSentinelActive) {
+            this.updateMediaSessionMetadata();
+        }
+    }
+
+    /**
+     * ─── ALARM TETİKLEYİCİ & SİSTEM BİLDİRİMİ ───
+     * Alarm vakti geldiğinde hem melodiyi çalar, hem de Android / PWA / Kilit Ekranı
+     * üzerinde görünen sistem bildirimini ateşler.
+     */
+    triggerAlarm(data = {}) {
+        const title = data.title || (data.type === 'medication' ? '💊 İlaç Zamanı!' : '💪 Takviye Zamanı!');
+        const label = data.label || 'İlaç/Takviye';
+        const dose  = data.dose ? ` (${data.dose})` : '';
+        const body  = data.body || `${label}${dose} alma vaktiniz geldi!`;
+
+        // 1. Sesli alarmı döngüsel başlat
+        this.start();
+
+        // 2. Kilit ekranı medya bildirimini hemen kırmızı alarm durumuna geçir
+        if ('mediaSession' in navigator) {
+            try {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: `🚨 ${title}`,
+                    artist: body,
+                    album: 'OptiLifeSync Alarmı'
+                });
+                navigator.mediaSession.playbackState = 'playing';
+            } catch (_) {}
+        }
+
+        // 3. Android Doze / Kilit ekranı sistem bildirimini göster
+        this.showSystemNotification(title, {
+            body: body,
+            tag: 'opti-alarm-' + (data.id || 'now'),
+            data: { id: data.id, url: window.location.origin + '/reminders.php' }
+        });
+    }
+
+    /**
+     * Mobil Chrome'da "Illegal constructor" hatası vermeyen,
+     * Service Worker üzerinden telefon ekranına bildirim basan fonksiyon.
+     */
+    async showSystemNotification(title, options = {}) {
+        const iconUrl = window.location.origin + '/assets/icons/icon-192.png';
+        const finalOpts = {
+            body: options.body || 'OptiLifeSync Alarmı',
+            icon: options.icon || iconUrl,
+            badge: options.badge || iconUrl,
+            tag: options.tag || 'opti-alarm',
+            renotify: true,
+            requireInteraction: true,
+            vibrate: [500, 250, 500, 250, 500, 250, 500],
+            silent: false,
+            timestamp: Date.now(),
+            data: Object.assign({ url: window.location.origin + '/reminders.php' }, options.data || {})
+        };
+
+        // 1. Titreşim desteği
+        if ('vibrate' in navigator) {
+            try { navigator.vibrate(finalOpts.vibrate); } catch (_) {}
+        }
+
+        // 2. Capacitor LocalNotifications (Mobil APK)
+        if (window.Capacitor?.Plugins?.LocalNotifications) {
+            try {
+                await window.Capacitor.Plugins.LocalNotifications.schedule({
+                    notifications: [{
+                        id: Math.floor(Math.random() * 900000) + 100000,
+                        title: title,
+                        body: finalOpts.body,
+                        channelId: 'opti_alarms_channel',
+                        extra: finalOpts.data
+                    }]
+                });
+            } catch (e) {
+                console.warn('Capacitor anlık bildirim hatası:', e);
+            }
+        }
+
+        // 3. Service Worker showNotification (Android Chrome & PWA için ZORUNLU!)
+        if ('serviceWorker' in navigator) {
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                if (reg && typeof reg.showNotification === 'function') {
+                    await reg.showNotification(title, finalOpts);
+                    return true;
+                }
+            } catch (err) {
+                console.warn('ServiceWorker showNotification hatası:', err);
+            }
+        }
+
+        // 4. Masaüstü Tarayıcı Fallback
+        if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+                const notif = new Notification(title, finalOpts);
+                notif.onclick = function () {
+                    window.focus();
+                    notif.close();
+                };
+                return true;
+            } catch (err) {
+                console.warn('Notification constructor fallback hatası:', err);
+            }
+        }
+
+        return false;
     }
 
     /**

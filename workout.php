@@ -258,6 +258,29 @@ $activePage = 'workout';
             color: var(--text);
             box-shadow: 0 0 0 0.25rem rgba(2, 132, 199, 0.15);
         }
+        .day-chip {
+            cursor: pointer;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 8px 10px;
+            background: #f8fafc;
+            color: #334155;
+            transition: all 0.18s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+        }
+        .day-chip:hover {
+            border-color: #0284c7;
+            background: #f0f9ff;
+        }
+        .day-chip.active {
+            background: #0284c7 !important;
+            border-color: #0284c7 !important;
+            color: #ffffff !important;
+            box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+        }
     </style>
 </head>
 <body>
@@ -395,27 +418,85 @@ $activePage = 'workout';
 
 <!-- ═══════════════════════ MODAL: ANTRENMAN EKLE / DÜZENLE ═══════════════════════ -->
 <div class="modal fade" id="workoutModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow-lg">
-            <div class="modal-header border-secondary border-opacity-25">
-                <h5 class="modal-title fw-bold text-light" id="workoutModalTitle">
-                    <i class="bi bi-activity text-info me-2"></i>Antrenman Planla
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content shadow-lg" style="background:#ffffff; color:#1e293b; border-radius:18px; border:1px solid var(--border);">
+            <div class="modal-header border-bottom" style="border-color:var(--border) !important;">
+                <h5 class="modal-title fw-bold" id="workoutModalTitle" style="color:#0f172a;">
+                    <i class="bi bi-activity text-primary me-2"></i>Antrenman Planla
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
             </div>
             <form id="workoutForm" onsubmit="handleWorkoutSubmit(event)">
-                <div class="modal-body">
+                <div class="modal-body p-3 p-md-4">
                     
-                    <!-- Tarih -->
-                    <div class="mb-3">
-                        <label class="form-label small text-secondary fw-semibold">Antrenman Tarihi</label>
-                        <input type="date" class="form-control" name="tarih" id="modalDate" required>
+                    <!-- ÇOKLU GÜN SEÇİMİ (Planlama / Ekleme Modu) -->
+                    <div class="mb-3" id="multiDaySection">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label small fw-bold text-dark mb-0">
+                                <i class="bi bi-calendar-check text-primary me-1"></i>Antrenman Günleri
+                            </label>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-semibold" id="selectedDaysBadge">
+                                0 gün seçildi
+                            </span>
+                        </div>
+                        <p class="text-secondary small mb-2" style="font-size:12.5px;">
+                            Planlamak istediğiniz günlerin üzerine dokunarak birden fazla gün seçebilirsiniz:
+                        </p>
+
+                        <!-- Hızlı Seçim Şablonları -->
+                        <div class="d-flex flex-wrap gap-1 mb-3">
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 fw-semibold" style="font-size:11.5px; border-radius:6px;" onclick="applyDayPreset('mwf')">
+                                🏋️ Pzt - Çar - Cum (3 Gün)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 fw-semibold" style="font-size:11.5px; border-radius:6px;" onclick="applyDayPreset('tt')">
+                                🏃 Salı - Perş (2 Gün)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 fw-semibold" style="font-size:11.5px; border-radius:6px;" onclick="applyDayPreset('weekdays')">
+                                ⚡ Hafta İçi (5 Gün)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 fw-semibold" style="font-size:11.5px; border-radius:6px;" onclick="applyDayPreset('all')">
+                                Tüm Hafta
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2 fw-semibold" style="font-size:11.5px; border-radius:6px;" onclick="applyDayPreset('clear')">
+                                Temizle
+                            </button>
+                        </div>
+
+                        <!-- 7 Gün Chip Izgarası -->
+                        <div class="row g-2" id="weekDayChipsContainer">
+                            <!-- JS ile render edilecek -->
+                        </div>
+
+                        <!-- Ek Tarih Ekleme -->
+                        <div class="mt-3 pt-2 border-top border-light-subtle">
+                            <a class="small text-decoration-none text-primary fw-semibold d-inline-flex align-items-center gap-1" data-bs-toggle="collapse" href="#collapseExtraDate" role="button" aria-expanded="false">
+                                <i class="bi bi-calendar-plus"></i> Başka bir tarih daha ekle
+                            </a>
+                            <div class="collapse mt-2" id="collapseExtraDate">
+                                <div class="input-group input-group-sm" style="max-width:320px;">
+                                    <input type="date" class="form-control text-dark" id="extraDateInput">
+                                    <button type="button" class="btn btn-outline-primary fw-semibold" onclick="addCustomDate()">
+                                        <i class="bi bi-plus-lg me-1"></i>Listeye Ekle
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TEKİL TARİH SEÇİMİ (Düzenleme Modu) -->
+                    <div class="mb-3 d-none" id="singleDateSection">
+                        <label class="form-label small fw-bold text-dark mb-1">
+                            <i class="bi bi-calendar3 text-primary me-1"></i>Antrenman Tarihi
+                        </label>
+                        <input type="date" class="form-control text-dark" id="singleDateInput" readonly style="background:#f8fafc; font-weight:600;">
                     </div>
 
                     <!-- Antrenman Tipi -->
                     <div class="mb-3">
-                        <label class="form-label small text-secondary fw-semibold">Antrenman Tipi</label>
-                        <select class="form-select" name="antrenman_tipi" id="modalType" required>
+                        <label class="form-label small fw-bold text-dark mb-1">
+                            <i class="bi bi-lightning-charge-fill text-warning me-1"></i>Antrenman Tipi
+                        </label>
+                        <select class="form-select text-dark fw-medium" name="antrenman_tipi" id="modalType" required>
                             <option value="" disabled selected>Bir antrenman tipi seçin…</option>
                             <option value="Ağırlık Antrenmanı">🏋️ Ağırlık Antrenmanı (Hipertrofi / Güç)</option>
                             <option value="Kardiyo & Koşu">🏃 Kardiyo / Koşu / Bisiklet</option>
@@ -429,8 +510,10 @@ $activePage = 'workout';
 
                     <!-- Zorluk Seviyesi -->
                     <div class="mb-3">
-                        <label class="form-label small text-secondary fw-semibold">Zorluk Seviyesi</label>
-                        <select class="form-select" name="zorluk_seviyesi" id="modalDifficulty" required>
+                        <label class="form-label small fw-bold text-dark mb-1">
+                            <i class="bi bi-speedometer2 text-info me-1"></i>Zorluk Seviyesi
+                        </label>
+                        <select class="form-select text-dark fw-medium" name="zorluk_seviyesi" id="modalDifficulty" required>
                             <option value="Kolay">🟢 Kolay (Düşük Yoğunluk / Toparlanma)</option>
                             <option value="Orta" selected>🟡 Orta (Standart Antrenman Şiddeti)</option>
                             <option value="Zor">🔴 Zor (Ağır / Maksimal / Tükeniş)</option>
@@ -438,9 +521,9 @@ $activePage = 'workout';
                     </div>
 
                 </div>
-                <div class="modal-footer border-secondary border-opacity-25">
+                <div class="modal-footer border-top" style="border-color:var(--border) !important;">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Vazgeç</button>
-                    <button type="submit" class="btn btn-info btn-sm fw-bold px-3" id="btnSaveWorkout">
+                    <button type="submit" class="btn btn-primary btn-sm fw-bold px-3" id="btnSaveWorkout">
                         <i class="bi bi-check-lg me-1"></i> Antrenmanı Kaydet
                     </button>
                 </div>
@@ -461,6 +544,9 @@ $activePage = 'workout';
 
 let currentRefDate = new Date();
 let workoutModalInstance = null;
+let currentLoadedWeek = null;
+let selectedPlanDates = new Set();
+let isEditMode = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     workoutModalInstance = new bootstrap.Modal(document.getElementById('workoutModal'));
@@ -493,6 +579,7 @@ async function loadWeekData(dateStr) {
             throw new Error(data.error || 'Veri yüklenemedi');
         }
 
+        currentLoadedWeek = data;
         renderCalendar(data);
         updateSummaryKPIs(data);
     } catch (err) {
@@ -694,13 +781,10 @@ async function completeWorkout(workoutId, btnElem) {
             icon: 'success',
             title: 'Tebrikler! 🏆',
             text: 'Antrenman başarıyla tamamlandı olarak kaydedildi. Harika bir iş çıkardın!',
-            background: '#111827',
-            color: '#f8fafc',
-            confirmButtonColor: '#10b981',
+            background: '#ffffff',
+            color: '#1e293b',
+            confirmButtonColor: '#16a34a',
             confirmButtonText: 'Harika!',
-            customClass: {
-                popup: 'border border-secondary'
-            }
         });
 
         // Takvimi canlı güncelle
@@ -711,8 +795,8 @@ async function completeWorkout(workoutId, btnElem) {
             icon: 'error',
             title: 'Hata',
             text: err.message,
-            background: '#111827',
-            color: '#f8fafc'
+            background: '#ffffff',
+            color: '#1e293b'
         });
         if (btnElem) {
             btnElem.disabled = false;
@@ -722,17 +806,151 @@ async function completeWorkout(workoutId, btnElem) {
 }
 
 /**
+ * Çoklu Gün Seçimi (Chip'ler)
+ */
+function renderWeekDayChips() {
+    const container = document.getElementById('weekDayChipsContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!currentLoadedWeek || !currentLoadedWeek.days || !currentLoadedWeek.days.length) {
+        container.innerHTML = '<div class="col-12 text-muted small p-2">Takvim verisi bulunamadı.</div>';
+        return;
+    }
+
+    currentLoadedWeek.days.forEach(day => {
+        const isSelected = selectedPlanDates.has(day.date);
+        const col = document.createElement('div');
+        col.className = 'col-6 col-sm-4 col-md-3';
+        col.innerHTML = `
+            <div class="day-chip ${isSelected ? 'active' : ''}" onclick="togglePlanDate('${day.date}')">
+                <div>
+                    <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.4px; opacity:0.85;">${day.day_name}</div>
+                    <div style="font-size:13.5px; font-weight:700;">${day.day_number} ${day.month_name}</div>
+                </div>
+                <i class="bi ${isSelected ? 'bi-check-circle-fill' : 'bi-circle'} fs-6"></i>
+            </div>
+        `;
+        container.appendChild(col);
+    });
+
+    // Hafta dışından eklenmiş özel tarihler varsa onları da listele
+    const weekDateSet = new Set(currentLoadedWeek.days.map(d => d.date));
+    selectedPlanDates.forEach(dateStr => {
+        if (!weekDateSet.has(dateStr)) {
+            const col = document.createElement('div');
+            col.className = 'col-6 col-sm-4 col-md-3';
+            col.innerHTML = `
+                <div class="day-chip active" onclick="togglePlanDate('${dateStr}')">
+                    <div>
+                        <div style="font-size:11px; text-transform:uppercase; opacity:0.85;">Özel Tarih</div>
+                        <div style="font-size:13.5px; font-weight:700;">${dateStr}</div>
+                    </div>
+                    <i class="bi bi-x-circle-fill fs-6"></i>
+                </div>
+            `;
+            container.appendChild(col);
+        }
+    });
+
+    updateSelectedDaysBadge();
+}
+
+function togglePlanDate(dateStr) {
+    if (selectedPlanDates.has(dateStr)) {
+        selectedPlanDates.delete(dateStr);
+    } else {
+        selectedPlanDates.add(dateStr);
+    }
+    renderWeekDayChips();
+}
+
+function updateSelectedDaysBadge() {
+    const badge = document.getElementById('selectedDaysBadge');
+    if (badge) {
+        const count = selectedPlanDates.size;
+        badge.textContent = `${count} gün seçildi`;
+        if (count > 0) {
+            badge.className = 'badge bg-primary text-white border border-primary fw-bold';
+        } else {
+            badge.className = 'badge bg-secondary-subtle text-secondary border border-secondary-subtle fw-semibold';
+        }
+    }
+}
+
+function applyDayPreset(preset) {
+    if (!currentLoadedWeek || !currentLoadedWeek.days) return;
+    selectedPlanDates.clear();
+
+    const days = currentLoadedWeek.days;
+    if (preset === 'mwf') {
+        // Pazartesi (0), Çarşamba (2), Cuma (4)
+        [0, 2, 4].forEach(idx => { if (days[idx]) selectedPlanDates.add(days[idx].date); });
+    } else if (preset === 'tt') {
+        // Salı (1), Perşembe (3)
+        [1, 3].forEach(idx => { if (days[idx]) selectedPlanDates.add(days[idx].date); });
+    } else if (preset === 'weekdays') {
+        // Hafta İçi (0..4)
+        [0, 1, 2, 3, 4].forEach(idx => { if (days[idx]) selectedPlanDates.add(days[idx].date); });
+    } else if (preset === 'all') {
+        days.forEach(d => selectedPlanDates.add(d.date));
+    }
+    // 'clear' -> already cleared
+
+    renderWeekDayChips();
+}
+
+function addCustomDate() {
+    const input = document.getElementById('extraDateInput');
+    const val = input ? input.value.trim() : '';
+    if (!val) return;
+    selectedPlanDates.add(val);
+    input.value = '';
+    renderWeekDayChips();
+}
+
+/**
  * Antrenman Ekleme / Güncelleme Form Gönderimi (Fetch API)
  */
 async function handleWorkoutSubmit(e) {
     e.preventDefault();
     const btn = document.getElementById('btnSaveWorkout');
-    btn.disabled = true;
-    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Kaydediliyor…`;
 
     const form = document.getElementById('workoutForm');
     const formData = new FormData(form);
     formData.append('action', 'save');
+
+    if (isEditMode) {
+        const dateVal = document.getElementById('singleDateInput').value;
+        if (!dateVal) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Tarih Eksik',
+                text: 'Lütfen geçerli bir tarih seçin.',
+                background: '#ffffff',
+                color: '#1e293b'
+            });
+            return;
+        }
+        formData.append('tarih', dateVal);
+    } else {
+        const datesArr = Array.from(selectedPlanDates);
+        if (datesArr.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Gün Seçilmedi',
+                text: 'Lütfen antrenman planlamak istediğiniz en az bir günü seçin.',
+                confirmButtonColor: '#0284c7',
+                background: '#ffffff',
+                color: '#1e293b'
+            });
+            return;
+        }
+        formData.append('tarihler', datesArr.join(','));
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Kaydediliyor…`;
 
     try {
         const res = await fetch(`${window.API_BASE}/workout.php`, {
@@ -756,8 +974,8 @@ async function handleWorkoutSubmit(e) {
             position: 'top-end',
             timer: 3500,
             showConfirmButton: false,
-            background: '#111827',
-            color: '#f8fafc',
+            background: '#ffffff',
+            color: '#1e293b',
         });
 
         // Takvimi güncelle
@@ -768,12 +986,12 @@ async function handleWorkoutSubmit(e) {
             icon: 'error',
             title: 'Hata',
             text: err.message,
-            background: '#111827',
-            color: '#f8fafc',
+            background: '#ffffff',
+            color: '#1e293b',
         });
     } finally {
         btn.disabled = false;
-        btn.innerHTML = `<i class="bi bi-check-lg me-1"></i> Kaydet & Hedefleri Güncelle`;
+        btn.innerHTML = `<i class="bi bi-check-lg me-1"></i> Antrenmanı Kaydet`;
     }
 }
 
@@ -783,15 +1001,15 @@ async function handleWorkoutSubmit(e) {
 async function confirmDeleteWorkout(workoutId) {
     const result = await Swal.fire({
         title: 'Antrenmanı Kaldır?',
-        text: 'Bu antrenmanı sildiğinizde o güne ait dinamik makro hedefleri (+400 kcal, +30g protein) normale dönecektir.',
+        text: 'Bu antrenmanı sildiğinizde o güne ait antrenman kaydı ve hedefleri normale dönecektir.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
         cancelButtonColor: '#64748b',
         confirmButtonText: 'Evet, Kaldır',
         cancelButtonText: 'Vazgeç',
-        background: '#111827',
-        color: '#f8fafc',
+        background: '#ffffff',
+        color: '#1e293b',
     });
 
     if (result.isConfirmed) {
@@ -816,8 +1034,8 @@ async function confirmDeleteWorkout(workoutId) {
                 position: 'top-end',
                 timer: 3000,
                 showConfirmButton: false,
-                background: '#111827',
-                color: '#f8fafc',
+                background: '#ffffff',
+                color: '#1e293b',
             });
 
             loadWeekData(formatDateToIso(currentRefDate));
@@ -827,8 +1045,8 @@ async function confirmDeleteWorkout(workoutId) {
                 icon: 'error',
                 title: 'Hata',
                 text: err.message,
-                background: '#111827',
-                color: '#f8fafc',
+                background: '#ffffff',
+                color: '#1e293b',
             });
         }
     }
@@ -838,16 +1056,31 @@ async function confirmDeleteWorkout(workoutId) {
  * Modal Açma Yardımcıları
  */
 function openAddModal(dateStr = '') {
-    document.getElementById('workoutModalTitle').innerHTML = `<i class="bi bi-activity text-info me-2"></i>Antrenman Planla`;
-    document.getElementById('modalDate').value = dateStr || formatDateToIso(new Date());
+    isEditMode = false;
+    document.getElementById('workoutModalTitle').innerHTML = `<i class="bi bi-activity text-primary me-2"></i>Antrenman Planla`;
+    document.getElementById('multiDaySection').classList.remove('d-none');
+    document.getElementById('singleDateSection').classList.add('d-none');
     document.getElementById('modalType').value = '';
     document.getElementById('modalDifficulty').value = 'Orta';
+
+    selectedPlanDates.clear();
+    if (dateStr) {
+        selectedPlanDates.add(dateStr);
+    } else {
+        const todayIso = formatDateToIso(new Date());
+        selectedPlanDates.add(todayIso);
+    }
+
+    renderWeekDayChips();
     workoutModalInstance.show();
 }
 
 function openEditModal(dateStr, type, difficulty) {
+    isEditMode = true;
     document.getElementById('workoutModalTitle').innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Antrenmanı Düzenle`;
-    document.getElementById('modalDate').value = dateStr;
+    document.getElementById('multiDaySection').classList.add('d-none');
+    document.getElementById('singleDateSection').classList.remove('d-none');
+    document.getElementById('singleDateInput').value = dateStr;
     document.getElementById('modalType').value = type;
     document.getElementById('modalDifficulty').value = difficulty;
     workoutModalInstance.show();

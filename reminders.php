@@ -375,14 +375,14 @@ $typeLabels = [
 
                 <hr class="my-2" style="border-color:var(--border);">
 
-                <!-- Telefonun Dahili Saat Uygulamasına Aktar -->
+                <!-- Ekran & Bildirim Testi -->
                 <div class="mt-2">
-                    <button type="button" class="btn btn-outline-dark btn-sm w-100 fw-semibold d-flex align-items-center justify-content-center gap-2" onclick="promptSyncAllToPhoneClock()">
-                        <i class="bi bi-phone-fill text-primary"></i>
-                        <span>Tümünü Telefon Alarmına Kur</span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm w-100 fw-semibold d-flex align-items-center justify-content-center gap-2" onclick="testSystemNotification()">
+                        <i class="bi bi-bell-fill text-warning"></i>
+                        <span>Bildirim & Ekran Testi</span>
                     </button>
-                    <small class="text-secondary d-block text-center mt-1" style="font-size:10.5px;">
-                        Google / Samsung Saat ile telefon kapalıyken de çalar.
+                    <small class="text-secondary d-block text-center mt-1" style="font-size:11px;">
+                        Alarm çaldığında bildirim çubuğunda ve kilit ekranında görünür.
                     </small>
                 </div>
             </div>
@@ -486,17 +486,6 @@ $typeLabels = [
                                     <i class="bi bi-plus-lg me-1"></i>Ekle
                                 </button>
                             </div>
-
-                            <!-- Telefonun Dahili Saat Alarmına Aktar -->
-                            <?php if (!empty($times)): ?>
-                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 d-flex align-items-center gap-1 ms-auto"
-                                    style="font-size:11.5px; border-radius:8px; border-color:var(--border);"
-                                    onclick="promptSyncSupplementClock(<?= $supp['id'] ?>, '<?= htmlspecialchars(addslashes($supp['name'])) ?>')"
-                                    title="Bu ilacın alarmlarını telefonun dahili Saat / Alarm uygulamasına kur">
-                                <i class="bi bi-phone text-primary"></i>
-                                <span>Telefon Alarmına Kur</span>
-                            </button>
-                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -560,30 +549,13 @@ async function requestNotificationPermission() {
 }
 
 /**
- * Tarayıcı (yerel) push bildirimi gönderir.
- * @param {string} title  Bildirim başlığı
- * @param {string} body   Bildirim içeriği
- * @param {string} icon   Opsiyonel ikon URL
+ * Tarayıcı / mobil sistem push bildirimi gönderir.
+ * Service Worker desteği ile Android Chrome ve kilit ekranında sorunsuz çalışır.
  */
 function sendBrowserNotification(title, body, icon = '') {
-    if (Notification.permission !== 'granted') return;
-
-    const notif = new Notification(title, {
-        body,
-        icon: icon || '<?= (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] ?>/favicon.ico',
-        badge: '',
-        tag:  'optilifesync-alarm', // Aynı tag'li bildirim güncellenir, binmez
-        requireInteraction: true,   // Kullanıcı kapatana kadar görünür
-        silent: false,
-    });
-
-    notif.onclick = function () {
-        window.focus();
-        notif.close();
-    };
-
-    // 60 saniye sonra otomatik kapat
-    setTimeout(() => notif.close(), 60000);
+    if (window.optiAlarmEngine) {
+        window.optiAlarmEngine.showSystemNotification(title, { body, icon });
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -591,7 +563,7 @@ function sendBrowserNotification(title, body, icon = '') {
 // ─────────────────────────────────────────────────────────────────────
 
 /**
- * Zamanı gelen bir alarm için SweetAlert2 popup gösterir.
+ * Zamanı gelen bir alarm için SweetAlert2 popup gösterir ve ekran bildirimini tetikler.
  * @param {Object} reminder  check_due API veya yerel kontrolden dönen reminder nesnesi
  */
 function showAlarmModal(reminder) {
@@ -600,9 +572,16 @@ function showAlarmModal(reminder) {
     const color  = isIlac ? '#ef4444' : '#16a34a';
     const title  = isIlac ? 'İlaç Zamanı!' : 'Takviye Zamanı!';
 
-    // Sesli alarmı döngüsel başlat (Web Audio API)
+    // Sesli alarmı ve kilit ekranı / sistem bildirimini birlikte ateşle
     if (window.optiAlarmEngine) {
-        window.optiAlarmEngine.start();
+        window.optiAlarmEngine.triggerAlarm({
+            title: `${icon} ${title}`,
+            body: `${reminder.label} — Doz: ${reminder.dose || ''} (${reminder.form || ''}) vaktiniz geldi!`.trim(),
+            label: reminder.label,
+            dose: reminder.dose,
+            type: reminder.type,
+            id: reminder.id
+        });
     }
 
     Swal.fire({
@@ -975,105 +954,39 @@ function toggleSentinelMode(enabled) {
 }
 
 /**
- * Belirli bir takviyenin alarmlarını telefonun yerel saatine (Clock App) kurma
+ * Sistem Bildirimi ve Kilit Ekranı Görünüm Testi
  */
-function promptSyncSupplementClock(suppId, suppName) {
-    const times = [...(scheduleMap[suppId] ?? [])].sort();
-    if (!times.length) {
-        Swal.fire({
-            icon: 'info',
-            title: 'Alarm Saati Yok',
-            text: 'Önce bu takviye için en az bir alarm saati ekleyin.',
-            confirmButtonColor: '#0284c7',
-            background: '#ffffff',
-            color: '#1e293b'
-        });
-        return;
-    }
-
-    if (times.length === 1) {
-        window.optiAlarmEngine.setNativeClockAlarm(times[0], suppName);
-        return;
-    }
-
-    const buttonsHtml = times.map(t => `
-        <button type="button" class="btn btn-primary btn-sm mb-2 w-100 fw-semibold py-2 d-flex align-items-center justify-content-center gap-2"
-                onclick="window.optiAlarmEngine.setNativeClockAlarm('${t}', '${escapeHtml(suppName)}'); Swal.close();">
-            <i class="bi bi-alarm-fill"></i>
-            <span>Saat ${t} Alarmını Telefonuma Kur</span>
-        </button>
-    `).join('');
-
-    Swal.fire({
-        title: '📱 Telefon Alarmına Kur',
-        html: `
-            <div style="text-align:center; font-size:14px; margin-bottom:14px;">
-                <strong>${escapeHtml(suppName)}</strong> için kurmak istediğiniz saati seçin:<br>
-                <small class="text-secondary">Telefonunuzun dahili Saat / Alarm uygulaması açılacaktır.</small>
-            </div>
-            ${buttonsHtml}
-        `,
-        showConfirmButton: false,
-        showCloseButton: true,
-        background: '#ffffff',
-        color: '#1e293b'
-    });
-}
-
-/**
- * Tüm kayıtlı alarmları telefonun yerel saatine (Clock App) kurma
- */
-function promptSyncAllToPhoneClock() {
-    const list = [];
-    for (const supp of (window.__SUPPLEMENTS_CACHE__ || [])) {
-        for (const t of (supp.schedule_times || [])) {
-            list.push({ time: t, name: supp.name });
+async function testSystemNotification() {
+    if ('Notification' in window && Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Bildirim İzni Gerekli',
+                text: 'Bildirimlerin kilit ekranında ve bildirim çubuğunda görünmesi için tarayıcı bildirim iznini onaylamanız gerekir.',
+                confirmButtonColor: '#0284c7',
+                background: '#ffffff',
+                color: '#1e293b'
+            });
+            return;
         }
     }
 
-    if (!list.length) {
+    if (window.optiAlarmEngine) {
+        window.optiAlarmEngine.showSystemNotification('🔔 Test Bildirimi', {
+            body: 'Harika! OptiLifeSync alarm bildirimleri telefon ekranınızda başarıyla çalışıyor.'
+        });
+
         Swal.fire({
-            icon: 'info',
-            title: 'Kayıtlı Alarm Yok',
-            text: 'Henüz tanımlanmış bir alarm saati bulunmuyor.',
-            confirmButtonColor: '#0284c7',
+            icon: 'success',
+            title: 'Test Bildirimi Gönderildi',
+            text: 'Telefonunuzun bildirim çubuğunu veya kilit ekranını kontrol edin.',
+            timer: 3000,
+            showConfirmButton: false,
             background: '#ffffff',
             color: '#1e293b'
         });
-        return;
     }
-
-    list.sort((a,b) => a.time.localeCompare(b.time));
-
-    const rowsHtml = list.map(item => `
-        <div class="d-flex align-items-center justify-content-between p-2 mb-2 rounded-2 border" style="background:#f8fafc;">
-            <div>
-                <strong class="text-primary me-2" style="font-size:15px;">${item.time}</strong>
-                <span class="fw-semibold text-dark">${escapeHtml(item.name)}</span>
-            </div>
-            <button type="button" class="btn btn-outline-primary btn-sm py-1 px-3 fw-bold"
-                    onclick="window.optiAlarmEngine.setNativeClockAlarm('${item.time}', '${escapeHtml(item.name)}');">
-                Kur ⏰
-            </button>
-        </div>
-    `).join('');
-
-    Swal.fire({
-        title: '📱 Telefonun Saat Uygulamasına Aktar',
-        html: `
-            <div style="text-align:left; font-size:13.5px; margin-bottom:14px; line-height:1.4;">
-                Aşağıdaki alarmları telefonunuzun kendi <strong>Saat / Alarm</strong> uygulamasına tek tıkla kaydedebilirsiniz. Telefon kapalı olsa dahi %100 kesin çalar.
-            </div>
-            <div style="max-height:280px; overflow-y:auto; padding-right:4px;">
-                ${rowsHtml}
-            </div>
-        `,
-        showConfirmButton: true,
-        confirmButtonText: 'Kapat',
-        confirmButtonColor: '#64748b',
-        background: '#ffffff',
-        color: '#1e293b'
-    });
 }
 
 // ── Başlatma ─────────────────────────────────────────────────────────
