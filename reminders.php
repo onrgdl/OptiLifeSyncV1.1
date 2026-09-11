@@ -159,15 +159,15 @@ $typeLabels = [
             border-radius: 8px;
             min-height: 46px;
             align-items: center;
-            cursor: text;
         }
-        .tag-input-wrapper input[type="time"] {
-            background: transparent;
-            border: none;
-            outline: none;
-            color: #f8fafc;
-            font-size: .9rem;
-            width: 120px;
+        input[type="time"] {
+            color-scheme: light !important;
+            color: #1e293b !important;
+            font-weight: 600;
+        }
+        input[type="time"]::-webkit-calendar-picker-indicator {
+            filter: invert(0.2);
+            cursor: pointer;
         }
     </style>
 </head>
@@ -252,16 +252,40 @@ $typeLabels = [
                         </div>
                     </div>
 
-                    <!-- Saat Seçici (inline tag input) -->
+                    <!-- Saat Seçici (Ekle butonlu ve hızlı seçenekli) -->
                     <div class="mb-3">
-                        <label class="form-label text-secondary small">Alarm Saatleri</label>
-                        <div class="tag-input-wrapper" id="timeTagBox">
-                            <input type="time" id="newTimeInput" placeholder="--:--">
+                        <label class="form-label text-dark fw-semibold small mb-1">
+                            <i class="bi bi-alarm me-1 text-primary"></i>Alarm Saatleri
+                        </label>
+                        
+                        <!-- Saat Seçici ve Ekle Butonu -->
+                        <div class="input-group mb-2">
+                            <span class="input-group-text bg-light text-dark border" style="border-color:var(--border);">
+                                <i class="bi bi-clock"></i>
+                            </span>
+                            <input type="time" id="newTimeInput" class="form-control text-dark fw-semibold" value="08:00" style="color-scheme:light;color:#1e293b;background:#ffffff;border-color:var(--border);">
+                            <button type="button" class="btn btn-primary fw-semibold px-3" onclick="addCurrentTimeToForm()">
+                                <i class="bi bi-plus-lg me-1"></i>Saati Ekle
+                            </button>
                         </div>
-                        <input type="hidden" name="schedule_times" id="scheduleTimesInput">
-                        <small class="text-secondary mt-1 d-block">
-                            <i class="bi bi-info-circle me-1"></i>Saat seçip Enter'a basın — birden fazla ekleyebilirsiniz
-                        </small>
+                        
+                        <!-- Eklenen Saatlerin Rozet Kutusu -->
+                        <div class="tag-input-wrapper p-2 rounded-3" id="timeTagBox" style="background:#ffffff;border:1px solid var(--border);min-height:44px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+                            <span id="noTimeHint" class="text-muted small fst-italic ps-1">
+                                Henüz saat eklenmedi. Saati seçip "Saati Ekle" butonuna basın.
+                            </span>
+                        </div>
+                        
+                        <input type="hidden" name="schedule_times" id="scheduleTimesInput" value="">
+                        
+                        <!-- Hızlı Saat Seçim Önerileri -->
+                        <div class="d-flex align-items-center gap-1 mt-2 flex-wrap">
+                            <small class="text-secondary small me-1" style="font-size:11px;">Hızlı Ekle:</small>
+                            <button type="button" class="btn btn-sm btn-light border py-0 px-2 text-dark" style="font-size:11px;" onclick="quickAddTime('08:00')">🌅 08:00</button>
+                            <button type="button" class="btn btn-sm btn-light border py-0 px-2 text-dark" style="font-size:11px;" onclick="quickAddTime('13:00')">☀️ 13:00</button>
+                            <button type="button" class="btn btn-sm btn-light border py-0 px-2 text-dark" style="font-size:11px;" onclick="quickAddTime('19:00')">🌙 19:00</button>
+                            <button type="button" class="btn btn-sm btn-light border py-0 px-2 text-dark" style="font-size:11px;" onclick="quickAddTime('22:00')">💤 22:00</button>
+                        </div>
                     </div>
 
                     <!-- Kullanım Süresi (Kür / Tedavi Planı) -->
@@ -269,7 +293,7 @@ $typeLabels = [
                         <label class="form-label text-secondary small">Kullanım Süresi (Gün Sayısı)</label>
                         <div class="input-group input-group-sm">
                             <input type="number" name="duration_days" class="form-control" min="1" max="365" placeholder="Örn: 15 (Boş = Sürekli devam eder)">
-                            <span class="input-group-text bg-dark text-secondary border-secondary">Gün</span>
+                            <span class="input-group-text bg-light text-dark border">Gün</span>
                         </div>
                         <small class="text-secondary mt-1 d-block" style="font-size:0.75rem;">
                             <i class="bi bi-hourglass-split me-1"></i>Örn: 15 gün girerseniz, 15 gün sonra alarm otomatik olarak kapanır ve dashboarddan kalkar.
@@ -373,12 +397,18 @@ $typeLabels = [
                             </div>
 
                             <!-- Inline saat ekleme -->
-                            <input type="time" class="form-control form-control-sm"
-                                   style="width:130px"
-                                   onkeydown="if(event.key==='Enter'){event.preventDefault(); addTimeInline(<?= $supp['id'] ?>, this);}"
-                                   onchange="addTimeInline(<?= $supp['id'] ?>, this)"
-                                   placeholder="--:--"
-                                   id="inlineTime-<?= $supp['id'] ?>">
+                            <div class="input-group input-group-sm" style="width:170px;">
+                                <input type="time" class="form-control form-control-sm text-dark fw-semibold"
+                                       style="color-scheme:light;color:#1e293b;background:#ffffff;border-color:var(--border);"
+                                       onkeydown="if(event.key==='Enter'){event.preventDefault(); addTimeInline(<?= $supp['id'] ?>, this);}"
+                                       id="inlineTime-<?= $supp['id'] ?>"
+                                       value="08:00">
+                                <button type="button" class="btn btn-outline-primary btn-sm fw-semibold"
+                                        onclick="addTimeInline(<?= $supp['id'] ?>, document.getElementById('inlineTime-<?= $supp['id'] ?>'))"
+                                        title="Bu saati alarma ekle">
+                                    <i class="bi bi-plus-lg me-1"></i>Ekle
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -684,26 +714,43 @@ function renderTimeBadges(suppId) {
 
 const addFormTimes = new Set();
 
-document.getElementById('newTimeInput').addEventListener('change', function() {
-    addTagToForm(this.value.trim());
-    this.value = '';
-});
-document.getElementById('newTimeInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); addTagToForm(this.value.trim()); this.value = ''; }
-});
+function addCurrentTimeToForm() {
+    const input = document.getElementById('newTimeInput');
+    if (!input) return;
+    const val = input.value.trim();
+    if (val) {
+        addTagToForm(val);
+    }
+}
+
+function quickAddTime(timeStr) {
+    addTagToForm(timeStr);
+}
+
+const newTimeInputEl = document.getElementById('newTimeInput');
+if (newTimeInputEl) {
+    newTimeInputEl.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addCurrentTimeToForm();
+        }
+    });
+}
 
 function addTagToForm(time) {
     if (!time || !time.match(/^\d{2}:\d{2}$/) || addFormTimes.has(time)) return;
     addFormTimes.add(time);
     updateFormInput();
 
-    const box   = document.getElementById('timeTagBox');
-    const input = document.getElementById('newTimeInput');
-    const tag   = document.createElement('span');
+    const hint = document.getElementById('noTimeHint');
+    if (hint) hint.classList.add('d-none');
+
+    const box = document.getElementById('timeTagBox');
+    const tag = document.createElement('span');
     tag.className = 'time-badge';
     tag.dataset.time = time;
-    tag.innerHTML = `<i class="bi bi-clock-fill"></i>${escapeHtml(time)}<span class="remove-time" onclick="removeFormTag('${time}')">×</span>`;
-    box.insertBefore(tag, input);
+    tag.innerHTML = `<i class="bi bi-clock-fill"></i>${escapeHtml(time)}<span class="remove-time ms-1" onclick="removeFormTag('${time}')">×</span>`;
+    box.appendChild(tag);
 }
 
 function removeFormTag(time) {
@@ -712,6 +759,10 @@ function removeFormTag(time) {
     const box = document.getElementById('timeTagBox');
     for (const el of box.querySelectorAll('.time-badge')) {
         if (el.dataset.time === time) el.remove();
+    }
+    if (addFormTimes.size === 0) {
+        const hint = document.getElementById('noTimeHint');
+        if (hint) hint.classList.remove('d-none');
     }
 }
 
