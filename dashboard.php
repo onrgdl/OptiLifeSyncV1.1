@@ -1112,6 +1112,9 @@ async function loadDashboard(forceFetch = false) {
         window.__CURRENT_ALARMS__ = data.upcoming_alarms ?? [];
         renderDashboard(data);
         checkAlarms(window.__CURRENT_ALARMS__);
+        if (window.Capacitor && window.optiAlarmEngine) {
+            window.optiAlarmEngine.syncCapacitorNotifications(window.__CURRENT_ALARMS__);
+        }
     } catch (e) {
         const pollLbl = document.getElementById('pollLabel');
         if (pollLbl) pollLbl.textContent = '⚠️ Yeniden deneniyor…';
@@ -1235,7 +1238,10 @@ function renderAlarms(alarms) {
                 <div class="alarm-dose">${esc(a.dose)} · ${esc(a.form)}</div>
             </div>
             <div class="alarm-badge">${minLabel}</div>
-            <button class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="dismissDashboardAlarm(${a.id})" title="Alarmı Sil / Kaldır" style="text-decoration:none;opacity:0.8;">
+            <button class="btn btn-sm btn-link text-primary p-0 ms-2" onclick="window.optiAlarmEngine.setNativeClockAlarm('${a.remind_at}', '${esc(a.label).replace(/'/g, "\\'")}')" title="Telefonun kendi Saat / Alarm uygulamasına kur" style="text-decoration:none;opacity:0.85;font-size:15px;">
+                <i class="bi bi-phone"></i>
+            </button>
+            <button class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="dismissDashboardAlarm(${a.id})" title="Alarmı Sil / Kaldır" style="text-decoration:none;opacity:0.8;">
                 <i class="bi bi-trash3"></i>
             </button>
         </div>`;
@@ -1441,11 +1447,25 @@ function checkAlarms(alarms) {
 function openAlarmAudioModal() {
     const currentSound = window.optiAlarmEngine ? window.optiAlarmEngine.getSound() : 'classic';
     const currentVol   = window.optiAlarmEngine ? window.optiAlarmEngine.getVolumePercent() : 70;
+    const sentinelOn   = window.optiAlarmEngine ? window.optiAlarmEngine.isSentinelEnabled : true;
 
     Swal.fire({
         title: '🔊 Alarm & Ses Ayarları',
         html: `
             <div style="text-align:left; font-size:14px; padding:6px 0;">
+                <!-- Ekran Kapalıyken Çalma Switch -->
+                <div class="p-2 mb-3 rounded-3" style="background:#f8fafc; border:1px solid var(--border);">
+                    <div class="form-check form-switch d-flex align-items-center justify-content-between ps-0 mb-1">
+                        <label class="form-check-label small fw-bold text-dark mb-0" for="dashSentinelToggle" style="cursor:pointer;">
+                            <i class="bi bi-shield-check text-success me-1"></i>Ekran Kapalıyken Çal
+                        </label>
+                        <input class="form-check-input ms-2" type="checkbox" role="switch" id="dashSentinelToggle" ${sentinelOn ? 'checked' : ''}>
+                    </div>
+                    <small class="text-secondary d-block" style="font-size:11px; line-height:1.35;">
+                        Ekran kilitlendiğinde alarm motorunun uyumasını engeller.
+                    </small>
+                </div>
+
                 <div class="mb-3">
                     <label class="form-label small fw-bold text-secondary mb-1">
                         <i class="bi bi-music-note-beamed me-1"></i>Alarm Melodisi
@@ -1473,9 +1493,19 @@ function openAlarmAudioModal() {
                     </div>
                 </div>
 
-                <button type="button" class="btn btn-outline-primary btn-sm w-100 fw-semibold mt-2" id="swalTestBtn">
+                <button type="button" class="btn btn-outline-primary btn-sm w-100 fw-semibold mb-3" id="swalTestBtn">
                     <i class="bi bi-play-fill"></i> Sesi Test Et
                 </button>
+
+                <hr class="my-2" style="border-color:var(--border);">
+
+                <button type="button" class="btn btn-outline-dark btn-sm w-100 fw-semibold d-flex align-items-center justify-content-center gap-2" onclick="promptSyncAllToPhoneClock()">
+                    <i class="bi bi-phone-fill text-primary"></i>
+                    <span>Tümünü Telefon Alarmına Kur</span>
+                </button>
+                <small class="text-secondary d-block text-center mt-1" style="font-size:10.5px;">
+                    Google / Samsung Saat ile telefon kapalıyken de çalar.
+                </small>
             </div>
         `,
         showConfirmButton: true,
@@ -1484,10 +1514,11 @@ function openAlarmAudioModal() {
         background: '#ffffff',
         color: '#1e293b',
         didOpen: () => {
-            const selectEl = document.getElementById('swalSoundSelect');
-            const sliderEl = document.getElementById('swalVolSlider');
-            const labelEl  = document.getElementById('swalVolLabel');
-            const testBtn  = document.getElementById('swalTestBtn');
+            const selectEl    = document.getElementById('swalSoundSelect');
+            const sliderEl    = document.getElementById('swalVolSlider');
+            const labelEl     = document.getElementById('swalVolLabel');
+            const testBtn     = document.getElementById('swalTestBtn');
+            const sentinelEl  = document.getElementById('dashSentinelToggle');
 
             if (selectEl) {
                 selectEl.addEventListener('change', (e) => {
@@ -1514,7 +1545,60 @@ function openAlarmAudioModal() {
                     }
                 });
             }
+
+            if (sentinelEl) {
+                sentinelEl.addEventListener('change', (e) => {
+                    if (window.optiAlarmEngine) {
+                        window.optiAlarmEngine.toggleSentinel(e.target.checked);
+                    }
+                });
+            }
         }
+    });
+}
+
+function promptSyncAllToPhoneClock() {
+    const alarms = window.__CURRENT_ALARMS__ || [];
+    if (!alarms.length) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Kayıtlı Alarm Yok',
+            text: 'Yaklaşan alarm bulunmuyor. İlaç & Takviye sayfasından alarm kurabilirsiniz.',
+            confirmButtonColor: '#0284c7',
+            background: '#ffffff',
+            color: '#1e293b'
+        });
+        return;
+    }
+
+    const rowsHtml = alarms.map(a => `
+        <div class="d-flex align-items-center justify-content-between p-2 mb-2 rounded-2 border" style="background:#f8fafc;">
+            <div>
+                <strong class="text-primary me-2" style="font-size:15px;">${a.remind_at}</strong>
+                <span class="fw-semibold text-dark">${esc(a.label)}</span>
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm py-1 px-3 fw-bold"
+                    onclick="window.optiAlarmEngine.setNativeClockAlarm('${a.remind_at}', '${esc(a.label).replace(/'/g, "\\'")}');">
+                Kur ⏰
+            </button>
+        </div>
+    `).join('');
+
+    Swal.fire({
+        title: '📱 Telefonun Saat Uygulamasına Aktar',
+        html: `
+            <div style="text-align:left; font-size:13.5px; margin-bottom:14px; line-height:1.4;">
+                Aşağıdaki alarmları telefonunuzun kendi <strong>Saat / Alarm</strong> uygulamasına tek tıkla kaydedebilirsiniz. Telefon kapalı olsa dahi %100 kesin çalar.
+            </div>
+            <div style="max-height:280px; overflow-y:auto; padding-right:4px;">
+                ${rowsHtml}
+            </div>
+        `,
+        showConfirmButton: true,
+        confirmButtonText: 'Kapat',
+        confirmButtonColor: '#64748b',
+        background: '#ffffff',
+        color: '#1e293b'
     });
 }
 

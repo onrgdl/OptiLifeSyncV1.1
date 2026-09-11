@@ -321,6 +321,22 @@ $typeLabels = [
                     </span>
                 </div>
 
+                <!-- Arka Plan Nöbetçisi (Ekran Kapalıyken Çalma Koruyucusu) -->
+                <div class="p-3 mb-3 rounded-3" style="background:#f8fafc; border:1px solid var(--border);">
+                    <div class="form-check form-switch d-flex align-items-center justify-content-between ps-0 mb-1">
+                        <label class="form-check-label small fw-bold text-dark mb-0" for="sentinelToggle" style="cursor:pointer;">
+                            <i class="bi bi-shield-check text-success me-1"></i>Ekran Kapalıyken Çal
+                        </label>
+                        <input class="form-check-input ms-2" type="checkbox" role="switch" id="sentinelToggle" checked onchange="toggleSentinelMode(this.checked)">
+                    </div>
+                    <small class="text-secondary d-block" style="font-size:11px; line-height:1.35;">
+                        Telefon ekranı kilitlendiğinde veya tarayıcı arka plandayken alarm motorunun uyumasını engeller.
+                    </small>
+                    <div id="sentinelStatusBadge" class="badge bg-success-subtle text-success border border-success-subtle mt-2 px-2 py-1" style="font-size:10.5px;">
+                        🟢 Nöbetçi Aktif (Ekran kapansa da çalar)
+                    </div>
+                </div>
+
                 <!-- Alarm Sesi Seçimi -->
                 <div class="mb-3">
                     <label class="form-label small fw-semibold text-secondary mb-1">
@@ -353,9 +369,22 @@ $typeLabels = [
                 </div>
 
                 <!-- Sesi Test Et Butonu -->
-                <button type="button" class="btn btn-outline-primary btn-sm w-100 fw-semibold d-flex align-items-center justify-content-center gap-2" id="testSoundBtn">
+                <button type="button" class="btn btn-outline-primary btn-sm w-100 fw-semibold d-flex align-items-center justify-content-center gap-2 mb-3" id="testSoundBtn">
                     <i class="bi bi-play-fill fs-6"></i> Sesi Test Et
                 </button>
+
+                <hr class="my-2" style="border-color:var(--border);">
+
+                <!-- Telefonun Dahili Saat Uygulamasına Aktar -->
+                <div class="mt-2">
+                    <button type="button" class="btn btn-outline-dark btn-sm w-100 fw-semibold d-flex align-items-center justify-content-center gap-2" onclick="promptSyncAllToPhoneClock()">
+                        <i class="bi bi-phone-fill text-primary"></i>
+                        <span>Tümünü Telefon Alarmına Kur</span>
+                    </button>
+                    <small class="text-secondary d-block text-center mt-1" style="font-size:10.5px;">
+                        Google / Samsung Saat ile telefon kapalıyken de çalar.
+                    </small>
+                </div>
             </div>
         </div>
 
@@ -457,6 +486,17 @@ $typeLabels = [
                                     <i class="bi bi-plus-lg me-1"></i>Ekle
                                 </button>
                             </div>
+
+                            <!-- Telefonun Dahili Saat Alarmına Aktar -->
+                            <?php if (!empty($times)): ?>
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 d-flex align-items-center gap-1 ms-auto"
+                                    style="font-size:11.5px; border-radius:8px; border-color:var(--border);"
+                                    onclick="promptSyncSupplementClock(<?= $supp['id'] ?>, '<?= htmlspecialchars(addslashes($supp['name'])) ?>')"
+                                    title="Bu ilacın alarmlarını telefonun dahili Saat / Alarm uygulamasına kur">
+                                <i class="bi bi-phone text-primary"></i>
+                                <span>Telefon Alarmına Kur</span>
+                            </button>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -915,6 +955,127 @@ function confirmFinish(event, name) {
     return false;
 }
 
+/**
+ * Arka Plan Nöbetçisi Açma / Kapatma
+ */
+function toggleSentinelMode(enabled) {
+    if (window.optiAlarmEngine) {
+        window.optiAlarmEngine.toggleSentinel(enabled);
+    }
+    const badge = document.getElementById('sentinelStatusBadge');
+    if (badge) {
+        if (enabled) {
+            badge.className = 'badge bg-success-subtle text-success border border-success-subtle mt-2 px-2 py-1';
+            badge.innerHTML = '🟢 Nöbetçi Aktif (Ekran kapansa da çalar)';
+        } else {
+            badge.className = 'badge bg-secondary-subtle text-secondary border border-secondary-subtle mt-2 px-2 py-1';
+            badge.innerHTML = '⏸️ Nöbetçi Kapalı (Yalnızca ekran açıkken)';
+        }
+    }
+}
+
+/**
+ * Belirli bir takviyenin alarmlarını telefonun yerel saatine (Clock App) kurma
+ */
+function promptSyncSupplementClock(suppId, suppName) {
+    const times = [...(scheduleMap[suppId] ?? [])].sort();
+    if (!times.length) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Alarm Saati Yok',
+            text: 'Önce bu takviye için en az bir alarm saati ekleyin.',
+            confirmButtonColor: '#0284c7',
+            background: '#ffffff',
+            color: '#1e293b'
+        });
+        return;
+    }
+
+    if (times.length === 1) {
+        window.optiAlarmEngine.setNativeClockAlarm(times[0], suppName);
+        return;
+    }
+
+    const buttonsHtml = times.map(t => `
+        <button type="button" class="btn btn-primary btn-sm mb-2 w-100 fw-semibold py-2 d-flex align-items-center justify-content-center gap-2"
+                onclick="window.optiAlarmEngine.setNativeClockAlarm('${t}', '${escapeHtml(suppName)}'); Swal.close();">
+            <i class="bi bi-alarm-fill"></i>
+            <span>Saat ${t} Alarmını Telefonuma Kur</span>
+        </button>
+    `).join('');
+
+    Swal.fire({
+        title: '📱 Telefon Alarmına Kur',
+        html: `
+            <div style="text-align:center; font-size:14px; margin-bottom:14px;">
+                <strong>${escapeHtml(suppName)}</strong> için kurmak istediğiniz saati seçin:<br>
+                <small class="text-secondary">Telefonunuzun dahili Saat / Alarm uygulaması açılacaktır.</small>
+            </div>
+            ${buttonsHtml}
+        `,
+        showConfirmButton: false,
+        showCloseButton: true,
+        background: '#ffffff',
+        color: '#1e293b'
+    });
+}
+
+/**
+ * Tüm kayıtlı alarmları telefonun yerel saatine (Clock App) kurma
+ */
+function promptSyncAllToPhoneClock() {
+    const list = [];
+    for (const supp of (window.__SUPPLEMENTS_CACHE__ || [])) {
+        for (const t of (supp.schedule_times || [])) {
+            list.push({ time: t, name: supp.name });
+        }
+    }
+
+    if (!list.length) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Kayıtlı Alarm Yok',
+            text: 'Henüz tanımlanmış bir alarm saati bulunmuyor.',
+            confirmButtonColor: '#0284c7',
+            background: '#ffffff',
+            color: '#1e293b'
+        });
+        return;
+    }
+
+    list.sort((a,b) => a.time.localeCompare(b.time));
+
+    const rowsHtml = list.map(item => `
+        <div class="d-flex align-items-center justify-content-between p-2 mb-2 rounded-2 border" style="background:#f8fafc;">
+            <div>
+                <strong class="text-primary me-2" style="font-size:15px;">${item.time}</strong>
+                <span class="fw-semibold text-dark">${escapeHtml(item.name)}</span>
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm py-1 px-3 fw-bold"
+                    onclick="window.optiAlarmEngine.setNativeClockAlarm('${item.time}', '${escapeHtml(item.name)}');">
+                Kur ⏰
+            </button>
+        </div>
+    `).join('');
+
+    Swal.fire({
+        title: '📱 Telefonun Saat Uygulamasına Aktar',
+        html: `
+            <div style="text-align:left; font-size:13.5px; margin-bottom:14px; line-height:1.4;">
+                Aşağıdaki alarmları telefonunuzun kendi <strong>Saat / Alarm</strong> uygulamasına tek tıkla kaydedebilirsiniz. Telefon kapalı olsa dahi %100 kesin çalar.
+            </div>
+            <div style="max-height:280px; overflow-y:auto; padding-right:4px;">
+                ${rowsHtml}
+            </div>
+        `,
+        showConfirmButton: true,
+        confirmButtonText: 'Kapat',
+        confirmButtonColor: '#64748b',
+        background: '#ffffff',
+        color: '#1e293b'
+    });
+}
+
 // ── Başlatma ─────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -935,10 +1096,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 5. Alarm Ses ve Düzey Ayarları
     if (window.optiAlarmEngine) {
-        const soundSelect = document.getElementById('alarmSoundSelect');
-        const volSlider   = document.getElementById('alarmVolumeSlider');
-        const volLabel    = document.getElementById('alarmVolumeLabel');
-        const testBtn     = document.getElementById('testSoundBtn');
+        const soundSelect    = document.getElementById('alarmSoundSelect');
+        const volSlider      = document.getElementById('alarmVolumeSlider');
+        const volLabel       = document.getElementById('alarmVolumeLabel');
+        const testBtn        = document.getElementById('testSoundBtn');
+        const sentinelToggle = document.getElementById('sentinelToggle');
 
         if (soundSelect) {
             soundSelect.value = window.optiAlarmEngine.getSound();
@@ -961,6 +1123,22 @@ document.addEventListener('DOMContentLoaded', () => {
             testBtn.addEventListener('click', () => {
                 window.optiAlarmEngine.testSound();
             });
+        }
+
+        if (sentinelToggle) {
+            sentinelToggle.checked = window.optiAlarmEngine.isSentinelEnabled;
+            toggleSentinelMode(sentinelToggle.checked);
+        }
+
+        // Capacitor APK ortamındaysa sistem alarmlarını senkronize et
+        if (window.Capacitor) {
+            const allAlarms = [];
+            for (const s of (window.__SUPPLEMENTS_CACHE__ || [])) {
+                for (const t of (s.schedule_times || [])) {
+                    allAlarms.push({ id: s.id, type: s.type, label: s.name, dose: `${s.dose_amount||''} ${s.dose_unit||''}`.trim(), remind_at: t });
+                }
+            }
+            window.optiAlarmEngine.syncCapacitorNotifications(allAlarms);
         }
     }
 

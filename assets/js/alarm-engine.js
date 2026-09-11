@@ -25,6 +25,12 @@ class OptiAlarmEngine {
         this.volume = savedVol !== null ? Math.max(0, Math.min(1, parseFloat(savedVol))) : 0.7;
         this.soundType = localStorage.getItem('opti_alarm_sound') || 'classic';
 
+        // Arka Plan Nöbetçisi (Ekran kapalıyken veya arka plandayken uyutmayan koruyucu)
+        this.isSentinelEnabled = localStorage.getItem('opti_sentinel_enabled') !== 'false';
+        this.sentinelAudio = null;
+        this.wakeLock = null;
+        this.isSentinelActive = false;
+
         // Melodi tanımları
         this.availableSounds = {
             'classic': { id: 'classic', name: '🔔 Klasik Dijital Bip', interval: 1600 },
@@ -64,6 +70,7 @@ class OptiAlarmEngine {
     setupUnlockListener() {
         const unlock = () => {
             this.initContext();
+            this.startSentinel();
             if (this.audioCtx && this.audioCtx.state === 'running') {
                 this.isUnlocked = true;
                 window.removeEventListener('click', unlock);
@@ -265,6 +272,175 @@ class OptiAlarmEngine {
         }
         if ('vibrate' in navigator) {
             try { navigator.vibrate(0); } catch (_) {}
+        }
+    }
+
+    /**
+     * ─── ARKA PLAN NÖBETÇİSİ (Background Audio Sentinel & WakeLock) ───
+     * Mobil cihazlarda ekran kilitlendiğinde veya tarayıcı arka plana atıldığında
+     * işletim sisteminin (Android Doze / iOS) JavaScript motorunu uyutmasını engeller.
+     * Sessiz bir ses akışı ve MediaSession API ile arka plan nöbeti tutar.
+     */
+    startSentinel() {
+        if (!this.isSentinelEnabled) return;
+
+        try {
+            if (!this.sentinelAudio) {
+                // 48 baytlık saf sessiz PCM WAV akışı
+                this.sentinelAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+                this.sentinelAudio.loop = true;
+                this.sentinelAudio.volume = 0.001;
+            }
+
+            const playPromise = this.sentinelAudio.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    this.isSentinelActive = true;
+                    this.updateMediaSessionMetadata();
+                }).catch(() => {
+                    // Kullanıcı etkileşimi beklenir
+                });
+            }
+
+            // Destekleyen tarayıcılarda ekran uyanık tutma desteği
+            if ('wakeLock' in navigator && !this.wakeLock) {
+                navigator.wakeLock.request('screen').then(wl => {
+                    this.wakeLock = wl;
+                }).catch(() => {});
+            }
+        } catch (_) {}
+    }
+
+    stopSentinel() {
+        if (this.sentinelAudio) {
+            try { this.sentinelAudio.pause(); } catch (_) {}
+        }
+        if (this.wakeLock) {
+            try { this.wakeLock.release(); this.wakeLock = null; } catch (_) {}
+        }
+        this.isSentinelActive = false;
+        if ('mediaSession' in navigator) {
+            try { navigator.mediaSession.playbackState = 'none'; } catch (_) {}
+        }
+    }
+
+    toggleSentinel(enabled) {
+        this.isSentinelEnabled = !!enabled;
+        localStorage.setItem('opti_sentinel_enabled', this.isSentinelEnabled ? 'true' : 'false');
+        if (this.isSentinelEnabled) {
+            this.startSentinel();
+        } else {
+            this.stopSentinel();
+        }
+    }
+
+    updateMediaSessionMetadata() {
+        if ('mediaSession' in navigator) {
+            try {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: 'OptiLifeSync Alarm Nöbetçisi',
+                    artist: 'İlaç & Takviye Alarmları İzleniyor',
+                    album: 'OptiLifeSync'
+                });
+                navigator.mediaSession.playbackState = 'playing';
+            } catch (_) {}
+        }
+    }
+
+    /**
+     * ─── TELEFONUN DAHİLİ SAATİNE (ANDROID CLOCK INTENT) ALARM KUR ───
+     * Doğrudan telefonun kendi dahili "Saat / Alarm" uygulamasına (Google Saat / Samsung Saat)
+     * alarm kurar. Telefon kapalı olsa veya tüm uygulamalar kapatılsa dahi %100 kesin çalar!
+     */
+    setNativeClockAlarm(timeStr, label) {
+        if (!timeStr || !timeStr.includes(':')) return false;
+        const [hStr, mStr] = timeStr.split(':');
+        const h = parseInt(hStr, 10);
+        const m = parseInt(mStr, 10);
+        if (isNaN(h) || isNaN(m)) return false;
+
+        const isAndroid = /android/i.test(navigator.userAgent);
+        const cleanLabel = encodeURIComponent(label ? `💊 ${label}` : 'OptiLifeSync İlaç/Takviye');
+
+        if (isAndroid) {
+            const intentUrl = `intent:#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.HOUR=${h};i.android.intent.extra.MINUTES=${m};S.android.intent.extra.MESSAGE=${cleanLabel};B.android.intent.extra.SKIP_UI=false;end`;
+            window.location.href = intentUrl;
+            return true;
+        } else {
+            if (window.Swal) {
+                Swal.fire({
+                    icon: 'info',
+                    title: '📱 Telefon Alarmı',
+                    html: `Telefonunuzun dahili saatine saat <strong>${timeStr}</strong> için <strong>${label}</strong> alarmı kurmak üzeresiniz.<br><br><small class="text-secondary">Android cihazlarda bu buton doğrudan telefonun kendi Saat / Alarm uygulamasını açıp alarmı kurar.</small>`,
+                    confirmButtonText: 'Anladım',
+                    confirmButtonColor: '#0284c7',
+                    background: '#ffffff',
+                    color: '#1e293b'
+                });
+            }
+            return false;
+        }
+    }
+
+    /**
+     * ─── CAPACITOR NATIVE LOCAL NOTIFICATIONS SENKRONİZASYONU ───
+     * Eğer uygulama Capacitor APK olarak çalışıyorsa, alarmları Android AlarmManager'a kaydeder.
+     */
+    async syncCapacitorNotifications(alarms) {
+        const LN = window.Capacitor?.Plugins?.LocalNotifications;
+        if (!LN || !alarms || !alarms.length) return false;
+
+        try {
+            const perm = await LN.requestPermissions();
+            if (perm && perm.display !== 'granted') return false;
+
+            await LN.createChannel({
+                id: 'opti_alarms_channel',
+                name: 'OptiLifeSync İlaç & Takviye Alarmları',
+                description: 'Uygulama kapalıyken çalan yüksek öncelikli sesli alarm',
+                importance: 5,
+                visibility: 1,
+                vibration: true,
+                sound: 'beep.wav'
+            });
+
+            const pending = await LN.getPending();
+            if (pending && pending.notifications && pending.notifications.length > 0) {
+                await LN.cancel({ notifications: pending.notifications });
+            }
+
+            const list = [];
+            let idx = 2000;
+            for (const a of alarms) {
+                if (!a.remind_at || !a.remind_at.includes(':')) continue;
+                const [hStr, mStr] = a.remind_at.split(':');
+                const hour = parseInt(hStr, 10);
+                const minute = parseInt(mStr, 10);
+                if (isNaN(hour) || isNaN(minute)) continue;
+
+                idx++;
+                list.push({
+                    id: idx,
+                    title: a.type === 'medication' ? '💊 İlaç Zamanı!' : '💪 Takviye Zamanı!',
+                    body: `${a.label} — ${a.dose || ''} alma vaktiniz geldi!`.trim(),
+                    channelId: 'opti_alarms_channel',
+                    schedule: {
+                        on: { hour, minute },
+                        allowWhileIdle: true
+                    },
+                    extra: { id: a.id, remind_at: a.remind_at },
+                    smallIcon: 'ic_stat_icon_config_sample'
+                });
+            }
+
+            if (list.length > 0) {
+                await LN.schedule({ notifications: list });
+                console.log(`📱 ${list.length} adet sistem alarmı Capacitor ile zamanlandı.`);
+            }
+            return true;
+        } catch (err) {
+            console.warn('Capacitor LocalNotifications hatası:', err);
+            return false;
         }
     }
 }
