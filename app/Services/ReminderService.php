@@ -159,9 +159,8 @@ class ReminderService
     public function getDueReminders(int $userId): array
     {
         $now        = new DateTime('now');
-        $currentMin = $now->format('H:i');
-        $minStart   = $currentMin . ':00';
-        $minEnd     = $currentMin . ':59';
+        $minStart   = date('H:i:00', strtotime('-1 minute'));
+        $minEnd     = date('H:i:59', strtotime('+1 minute'));
         $todayIndex = (int) $now->format('w'); // 0=Pazar … 6=Cumartesi
         $todayDate  = $now->format('Y-m-d');
 

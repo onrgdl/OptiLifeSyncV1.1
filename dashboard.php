@@ -478,7 +478,13 @@ button { cursor: pointer; border: none; background: none; }
                     <div class="card-body">
                         <div class="section-header">
                             <div class="section-title"><i class="bi bi-alarm-fill" style="color:var(--yellow)"></i> Yaklaşan Alarmlar</div>
-                            <a href="reminders.php" style="font-size:12px;color:var(--accent)">Tümünü Yönet →</a>
+                            <div class="d-flex align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 d-flex align-items-center gap-1" onclick="openAlarmAudioModal()" title="Alarm &amp; Ses Ayarları" style="font-size:11.5px; border-radius:8px; border-color:var(--border);">
+                                    <i class="bi bi-volume-up-fill text-primary"></i>
+                                    <span>Ses Ayarları</span>
+                                </button>
+                                <a href="reminders.php" style="font-size:12px;color:var(--accent)">Tümünü Yönet →</a>
+                            </div>
                         </div>
                         <div id="alarmList">
                             <div class="skeleton" style="height:56px;margin-bottom:8px"></div>
@@ -1103,8 +1109,9 @@ async function loadDashboard(forceFetch = false) {
         }
         authFailureStreak = 0; // Başarılı yanıtta sayacı sıfırla
         dashData = data;
+        window.__CURRENT_ALARMS__ = data.upcoming_alarms ?? [];
         renderDashboard(data);
-        checkAlarms(data.upcoming_alarms ?? []);
+        checkAlarms(window.__CURRENT_ALARMS__);
     } catch (e) {
         const pollLbl = document.getElementById('pollLabel');
         if (pollLbl) pollLbl.textContent = '⚠️ Yeniden deneniyor…';
@@ -1245,8 +1252,8 @@ async function dismissDashboardAlarm(alarmId) {
         cancelButtonColor: '#64748b',
         confirmButtonText: 'Evet, Sil',
         cancelButtonText: 'Vazgeç',
-        background: '#111827',
-        color: '#f8fafc',
+        background: '#ffffff',
+        color: '#1e293b',
     });
 
     if (result.isConfirmed) {
@@ -1265,8 +1272,8 @@ async function dismissDashboardAlarm(alarmId) {
                 position: 'top-end',
                 timer: 2000,
                 showConfirmButton: false,
-                background: '#111827',
-                color: '#f8fafc',
+                background: '#ffffff',
+                color: '#1e293b',
             });
             await loadDashboard();
         }
@@ -1391,12 +1398,12 @@ function checkAlarms(alarms) {
         }
 
         Swal.fire({
-            icon:'warning', iconColor:'#facc15',
+            icon:'warning', iconColor:'#f59e0b',
             title: a.type==='medication' ? '💊 İlaç Zamanı!' : '💪 Takviye Zamanı!',
             html:`<div style="text-align:center">
-                      <h5 style="color:#f8fafc; font-size:1.2rem; margin-bottom:8px;">${esc(a.label)}</h5>
-                      <p style="color:#94a3b8; margin-bottom:4px;">Saat: <strong style="color:var(--accent)">${a.remind_at}</strong></p>
-                      <p style="color:#94a3b8; margin-bottom:12px;">Doz: <strong style="color:#f8fafc">${esc(a.dose)}</strong></p>
+                      <h5 style="color:#0f172a; font-size:1.2rem; margin-bottom:8px; font-weight:700;">${esc(a.label)}</h5>
+                      <p style="color:#64748b; margin-bottom:4px; font-size:14px;">Saat: <strong style="color:var(--accent); font-size:15px;">${a.remind_at}</strong></p>
+                      <p style="color:#64748b; margin-bottom:12px; font-size:14px;">Doz: <strong style="color:#0f172a">${esc(a.dose)}</strong></p>
                       <div class="badge bg-danger px-3 py-2" style="font-size:12px; letter-spacing:0.5px;">
                           🔔 Sesli Alarm Çalıyor...
                       </div>
@@ -1404,8 +1411,9 @@ function checkAlarms(alarms) {
             confirmButtonText:'✅ Aldım / Durdur',
             cancelButtonText:'⏸ Ertele 15dk',
             showCancelButton:true,
-            confirmButtonColor:'#22c55e', cancelButtonColor:'#64748b',
-            background:'#1e293b', color:'#f8fafc', allowOutsideClick:false,
+            confirmButtonColor:'#16a34a', cancelButtonColor:'#64748b',
+            background:'#ffffff', color:'#1e293b', allowOutsideClick:false,
+            backdrop: `rgba(15, 23, 42, 0.65)`,
         }).then(r => {
             // Alarm sesini kapat
             if (window.optiAlarmEngine) {
@@ -1425,6 +1433,89 @@ function checkAlarms(alarms) {
             });
         }
     }
+}
+
+/**
+ * Dashboard içi hızlı Alarm & Ses Ayarları Modalı
+ */
+function openAlarmAudioModal() {
+    const currentSound = window.optiAlarmEngine ? window.optiAlarmEngine.getSound() : 'classic';
+    const currentVol   = window.optiAlarmEngine ? window.optiAlarmEngine.getVolumePercent() : 70;
+
+    Swal.fire({
+        title: '🔊 Alarm & Ses Ayarları',
+        html: `
+            <div style="text-align:left; font-size:14px; padding:6px 0;">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-secondary mb-1">
+                        <i class="bi bi-music-note-beamed me-1"></i>Alarm Melodisi
+                    </label>
+                    <select id="swalSoundSelect" class="form-select form-select-sm fw-medium">
+                        <option value="classic" ${currentSound==='classic'?'selected':''}>🔔 Klasik Dijital Bip</option>
+                        <option value="chime" ${currentSound==='chime'?'selected':''}>🎵 Melodik Çan (Ding-Dong)</option>
+                        <option value="marimba" ${currentSound==='marimba'?'selected':''}>🌿 Yumuşak Marimba</option>
+                        <option value="urgent" ${currentSound==='urgent'?'selected':''}>🚨 Acil Uyarı Sireni</option>
+                        <option value="pulse" ${currentSound==='pulse'?'selected':''}>⚡ Modern Elektronik Ritim</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small fw-bold text-secondary mb-0">
+                            <i class="bi bi-speaker me-1"></i>Ses Düzeyi
+                        </label>
+                        <span id="swalVolLabel" class="badge bg-light text-dark border px-2 py-1 fw-bold">${currentVol}%</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-volume-mute text-muted small"></i>
+                        <input type="range" class="form-range" id="swalVolSlider" min="0" max="100" step="5" value="${currentVol}">
+                        <i class="bi bi-volume-up text-primary small"></i>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-outline-primary btn-sm w-100 fw-semibold mt-2" id="swalTestBtn">
+                    <i class="bi bi-play-fill"></i> Sesi Test Et
+                </button>
+            </div>
+        `,
+        showConfirmButton: true,
+        confirmButtonText: 'Tamam',
+        confirmButtonColor: '#0284c7',
+        background: '#ffffff',
+        color: '#1e293b',
+        didOpen: () => {
+            const selectEl = document.getElementById('swalSoundSelect');
+            const sliderEl = document.getElementById('swalVolSlider');
+            const labelEl  = document.getElementById('swalVolLabel');
+            const testBtn  = document.getElementById('swalTestBtn');
+
+            if (selectEl) {
+                selectEl.addEventListener('change', (e) => {
+                    if (window.optiAlarmEngine) {
+                        window.optiAlarmEngine.setSound(e.target.value);
+                        window.optiAlarmEngine.testSound();
+                    }
+                });
+            }
+
+            if (sliderEl && labelEl) {
+                sliderEl.addEventListener('input', (e) => {
+                    labelEl.textContent = e.target.value + '%';
+                    if (window.optiAlarmEngine) {
+                        window.optiAlarmEngine.setVolume(e.target.value);
+                    }
+                });
+            }
+
+            if (testBtn) {
+                testBtn.addEventListener('click', () => {
+                    if (window.optiAlarmEngine) {
+                        window.optiAlarmEngine.testSound();
+                    }
+                });
+            }
+        }
+    });
 }
 
 // ─── MODAL: SEKMELER ─────────────────────────────────────────────────
@@ -1922,6 +2013,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Her 30sn veri yenile
     setInterval(() => loadDashboard(true), 30_000);
+
+    // Yüksek hassasiyetli yerel alarm kontrolü (Her 2 saniyede bir - Sıfır gecikme)
+    setInterval(() => {
+        if (window.__CURRENT_ALARMS__ && window.__CURRENT_ALARMS__.length > 0) {
+            checkAlarms(window.__CURRENT_ALARMS__);
+        }
+    }, 2000);
 
     // Bildirim izni
     if ('Notification' in window && Notification.permission === 'default') {

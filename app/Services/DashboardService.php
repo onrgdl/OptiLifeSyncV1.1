@@ -100,8 +100,8 @@ class DashboardService
             'fat_g'     => round($target['fat_g']     - $consumed['fat_g'],     1),
         ];
 
-        // Yaklaşan alarmlar (sonraki 3 saat)
-        $nowTime = date('H:i:s');
+        // Yaklaşan alarmlar (şu anki dakika ve sonraki 3 saat)
+        $nowTime = date('H:i:00', strtotime('-5 minutes'));
         $futTime = date('H:i:s', strtotime('+180 minutes'));
         $todayIdx = (int)date('w');
 

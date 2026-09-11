@@ -1,23 +1,45 @@
 /**
- * OptiLifeSync - Sesli Alarm & Bildirim Motoru (Web Audio API Synthesizer)
+ * OptiLifeSync - Gelişmiş Sesli Alarm Motoru (Web Audio API Synthesizer)
  * ────────────────────────────────────────────────────────────────────────
- * Harici ses dosyasına (MP3/WAV) ihtiyaç duymadan, tüm tarayıcılarda ve
- * mobil cihazlarda anında çalan, modern ve ritmik alarm ses motoru.
+ * Harici ses dosyasına (MP3/WAV) ihtiyaç duymadan, sıfır gecikmeyle tüm
+ * tarayıcılarda ve mobil cihazlarda anında çalan çok melodili synthesizer motoru.
+ * 
+ * Özellikler:
+ * - 5 farklı polifonik melodi seçeneği (Klasik, Melodik Çan, Marimba, Acil Siren, Modern Pulse)
+ * - Canlı ses seviyesi kontrolü (Master Gain: %0 - %100)
+ * - Otomatik tarayıcı ses kilidi çözümü (Autoplay Policy / User Interaction Unlock)
+ * - Haptic titreşim desteği (Mobil)
+ * - LocalStorage kalıcılığı
  */
 
 class OptiAlarmEngine {
     constructor() {
         this.audioCtx = null;
+        this.masterGain = null;
         this.isPlaying = false;
         this.alarmInterval = null;
         this.isUnlocked = false;
 
-        // Tarayıcı otomatik ses engellemesini (Autoplay Policy) aşmak için ilk tıklamada kilidi aç
+        // Ayarları LocalStorage'dan al veya varsayılan ata
+        const savedVol = localStorage.getItem('opti_alarm_volume');
+        this.volume = savedVol !== null ? Math.max(0, Math.min(1, parseFloat(savedVol))) : 0.7;
+        this.soundType = localStorage.getItem('opti_alarm_sound') || 'classic';
+
+        // Melodi tanımları
+        this.availableSounds = {
+            'classic': { id: 'classic', name: '🔔 Klasik Dijital Bip', interval: 1600 },
+            'chime':   { id: 'chime',   name: '🎵 Melodik Çan (Ding-Dong)', interval: 2000 },
+            'marimba': { id: 'marimba', name: '🌿 Yumuşak Marimba', interval: 1800 },
+            'urgent':  { id: 'urgent',  name: '🚨 Acil Uyarı Sireni', interval: 1400 },
+            'pulse':   { id: 'pulse',   name: '⚡ Modern Elektronik Ritim', interval: 1600 }
+        };
+
+        // Tarayıcı otomatik ses engellemesini (Autoplay Policy) aşmak için ilk etkileşimde kilidi aç
         this.setupUnlockListener();
     }
 
     /**
-     * Web Audio Context başlat ve hazırla
+     * Web Audio Context başlat ve Master Gain bağla
      */
     initContext() {
         if (!this.audioCtx) {
@@ -26,8 +48,16 @@ class OptiAlarmEngine {
                 this.audioCtx = new AudioContext();
             }
         }
-        if (this.audioCtx && this.audioCtx.state === 'suspended') {
-            this.audioCtx.resume();
+
+        if (this.audioCtx) {
+            if (!this.masterGain) {
+                this.masterGain = this.audioCtx.createGain();
+                this.masterGain.gain.setValueAtTime(this.volume, this.audioCtx.currentTime);
+                this.masterGain.connect(this.audioCtx.destination);
+            }
+            if (this.audioCtx.state === 'suspended') {
+                this.audioCtx.resume();
+            }
         }
     }
 
@@ -39,65 +69,165 @@ class OptiAlarmEngine {
                 window.removeEventListener('click', unlock);
                 window.removeEventListener('touchstart', unlock);
                 window.removeEventListener('keydown', unlock);
-                console.log('🔊 OptiLifeSync Ses Motoru Aktif Edildi.');
             }
         };
 
-        window.addEventListener('click', unlock, { once: false });
-        window.addEventListener('touchstart', unlock, { once: false });
-        window.addEventListener('keydown', unlock, { once: false });
+        window.addEventListener('click', unlock, { once: false, passive: true });
+        window.addEventListener('touchstart', unlock, { once: false, passive: true });
+        window.addEventListener('keydown', unlock, { once: false, passive: true });
     }
 
     /**
-     * Tek bir çift-tonlu bildirim "bip"i çal (Frekanslar: 880Hz -> 1320Hz)
+     * Ses Seviyesini Ayarla (0.0 - 1.0 veya 0 - 100)
      */
-    playChime(freq = 880, duration = 0.15, gainVal = 0.25) {
+    setVolume(val) {
+        let num = parseFloat(val);
+        if (isNaN(num)) num = 0.7;
+        if (num > 1) num = num / 100; // 70 girildiyse 0.7 yap
+        this.volume = Math.max(0, Math.min(1, num));
+        localStorage.setItem('opti_alarm_volume', this.volume.toString());
+
+        if (this.audioCtx && this.masterGain) {
+            try {
+                this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
+                this.masterGain.gain.setValueAtTime(this.volume, this.audioCtx.currentTime);
+            } catch (_) {}
+        }
+    }
+
+    getVolume() {
+        return this.volume;
+    }
+
+    getVolumePercent() {
+        return Math.round(this.volume * 100);
+    }
+
+    /**
+     * Alarm Melodisini Ayarla
+     */
+    setSound(soundKey) {
+        if (this.availableSounds[soundKey]) {
+            this.soundType = soundKey;
+            localStorage.setItem('opti_alarm_sound', soundKey);
+        }
+    }
+
+    getSound() {
+        return this.soundType;
+    }
+
+    /**
+     * Tekil bir osilatör tonu oluştur ve master gain'e bağla
+     */
+    playTone(freq, startTime, duration, peakGain = 0.4, type = 'sine') {
         try {
             this.initContext();
-            if (!this.audioCtx) return;
+            if (!this.audioCtx || !this.masterGain) return;
 
-            const now = this.audioCtx.currentTime;
             const osc = this.audioCtx.createOscillator();
             const gain = this.audioCtx.createGain();
 
-            osc.type = 'sine'; // Yumuşak ama net sinüs dalgası
-            osc.frequency.setValueAtTime(freq, now);
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, startTime);
 
-            // Yumuşak giriş ve hızlı sönümleme (Attack & Decay)
-            gain.gain.setValueAtTime(0.001, now);
-            gain.gain.exponentialRampToValueAtTime(gainVal, now + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+            // Yumuşak Attack ve Decay eğrisi (Tık/patlama seslerini engeller)
+            gain.gain.setValueAtTime(0.0001, startTime);
+            gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakGain), startTime + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 
             osc.connect(gain);
-            gain.connect(this.audioCtx.destination);
+            gain.connect(this.masterGain);
 
-            osc.start(now);
-            osc.stop(now + duration);
+            osc.start(startTime);
+            osc.stop(startTime + duration);
         } catch (e) {
-            console.warn('Alarm sesi çalınamadı:', e);
+            console.warn('Ton çalınamadı:', e);
         }
     }
 
     /**
-     * Ritmik Alarm Sinyali: İki hızlı bip + kısa bekleme
+     * Melodi 1: Klasik Dijital Bip
      */
-    playBeepSequence() {
-        if (!this.isPlaying) return;
+    playClassicSequence(t0) {
+        this.playTone(880,  t0,        0.12, 0.40, 'sine');
+        this.playTone(1175, t0 + 0.14, 0.14, 0.45, 'sine');
+        this.playTone(1760, t0 + 0.30, 0.22, 0.50, 'sine');
+    }
 
-        this.playChime(880, 0.12, 0.35);
-        setTimeout(() => {
-            if (this.isPlaying) this.playChime(1175, 0.15, 0.40);
-        }, 140);
-        setTimeout(() => {
-            if (this.isPlaying) this.playChime(1760, 0.22, 0.45);
-        }, 300);
+    /**
+     * Melodi 2: Melodik Çan (Ding-Dong / Harmonic Chime)
+     */
+    playChimeSequence(t0) {
+        this.playTone(523.25, t0,        0.45, 0.40, 'sine');     // C5
+        this.playTone(659.25, t0 + 0.14, 0.50, 0.40, 'sine');     // E5
+        this.playTone(783.99, t0 + 0.28, 0.55, 0.45, 'sine');     // G5
+        this.playTone(1046.50,t0 + 0.42, 0.85, 0.50, 'triangle'); // C6
+    }
 
-        // Mobil Titreşim Desteği (Haptic Feedback)
-        if ('vibrate' in navigator) {
-            try {
-                navigator.vibrate([200, 100, 200, 100, 300]);
-            } catch (_) {}
+    /**
+     * Melodi 3: Yumuşak Marimba (Akustik Doğal Ritim)
+     */
+    playMarimbaSequence(t0) {
+        this.playTone(440.00, t0,        0.20, 0.45, 'triangle'); // A4
+        this.playTone(554.37, t0 + 0.12, 0.20, 0.45, 'triangle'); // C#5
+        this.playTone(659.25, t0 + 0.24, 0.22, 0.45, 'triangle'); // E5
+        this.playTone(880.00, t0 + 0.36, 0.35, 0.50, 'triangle'); // A5
+    }
+
+    /**
+     * Melodi 4: Acil Uyarı Sireni (Urgent Alert)
+     */
+    playUrgentSequence(t0) {
+        this.playTone(987.77,  t0,        0.10, 0.35, 'sawtooth'); // B5
+        this.playTone(1318.51, t0 + 0.12, 0.12, 0.35, 'sawtooth'); // E6
+        this.playTone(987.77,  t0 + 0.24, 0.10, 0.35, 'sawtooth'); // B5
+        this.playTone(1318.51, t0 + 0.36, 0.16, 0.40, 'sawtooth'); // E6
+    }
+
+    /**
+     * Melodi 5: Modern Elektronik Ritim (Pulse)
+     */
+    playPulseSequence(t0) {
+        this.playTone(587.33, t0,        0.09, 0.42, 'sine');     // D5
+        this.playTone(587.33, t0 + 0.12, 0.09, 0.42, 'sine');     // D5
+        this.playTone(880.00, t0 + 0.26, 0.30, 0.48, 'triangle'); // A5
+    }
+
+    /**
+     * Belirtilen melodiyi bir kez çal
+     */
+    playMelodyOnce(soundKey = null) {
+        this.initContext();
+        if (!this.audioCtx) return;
+
+        const key = soundKey || this.soundType;
+        const now = this.audioCtx.currentTime + 0.02;
+
+        switch (key) {
+            case 'chime':   this.playChimeSequence(now); break;
+            case 'marimba': this.playMarimbaSequence(now); break;
+            case 'urgent':  this.playUrgentSequence(now); break;
+            case 'pulse':   this.playPulseSequence(now); break;
+            case 'classic':
+            default:
+                this.playClassicSequence(now);
+                break;
         }
+
+        // Mobil Titreşim
+        if ('vibrate' in navigator) {
+            try { navigator.vibrate([150, 80, 150, 80, 250]); } catch (_) {}
+        }
+    }
+
+    /**
+     * Seçili sesi tek sefer test et
+     */
+    testSound(soundKey = null, vol = null) {
+        if (vol !== null) this.setVolume(vol);
+        if (soundKey) this.setSound(soundKey);
+        this.playMelodyOnce(soundKey);
     }
 
     /**
@@ -108,17 +238,20 @@ class OptiAlarmEngine {
         this.isPlaying = true;
         this.initContext();
 
-        // İlk vuruş
-        this.playBeepSequence();
+        const soundConf = this.availableSounds[this.soundType] || this.availableSounds['classic'];
+        const intervalMs = soundConf.interval || 1600;
 
-        // Her 1.5 saniyede bir ritmik tekrarla
+        // İlk vuruş hemen
+        this.playMelodyOnce();
+
+        // Ritmik tekrar
         this.alarmInterval = setInterval(() => {
             if (this.isPlaying) {
-                this.playBeepSequence();
+                this.playMelodyOnce();
             } else {
                 clearInterval(this.alarmInterval);
             }
-        }, 1600);
+        }, intervalMs);
     }
 
     /**

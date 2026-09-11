@@ -309,6 +309,54 @@ $typeLabels = [
                     </button>
                 </form>
             </div>
+
+            <!-- ALARM & SES AYARLARI KARTI -->
+            <div class="card p-4 mt-4" id="alarmSettingsCard">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h6 class="mb-0 fw-bold text-dark">
+                        <i class="bi bi-volume-up-fill text-primary me-2"></i>Alarm &amp; Ses Ayarları
+                    </h6>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" style="font-size:11px;">
+                        Canlı Ayar
+                    </span>
+                </div>
+
+                <!-- Alarm Sesi Seçimi -->
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-secondary mb-1">
+                        <i class="bi bi-music-note-beamed me-1"></i>Alarm Melodisi
+                    </label>
+                    <select id="alarmSoundSelect" class="form-select form-select-sm fw-medium">
+                        <option value="classic">🔔 Klasik Dijital Bip</option>
+                        <option value="chime">🎵 Melodik Çan (Ding-Dong)</option>
+                        <option value="marimba">🌿 Yumuşak Marimba</option>
+                        <option value="urgent">🚨 Acil Uyarı Sireni</option>
+                        <option value="pulse">⚡ Modern Elektronik Ritim</option>
+                    </select>
+                </div>
+
+                <!-- Ses Seviyesi Slider -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small fw-semibold text-secondary mb-0">
+                            <i class="bi bi-speaker me-1"></i>Ses Düzeyi
+                        </label>
+                        <span id="alarmVolumeLabel" class="badge bg-light text-dark border px-2 py-1 fw-bold" style="font-size:12px;">
+                            70%
+                        </span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-volume-mute text-muted small"></i>
+                        <input type="range" class="form-range" id="alarmVolumeSlider" min="0" max="100" step="5" value="70">
+                        <i class="bi bi-volume-up text-primary small"></i>
+                    </div>
+                </div>
+
+                <!-- Sesi Test Et Butonu -->
+                <button type="button" class="btn btn-outline-primary btn-sm w-100 fw-semibold d-flex align-items-center justify-content-center gap-2" id="testSoundBtn">
+                    <i class="bi bi-play-fill fs-6"></i> Sesi Test Et
+                </button>
+            </div>
         </div>
 
         <!-- SAĞ: Mevcut Liste -->
@@ -504,15 +552,15 @@ function sendBrowserNotification(title, body, icon = '') {
 
 /**
  * Zamanı gelen bir alarm için SweetAlert2 popup gösterir.
- * @param {Object} reminder  check_due API'den dönen reminder nesnesi
+ * @param {Object} reminder  check_due API veya yerel kontrolden dönen reminder nesnesi
  */
 function showAlarmModal(reminder) {
     const isIlac = reminder.type === 'medication';
     const icon   = isIlac ? '💊' : '💪';
-    const color  = isIlac ? '#f87171' : '#4ade80';
+    const color  = isIlac ? '#ef4444' : '#16a34a';
     const title  = isIlac ? 'İlaç Zamanı!' : 'Takviye Zamanı!';
 
-    // Sesli alarmı döngüsel başlat
+    // Sesli alarmı döngüsel başlat (Web Audio API)
     if (window.optiAlarmEngine) {
         window.optiAlarmEngine.start();
     }
@@ -523,18 +571,18 @@ function showAlarmModal(reminder) {
         title:              `${icon} ${title}`,
         html: `
             <div style="text-align:center; line-height: 1.8;">
-                <h4 style="color:#f8fafc; margin: 0 0 8px;">
-                    <strong>${escapeHtml(reminder.label)}</strong>
+                <h4 style="color:#0f172a; margin: 0 0 8px; font-weight:700;">
+                    ${escapeHtml(reminder.label)}
                 </h4>
-                <p style="color:#94a3b8; margin:0;">
-                    <i class="bi bi-clock"></i>
-                    Alım Saati: <strong style="color:#38bdf8">${reminder.remind_at}</strong>
+                <p style="color:#64748b; margin:0; font-size:14px;">
+                    <i class="bi bi-clock me-1"></i>
+                    Alım Saati: <strong style="color:#0284c7; font-size:15px;">${reminder.remind_at}</strong>
                 </p>
-                <p style="color:#94a3b8; margin:4px 0 0;">
-                    Doz: <strong style="color:#f8fafc">${escapeHtml(reminder.dose)}</strong>
+                <p style="color:#64748b; margin:4px 0 0; font-size:14px;">
+                    Doz: <strong style="color:#0f172a">${escapeHtml(reminder.dose)}</strong>
                     — ${escapeHtml(reminder.form)}
                 </p>
-                <div class="badge bg-danger px-3 py-2 mt-3" style="font-size:12px;">
+                <div class="badge bg-danger px-3 py-2 mt-3" style="font-size:12px; letter-spacing:0.3px;">
                     🔔 Sesli Alarm Çalıyor...
                 </div>
             </div>
@@ -542,11 +590,11 @@ function showAlarmModal(reminder) {
         confirmButtonText:  '✅ Aldım / Durdur',
         cancelButtonText:   '⏸ Ertele (15 dk)',
         showCancelButton:   true,
-        confirmButtonColor: '#22c55e',
+        confirmButtonColor: '#16a34a',
         cancelButtonColor:  '#64748b',
-        background:         '#1e293b',
-        color:              '#f8fafc',
-        backdrop:           `rgba(0,0,0,0.7)`,
+        background:         '#ffffff',
+        color:              '#1e293b',
+        backdrop:           `rgba(15, 23, 42, 0.65)`,
         allowOutsideClick:  false,
     }).then((result) => {
         // Alarm sesini durdur
@@ -560,7 +608,7 @@ function showAlarmModal(reminder) {
             Swal.fire({
                 icon: 'info', title: '15 Dakika Ertelendi',
                 timer: 2000, showConfirmButton: false,
-                background: '#1e293b', color: '#f8fafc',
+                background: '#ffffff', color: '#1e293b',
             });
         }
     });
@@ -638,6 +686,47 @@ const scheduleMap = {};
 scheduleMap[<?= $supp['id'] ?>] = new Set(<?= json_encode($supp['schedule_times']) ?>);
 <?php endforeach; ?>
 
+// Aktif takviyeleri yüksek hassasiyetli yerel kontrol için sakla
+window.__SUPPLEMENTS_CACHE__ = <?= json_encode(array_values(array_filter($supplements, fn($s) => (int)$s['is_active'] === 1 && empty($s['is_expired'])))) ?>;
+
+/**
+ * Tarayıcı saatiyle her 2 saniyede bir eşleşen alarmları anında çalar (Sıfır gecikme).
+ */
+function checkLocalReminders() {
+    if (!window.__SUPPLEMENTS_CACHE__ || !window.__SUPPLEMENTS_CACHE__.length) return;
+
+    const now = new Date();
+    const nowMin = now.toTimeString().substring(0, 5); // "14:30"
+    const todayDate = now.toDateString();
+
+    for (const supp of window.__SUPPLEMENTS_CACHE__) {
+        const times = supp.schedule_times || [];
+        for (const t of times) {
+            if (t === nowMin) {
+                const key = `${supp.id}-${t}-${todayDate}`;
+                if (shownAlarmIds.has(key)) continue;
+                shownAlarmIds.add(key);
+
+                const reminderObj = {
+                    id: supp.id,
+                    type: supp.type,
+                    label: supp.name,
+                    remind_at: t,
+                    dose: `${supp.dose_amount || ''} ${supp.dose_unit || ''}`.trim(),
+                    form: supp.form || 'tablet'
+                };
+
+                showAlarmModal(reminderObj);
+
+                sendBrowserNotification(
+                    supp.type === 'medication' ? '💊 İlaç Zamanı!' : '💪 Takviye Zamanı!',
+                    `${supp.name} — Doz: ${reminderObj.dose}`
+                );
+            }
+        }
+    }
+}
+
 /**
  * Inline saat input'undan yeni saat ekler ve API'ye kaydeder.
  * @param {number} suppId  Supplement ID
@@ -656,6 +745,10 @@ async function addTimeInline(suppId, inputEl) {
     scheduleMap[suppId].add(time);
     inputEl.value = '';
 
+    // Yerel önbelleği güncelle
+    const cached = (window.__SUPPLEMENTS_CACHE__ || []).find(s => s.id == suppId);
+    if (cached) cached.schedule_times = [...scheduleMap[suppId]];
+
     await syncScheduleToApi(suppId);
     renderTimeBadges(suppId);
 }
@@ -666,6 +759,11 @@ async function addTimeInline(suppId, inputEl) {
 async function removeTime(suppId, time) {
     if (!scheduleMap[suppId]) return;
     scheduleMap[suppId].delete(time);
+
+    // Yerel önbelleği güncelle
+    const cached = (window.__SUPPLEMENTS_CACHE__ || []).find(s => s.id == suppId);
+    if (cached) cached.schedule_times = [...scheduleMap[suppId]];
+
     await syncScheduleToApi(suppId);
     renderTimeBadges(suppId);
 }
@@ -684,7 +782,7 @@ async function syncScheduleToApi(suppId) {
     const data = await res.json();
 
     if (!data.ok) {
-        Swal.fire({ icon:'error', title:'Hata', text: data.error, background:'#1e293b', color:'#f8fafc' });
+        Swal.fire({ icon:'error', title:'Hata', text: data.error, background:'#ffffff', color:'#1e293b' });
     }
 }
 
@@ -788,13 +886,13 @@ function confirmDelete(event, name) {
     Swal.fire({
         icon: 'warning',
         title: 'Silmek istediğinize emin misiniz?',
-        html: `<strong style="color:#f87171">${escapeHtml(name)}</strong> ve tüm alarmları silinecek.`,
+        html: `<strong style="color:#ef4444">${escapeHtml(name)}</strong> ve tüm alarmları silinecek.`,
         confirmButtonText: '🗑️ Evet, Sil',
         cancelButtonText:  'Vazgeç',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#64748b',
-        background: '#1e293b', color: '#f8fafc',
+        cancelButtonColor:  '#64748b',
+        background: '#ffffff', color: '#1e293b',
     }).then(r => { if (r.isConfirmed) form.submit(); });
     return false;
 }
@@ -806,13 +904,13 @@ function confirmFinish(event, name) {
     Swal.fire({
         icon: 'question',
         title: 'İlaç/Tedavi Tamamlandı mı?',
-        html: `<strong style="color:#38bdf8">${escapeHtml(name)}</strong> için tedaviyi tamamlayıp tüm alarmlarını sonlandırmak istiyor musunuz?<br><small class="text-secondary mt-2 d-block">Dashboard ve bildirimlerden bu ilacın tüm alarmları kaldırılacaktır.</small>`,
+        html: `<strong style="color:#0284c7">${escapeHtml(name)}</strong> için tedaviyi tamamlayıp tüm alarmlarını sonlandırmak istiyor musunuz?<br><small class="text-secondary mt-2 d-block">Dashboard ve bildirimlerden bu ilacın tüm alarmları kaldırılacaktır.</small>`,
         confirmButtonText: '🏁 Evet, İlacı Bitir',
         cancelButtonText:  'Vazgeç',
         showCancelButton: true,
         confirmButtonColor: '#f59e0b',
-        cancelButtonColor: '#64748b',
-        background: '#1e293b', color: '#f8fafc',
+        cancelButtonColor:  '#64748b',
+        background: '#ffffff', color: '#1e293b',
     }).then(r => { if (r.isConfirmed) form.submit(); });
     return false;
 }
@@ -832,10 +930,45 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. İlk polling hemen çalışsın
     pollForDueReminders();
 
-    // 4. Her 30 saniyede bir tekrar et
+    // 4. Her 30 saniyede bir server polling tekrar et
     setInterval(pollForDueReminders, 30 * 1000);
 
-    console.log('🔔 OptiLifeSync Alarm Sistemi başlatıldı. Polling aralığı: 30sn');
+    // 5. Alarm Ses ve Düzey Ayarları
+    if (window.optiAlarmEngine) {
+        const soundSelect = document.getElementById('alarmSoundSelect');
+        const volSlider   = document.getElementById('alarmVolumeSlider');
+        const volLabel    = document.getElementById('alarmVolumeLabel');
+        const testBtn     = document.getElementById('testSoundBtn');
+
+        if (soundSelect) {
+            soundSelect.value = window.optiAlarmEngine.getSound();
+            soundSelect.addEventListener('change', (e) => {
+                window.optiAlarmEngine.setSound(e.target.value);
+                window.optiAlarmEngine.testSound();
+            });
+        }
+
+        if (volSlider && volLabel) {
+            volSlider.value = window.optiAlarmEngine.getVolumePercent();
+            volLabel.textContent = window.optiAlarmEngine.getVolumePercent() + '%';
+            volSlider.addEventListener('input', (e) => {
+                window.optiAlarmEngine.setVolume(e.target.value);
+                volLabel.textContent = e.target.value + '%';
+            });
+        }
+
+        if (testBtn) {
+            testBtn.addEventListener('click', () => {
+                window.optiAlarmEngine.testSound();
+            });
+        }
+    }
+
+    // 6. Yüksek hassasiyetli yerel alarm kontrolü (Her 2 saniyede bir - Sıfır gecikme)
+    checkLocalReminders();
+    setInterval(checkLocalReminders, 2000);
+
+    console.log('🔔 OptiLifeSync Alarm & Ses Sistemi başlatıldı.');
 });
 </script>
 
