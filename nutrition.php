@@ -528,25 +528,24 @@ $deficits = $tracker->getDeficits($macroTarget);
 
             <!-- Lokal Takviye Sonuçları -->
             <?php if (!empty($suppResults)): ?>
-            <div class="card p-3 mb-3">
-                <h6 class="mb-3"><i class="bi bi-capsule me-1 text-success"></i> Lokal Takviye Sonuçları
-                    <span class="badge badge-local ms-1 small">MySQL • supplements tablosu</span>
+            <div class="card p-3 mb-3" style="background:#ffffff;border:1px solid var(--border);border-radius:16px;">
+                <h6 class="mb-3 text-dark fw-bold"><i class="bi bi-capsule me-1 text-success"></i> 💊 İlaçlar & Takviyeler
                 </h6>
                 <div class="table-responsive">
-                    <table class="table table-dark table-sm table-hover align-middle mb-0">
-                        <thead><tr class="text-secondary">
+                    <table class="table table-sm table-hover align-middle mb-0" style="background:#ffffff;color:var(--text);border-color:var(--border);">
+                        <thead><tr class="text-secondary" style="font-size:12px;">
                             <th>Ürün</th><th>Tür</th><th>Doz</th><th>Kalori</th><th>Protein</th><th>Karb</th><th>Yağ</th>
                         </tr></thead>
                         <tbody>
                         <?php foreach ($suppResults as $sr): ?>
                             <tr>
-                                <td class="fw-semibold text-light"><?= htmlspecialchars($sr['name']) ?></td>
-                                <td><span class="badge bg-secondary"><?= htmlspecialchars($sr['type']) ?></span></td>
+                                <td class="fw-semibold text-dark"><?= htmlspecialchars($sr['name']) ?></td>
+                                <td><span class="badge bg-secondary-subtle text-secondary border small"><?= htmlspecialchars($sr['type']) ?></span></td>
                                 <td><?= $sr['dose_amount'] ?> <?= htmlspecialchars($sr['dose_unit']) ?></td>
-                                <td class="m-calorie"><?= $sr['calories_per_dose'] ?></td>
-                                <td class="m-protein"><?= $sr['protein_g'] ?>g</td>
-                                <td class="m-carb"><?= $sr['carbs_g'] ?>g</td>
-                                <td class="m-fat"><?= $sr['fat_g'] ?>g</td>
+                                <td class="m-calorie fw-bold"><?= $sr['calories_per_dose'] ?></td>
+                                <td class="m-protein fw-semibold"><?= $sr['protein_g'] ?>g</td>
+                                <td class="m-carb fw-semibold"><?= $sr['carbs_g'] ?>g</td>
+                                <td class="m-fat fw-semibold"><?= $sr['fat_g'] ?>g</td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
@@ -556,11 +555,11 @@ $deficits = $tracker->getDeficits($macroTarget);
             <?php endif; ?>
 
             <!-- Günlük Detay Breakdown -->
-            <div class="card p-3 mb-4">
+            <div class="card p-3 mb-4" style="background:#ffffff;border:1px solid var(--border);border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="mb-0 text-light fw-bold">
-                        <i class="bi bi-list-check me-2 text-info"></i>Gün İçi Tüketim Listesi
-                        <span class="badge bg-secondary ms-2 small"><?= count($deficits['entry_breakdown']) ?> kayıt</span>
+                    <h6 class="mb-0 text-dark fw-bold">
+                        <i class="bi bi-list-check me-2 text-primary"></i>Gün İçi Tüketim Listesi
+                        <span class="badge ms-2 small" style="background:rgba(2,132,199,0.1);color:#0284c7;border:1px solid rgba(2,132,199,0.25);"><?= count($deficits['entry_breakdown']) ?> kayıt</span>
                     </h6>
                 </div>
 
@@ -571,54 +570,67 @@ $deficits = $tracker->getDeficits($macroTarget);
                         <small class="text-muted">Sol taraftaki panelden öğününüzü yazıp analiz ederek ekleyebilirsiniz.</small>
                     </div>
                 <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="table table-dark table-sm table-hover align-middle mb-0" style="background:transparent">
-                            <thead>
-                                <tr class="text-secondary" style="font-size:12px; border-bottom: 1px solid var(--border);">
-                                    <th>Besin</th>
-                                    <th>Öğün</th>
-                                    <th style="color:#f87171">Kalori</th>
-                                    <th style="color:#60a5fa">Protein</th>
-                                    <th style="color:#facc15">Karb</th>
-                                    <th style="color:#c084fc">Yağ</th>
-                                    <th>Saat</th>
-                                    <th class="text-end">İşlem</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            <?php foreach ($deficits['entry_breakdown'] as $row): 
-                                $timeStr = !empty($row['logged_at']) ? date('H:i', strtotime($row['logged_at'])) : '—';
-                                $mealLabel = $mealTypeLabels[$row['meal']] ?? htmlspecialchars($row['meal']);
-                            ?>
-                                <tr>
-                                    <td class="fw-semibold text-light">
+                    <div class="d-flex flex-column gap-2">
+                    <?php foreach ($deficits['entry_breakdown'] as $row): 
+                        $timeStr = !empty($row['logged_at']) ? date('H:i', strtotime($row['logged_at'])) : '—';
+                        $mealLabel = $mealTypeLabels[$row['meal']] ?? htmlspecialchars($row['meal']);
+                    ?>
+                        <div class="consumption-card p-3 rounded-3" style="background:#fdfbf7;border:1px solid var(--border);transition:all 0.15s ease;">
+                            <!-- Üst Satır: Besin Adı, Rozet, Saat ve Sil Butonu -->
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="pe-2">
+                                    <div class="fw-bold fs-6 mb-1 text-dark" style="line-height:1.35;">
                                         <?= htmlspecialchars($row['label']) ?>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-secondary-subtle text-light border border-secondary small">
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span class="badge" style="background:rgba(2,132,199,0.12);color:#0284c7;border:1px solid rgba(2,132,199,0.25);font-size:11px;font-weight:600;">
                                             <?= $mealLabel ?>
                                         </span>
-                                    </td>
-                                    <td class="m-calorie fw-bold"><?= $row['calories'] ?> kcal</td>
-                                    <td class="m-protein fw-semibold"><?= $row['protein'] ?>g</td>
-                                    <td class="m-carb fw-semibold"><?= $row['carbs'] ?>g</td>
-                                    <td class="m-fat fw-semibold"><?= $row['fat'] ?>g</td>
-                                    <td class="text-secondary small"><?= $timeStr ?></td>
-                                    <td class="text-end">
-                                        <?php if (!empty($row['id'])): ?>
-                                            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" 
-                                                    onclick="deleteNutritionFood(<?= (int)$row['id'] ?>, '<?= htmlspecialchars(addslashes($row['label'])) ?>')" 
-                                                    title="Bu besini sil">
-                                                <i class="bi bi-trash3"></i> Sil
-                                            </button>
-                                        <?php else: ?>
-                                            <span class="text-muted small">—</span>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                                        <span class="text-muted small" style="font-size:11px;">
+                                            <i class="bi bi-clock me-1"></i><?= $timeStr ?>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <?php if (!empty($row['id'])): ?>
+                                        <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2 rounded-2" 
+                                                onclick="deleteNutritionFood(<?= (int)$row['id'] ?>, '<?= htmlspecialchars(addslashes($row['label'])) ?>')" 
+                                                title="Bu besini sil" style="font-size:12px;white-space:nowrap;">
+                                            <i class="bi bi-trash3"></i> Sil
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+
+                            <!-- Alt Satır: Değerler (Besin üstte, Değerler altta) -->
+                            <div class="row g-2 pt-2" style="border-top:1px dashed var(--border);">
+                                <div class="col-3 text-center">
+                                    <div class="py-1 px-1 rounded" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);">
+                                        <div style="font-size:10px;color:#dc2626;font-weight:700;">🔥 Kalori</div>
+                                        <div class="fw-bold" style="color:#dc2626;font-size:12.5px;"><?= $row['calories'] ?> <span style="font-size:9.5px;font-weight:normal;">kcal</span></div>
+                                    </div>
+                                </div>
+                                <div class="col-3 text-center">
+                                    <div class="py-1 px-1 rounded" style="background:rgba(2,132,199,0.08);border:1px solid rgba(2,132,199,0.2);">
+                                        <div style="font-size:10px;color:#0284c7;font-weight:700;">💪 Protein</div>
+                                        <div class="fw-bold" style="color:#0284c7;font-size:12.5px;"><?= $row['protein'] ?>g</div>
+                                    </div>
+                                </div>
+                                <div class="col-3 text-center">
+                                    <div class="py-1 px-1 rounded" style="background:rgba(217,119,6,0.08);border:1px solid rgba(217,119,6,0.2);">
+                                        <div style="font-size:10px;color:#d97706;font-weight:700;">⚡ Karb</div>
+                                        <div class="fw-bold" style="color:#d97706;font-size:12.5px;"><?= $row['carbs'] ?>g</div>
+                                    </div>
+                                </div>
+                                <div class="col-3 text-center">
+                                    <div class="py-1 px-1 rounded" style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);">
+                                        <div style="font-size:10px;color:#7c3aed;font-weight:700;">💧 Yağ</div>
+                                        <div class="fw-bold" style="color:#7c3aed;font-size:12.5px;"><?= $row['fat'] ?>g</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
             </div>

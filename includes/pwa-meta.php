@@ -8,9 +8,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="OptiLifeSync">
-<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="assets/icons/icon-512.png">
+<link rel="icon" type="image/x-icon" href="favicon.ico?v=<?= file_exists(__DIR__ . '/../favicon.ico') ? filemtime(__DIR__ . '/../favicon.ico') : '2' ?>">
+<link rel="shortcut icon" type="image/png" href="assets/img/logo-icon.png?v=<?= file_exists(__DIR__ . '/../assets/img/logo-icon.png') ? filemtime(__DIR__ . '/../assets/img/logo-icon.png') : '2' ?>">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png?v=<?= file_exists(__DIR__ . '/../assets/icons/icon-192.png') ? filemtime(__DIR__ . '/../assets/icons/icon-192.png') : '2' ?>">
+<link rel="icon" type="image/png" sizes="512x512" href="assets/icons/icon-512.png?v=<?= file_exists(__DIR__ . '/../assets/icons/icon-512.png') ? filemtime(__DIR__ . '/../assets/icons/icon-512.png') : '2' ?>">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=<?= file_exists(__DIR__ . '/../assets/icons/apple-touch-icon.png') ? filemtime(__DIR__ . '/../assets/icons/apple-touch-icon.png') : '2' ?>">
 
 <script>
     // Hem localhost/Gyp/ hem de Vercel/kök dizin uyumlu evrensel API yolu

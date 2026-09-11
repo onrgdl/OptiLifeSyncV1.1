@@ -243,7 +243,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <div class="auth-card">
     <div class="auth-logo">
-        <div class="logo-icon">💚</div>
+        <?php if (file_exists(__DIR__ . '/assets/img/logo-icon.png')): ?>
+            <img src="assets/img/logo-icon.png?v=<?= filemtime(__DIR__ . '/assets/img/logo-icon.png') ?>" alt="OptiLifeSync" style="width:42px;height:42px;border-radius:12px;object-fit:contain;flex-shrink:0;">
+        <?php elseif (file_exists(__DIR__ . '/assets/img/logo.png')): ?>
+            <img src="assets/img/logo.png?v=<?= filemtime(__DIR__ . '/assets/img/logo.png') ?>" alt="OptiLifeSync" style="width:42px;height:42px;border-radius:12px;object-fit:contain;flex-shrink:0;">
+        <?php else: ?>
+            <div class="logo-icon">💚</div>
+        <?php endif; ?>
         <div>
             <div class="logo-text">OptiLifeSync</div>
             <div style="font-size: 10px; color: var(--muted); font-weight: 600; letter-spacing: 1px;">KİŞİSEL SAĞLIK & PERFORMANS</div>

@@ -40,7 +40,13 @@ $sbInitial = strtoupper(substr($sbUsername, 0, 1));
 <!-- Sabit Sol Menü -->
 <nav class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-        <div class="logo-icon">💚</div>
+        <?php if (file_exists(__DIR__ . '/../assets/img/logo-icon.png')): ?>
+            <img src="assets/img/logo-icon.png?v=<?= filemtime(__DIR__ . '/../assets/img/logo-icon.png') ?>" alt="OptiLifeSync" class="logo-img" style="width:36px;height:36px;border-radius:10px;object-fit:contain;flex-shrink:0;">
+        <?php elseif (file_exists(__DIR__ . '/../assets/img/logo.png')): ?>
+            <img src="assets/img/logo.png?v=<?= filemtime(__DIR__ . '/../assets/img/logo.png') ?>" alt="OptiLifeSync" class="logo-img" style="width:36px;height:36px;border-radius:10px;object-fit:contain;flex-shrink:0;">
+        <?php else: ?>
+            <div class="logo-icon">💚</div>
+        <?php endif; ?>
         <div>
             <div class="logo-text">OptiLifeSync</div>
             <div class="logo-sub">KİŞİSEL SAĞLIK SİSTEMİ</div>
