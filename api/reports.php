@@ -146,7 +146,7 @@ try {
 
             $gemini = new GeminiService(
                 Config::get('GEMINI_API_KEY'),
-                Config::get('GEMINI_MODEL', 'gemini-2.5-flash')
+                Config::get('GEMINI_MODEL', 'gemini-3.5-flash')
             );
 
             $advice = $gemini->generateWeeklyReportAdvice($summaryPrompt);

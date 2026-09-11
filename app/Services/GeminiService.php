@@ -80,9 +80,9 @@ PROMPT;
 
     /**
      * @param string $apiKey  Gemini API anahtarı (Config::get('GEMINI_API_KEY'))
-     * @param string $model   Kullanılacak model (varsayılan: gemini-2.5-flash)
+     * @param string $model   Kullanılacak model (varsayılan: gemini-3.5-flash)
      */
-    public function __construct(string $apiKey, string $model = 'gemini-2.5-flash')
+    public function __construct(string $apiKey, string $model = 'gemini-3.5-flash')
     {
         if (empty($apiKey)) {
             throw new \InvalidArgumentException('Gemini API anahtarı boş olamaz.');
@@ -141,13 +141,13 @@ PROMPT;
             // Model ayarları
             'generationConfig' => [
                 'temperature'       => 0.2,   // Tutarlılık için düşük tutuldu
-                'maxOutputTokens'   => 256,   // JSON yanıt kısa olacak
+                'maxOutputTokens'   => 1024,  // JSON yanıt ve reasoning tokenları için yeterli alan
                 'responseMimeType'  => 'application/json',  // Doğrudan JSON zorlama
             ],
         ];
 
         // ── API İsteği Gönder (Model Fallback Destekli) ─────────────
-        $candidateModels = array_unique([$this->model, 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.5-flash-lite']);
+        $candidateModels = array_unique([$this->model, 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite']);
         $lastException   = null;
 
         foreach ($candidateModels as $currentModel) {
@@ -226,12 +226,12 @@ PROMPT;
             ],
             'generationConfig' => [
                 'temperature'      => 0.2,
-                'maxOutputTokens'  => 512,
+                'maxOutputTokens'  => 1024,
                 'responseMimeType' => 'application/json',
             ],
         ];
 
-        $candidateModels = array_unique([$this->model, 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.5-flash-lite']);
+        $candidateModels = array_unique([$this->model, 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite']);
         $lastException   = null;
 
         foreach ($candidateModels as $currentModel) {
@@ -300,7 +300,7 @@ PROMPT;
             ],
         ];
 
-        $candidateModels = array_unique([$this->model, 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.5-flash-lite']);
+        $candidateModels = array_unique([$this->model, 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite']);
         $lastException   = null;
 
         foreach ($candidateModels as $currentModel) {

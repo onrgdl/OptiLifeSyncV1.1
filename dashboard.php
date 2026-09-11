@@ -771,7 +771,7 @@ button { cursor: pointer; border: none; background: none; }
                                 background:var(--surface-2);border:1px solid var(--border);
                                 padding:12px 20px;border-radius:12px">
                         <div class="spinner-border spinner-border-sm text-info" role="status"></div>
-                        <span style="font-size:13px;color:var(--muted)">Gemini AI analiz ediyor…</span>
+                        <span style="font-size:13px;color:var(--muted)">Analiz ediliyor…</span>
                     </div>
                 </div>
 
@@ -780,11 +780,7 @@ button { cursor: pointer; border: none; background: none; }
                     background: linear-gradient(135deg,rgba(56,189,248,.08),rgba(99,102,241,.05));
                     border: 1px solid rgba(56,189,248,.25);
                     border-radius: 14px; padding: 18px">
-                    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px">
-                        <i class="bi bi-stars text-info"></i> Gemini AI Tahmini
-                        <span id="geminiModelBadge" style="background:rgba(56,189,248,.15);border:1px solid rgba(56,189,248,.2);
-                              color:var(--accent);padding:2px 8px;border-radius:99px;font-size:10px"></span>
-                    </div>
+                    <span id="geminiModelBadge" class="d-none"></span>
                     <div style="font-weight:600;margin-bottom:12px;color:var(--text)" id="geminiPreviewLabel"></div>
 
                     <!-- Makro Kartları -->
@@ -836,10 +832,10 @@ button { cursor: pointer; border: none; background: none; }
         <div class="modal-header">
             <div>
                 <h5 class="modal-title fw-bold" style="background:linear-gradient(135deg,#f472b6,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent">
-                    <i class="bi bi-camera-fill me-1" style="-webkit-text-fill-color:#f472b6"></i> Gemini Vision ile Fotoğraftan Yemek Analizi
+                    <i class="bi bi-camera-fill me-1" style="-webkit-text-fill-color:#f472b6"></i> Fotoğrafla Öğün Analizi
                 </h5>
                 <div style="font-size:12px;color:var(--muted)">
-                    Tabağınızın veya yiyeceğinizin fotoğrafını yükleyin, yapay zeka besin değerlerini çıkarsın
+                    Tabağınızın veya yiyeceğinizin fotoğrafını yükleyin, besin değerlerinizi öğrenin.
                 </div>
             </div>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -856,11 +852,11 @@ button { cursor: pointer; border: none; background: none; }
                 <div class="fw-semibold mb-1" style="font-size:15px;color:var(--text)">Yemek Fotoğrafını Yükleyin veya Çekin</div>
                 <div class="small text-muted mb-3">JPG, PNG veya WEBP (Maksimum 10MB)</div>
                 <div class="d-flex flex-wrap justify-content-center gap-2">
-                    <button type="button" class="btn btn-sm btn-ghost px-3 py-2 text-white" onclick="document.getElementById('cameraFileInput').click()" style="background:rgba(236,72,153,.15);border-color:rgba(236,72,153,.4)">
-                        <i class="bi bi-camera-fill me-1" style="color:#f472b6"></i> Kamera ile Çek
+                    <button type="button" class="btn btn-sm px-3 py-2 fw-semibold" onclick="document.getElementById('cameraFileInput').click()" style="background:rgba(236,72,153,.15);border:1px solid rgba(236,72,153,.4);color:#000000 !important;">
+                        <i class="bi bi-camera-fill me-1" style="color:#db2777"></i> Kamera ile Çek
                     </button>
-                    <button type="button" class="btn btn-sm btn-ghost px-3 py-2 text-white" onclick="document.getElementById('galleryFileInput').click()">
-                        <i class="bi bi-image me-1" style="color:var(--accent)"></i> Galeriden Seç
+                    <button type="button" class="btn btn-sm px-3 py-2 fw-semibold" onclick="document.getElementById('galleryFileInput').click()" style="background:var(--surface-2);border:1px solid var(--border);color:#000000 !important;">
+                        <i class="bi bi-image me-1 text-primary"></i> Galeriden Seç
                     </button>
                 </div>
             </div>
@@ -897,7 +893,7 @@ button { cursor: pointer; border: none; background: none; }
                             </div>
                         </div>
                         <button type="button" id="startPhotoAnalysisBtn" class="btn btn-accent w-100 py-2 fw-semibold" onclick="analyzeSelectedPhoto()">
-                            <i class="bi bi-stars me-1"></i> Gemini Vision ile Analiz Et
+                            <i class="bi bi-stars me-1"></i> Analiz Et
                         </button>
                     </div>
                 </div>
@@ -906,7 +902,7 @@ button { cursor: pointer; border: none; background: none; }
             <!-- Yükleniyor Göstergesi -->
             <div id="photoAnalyzingSpinner" class="d-none text-center py-4">
                 <div class="spinner-border text-info mb-2" role="status" style="width:2.5rem;height:2.5rem;"></div>
-                <div class="fw-semibold text-info" style="font-size:14px">Gemini Vision Tabağınızı İnceliyor...</div>
+                <div class="fw-semibold text-info" style="font-size:14px">Fotoğraf Analiz Ediliyor...</div>
                 <div class="small text-muted">Yiyecekler tespit ediliyor ve makrolar hesaplanıyor...</div>
             </div>
 
@@ -916,7 +912,7 @@ button { cursor: pointer; border: none; background: none; }
                     <span class="badge" style="background:rgba(34,197,94,.2);color:var(--green);border:1px solid rgba(34,197,94,.3)">
                         <i class="bi bi-check-circle me-1"></i> Analiz Tamamlandı
                     </span>
-                    <small id="photoResultModel" class="text-muted" style="font-size:11px"></small>
+                    <small id="photoResultModel" class="text-muted d-none" style="font-size:11px"></small>
                 </div>
 
                 <div class="mb-2">
@@ -1402,14 +1398,15 @@ async function previewGemini() {
 
         // Önizleme kartı
         document.getElementById('geminiPreviewLabel').textContent = text.length > 80 ? text.substring(0,80)+'…' : text;
-        document.getElementById('geminiModelBadge').textContent   = data.analyzed.model_used ?? 'gemini';
+        const modelBadgeEl = document.getElementById('geminiModelBadge');
+        if (modelBadgeEl) modelBadgeEl.textContent = data.analyzed.model_used ?? 'gemini';
         document.getElementById('geminiMacroGrid').innerHTML = [
-            { label:'Kalori',  val: m.kalori,  unit:'kcal', color:'#f87171', icon:'🔥' },
-            { label:'Protein', val: m.protein, unit:'g',    color:'#60a5fa', icon:'💪' },
-            { label:'Karb',    val: m.karb,    unit:'g',    color:'#facc15', icon:'⚡' },
-            { label:'Yağ',     val: m.yag,     unit:'g',    color:'#c084fc', icon:'💧' },
+            { label:'Kalori',  val: m.kalori,  unit:'kcal', color:'#ef4444', icon:'🔥' },
+            { label:'Protein', val: m.protein, unit:'g',    color:'#2563eb', icon:'💪' },
+            { label:'Karb',    val: m.karb,    unit:'g',    color:'#d97706', icon:'⚡' },
+            { label:'Yağ',     val: m.yag,     unit:'g',    color:'#9333ea', icon:'💧' },
         ].map(c => `
-            <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+            <div style="background:var(--surface);border:1px solid var(--border);
                         border-radius:10px;padding:10px;text-align:center">
                 <div style="font-size:16px">${c.icon}</div>
                 <div style="font-size:18px;font-weight:700;color:${c.color};margin:2px 0">${c.val}</div>

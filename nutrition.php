@@ -662,7 +662,7 @@ document.getElementById('nutritionForm').addEventListener('submit', function(e) 
     // Yükleniyor durumunu butona yansıt
     const btn = document.getElementById('analyzeSubmitBtn');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Yapay Zeka Analiz Ediyor...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Analiz ediliyor...';
 });
 
 // Besin silme fonksiyonu
@@ -897,10 +897,10 @@ async function confirmSavePhotoFood() {
         <div class="modal-header" style="border-bottom:1px solid var(--border)">
             <div>
                 <h5 class="modal-title fw-bold" style="background:linear-gradient(135deg,#f472b6,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent">
-                    <i class="bi bi-camera-fill me-1" style="-webkit-text-fill-color:#f472b6"></i> Gemini Vision ile Fotoğraftan Yemek Analizi
+                    <i class="bi bi-camera-fill me-1" style="-webkit-text-fill-color:#f472b6"></i> Fotoğrafla Öğün Analizi
                 </h5>
                 <div style="font-size:12px;color:var(--muted)">
-                    Tabağınızın veya yiyeceğinizin fotoğrafını yükleyin, yapay zeka besin değerlerini çıkarsın
+                    Tabağınızın veya yiyeceğinizin fotoğrafını yükleyin, besin değerlerinizi öğrenin.
                 </div>
             </div>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -912,16 +912,16 @@ async function confirmSavePhotoFood() {
             <input type="file" id="galleryFileInput" accept="image/*" style="display:none" onchange="handlePhotoSelected(this)">
 
             <!-- Aşama 1: Fotoğraf Seçim Alanı -->
-            <div id="photoDropArea" class="p-4 text-center mb-3" style="background:rgba(255,255,255,.02);border:2px dashed rgba(236,72,153,.35);border-radius:14px;transition:border-color .2s">
+            <div id="photoDropArea" class="p-4 text-center mb-3" style="background:var(--surface-2);border:2px dashed rgba(236,72,153,.35);border-radius:14px;transition:border-color .2s">
                 <div style="font-size:38px;margin-bottom:8px">📸</div>
                 <div class="fw-semibold mb-1" style="font-size:15px;color:var(--text)">Yemek Fotoğrafını Yükleyin veya Çekin</div>
                 <div class="small text-muted mb-3">JPG, PNG veya WEBP (Maksimum 10MB)</div>
                 <div class="d-flex flex-wrap justify-content-center gap-2">
-                    <button type="button" class="btn btn-sm btn-ghost px-3 py-2 text-white" onclick="document.getElementById('cameraFileInput').click()" style="background:rgba(236,72,153,.15);border-color:rgba(236,72,153,.4)">
-                        <i class="bi bi-camera-fill me-1" style="color:#f472b6"></i> Kamera ile Çek
+                    <button type="button" class="btn btn-sm px-3 py-2 fw-semibold" onclick="document.getElementById('cameraFileInput').click()" style="background:rgba(236,72,153,.15);border:1px solid rgba(236,72,153,.4);color:#000000 !important;">
+                        <i class="bi bi-camera-fill me-1" style="color:#db2777"></i> Kamera ile Çek
                     </button>
-                    <button type="button" class="btn btn-sm btn-ghost px-3 py-2 text-white" onclick="document.getElementById('galleryFileInput').click()">
-                        <i class="bi bi-image me-1" style="color:var(--accent)"></i> Galeriden Seç
+                    <button type="button" class="btn btn-sm px-3 py-2 fw-semibold" onclick="document.getElementById('galleryFileInput').click()" style="background:var(--surface);border:1px solid var(--border);color:#000000 !important;">
+                        <i class="bi bi-image me-1 text-primary"></i> Galeriden Seç
                     </button>
                 </div>
             </div>
@@ -941,12 +941,13 @@ async function confirmSavePhotoFood() {
                         <div class="mb-2">
                             <label class="form-label text-secondary small mb-1">Öğün Zamanı</label>
                             <select id="photoMealType" class="form-select form-select-sm">
-                                <option value="breakfast">🌅 Kahvaltı</option>
-                                <option value="lunch" selected>☀️ Öğle Yemeği</option>
-                                <option value="dinner">🌙 Akşam Yemeği</option>
-                                <option value="snack">🍎 Ara Öğün</option>
-                                <option value="pre_workout">⚡ Antrenman Öncesi</option>
-                                <option value="post_workout">💪 Antrenman Sonrası</option>
+                                <option value="" disabled selected>-- Öğün Seçiniz --</option>
+                                <option value="breakfast">Kahvaltı</option>
+                                <option value="lunch">Öğle</option>
+                                <option value="dinner">Akşam</option>
+                                <option value="snack">Ara</option>
+                                <option value="pre_workout">Antrenman Öncesi</option>
+                                <option value="post_workout">Sonrası</option>
                             </select>
                         </div>
                         <div class="mb-3">
@@ -957,7 +958,7 @@ async function confirmSavePhotoFood() {
                             </div>
                         </div>
                         <button type="button" id="startPhotoAnalysisBtn" class="btn btn-info w-100 py-2 fw-semibold" onclick="analyzeSelectedPhoto()">
-                            <i class="bi bi-stars me-1"></i> Gemini Vision ile Analiz Et
+                            <i class="bi bi-stars me-1"></i> Analiz Et
                         </button>
                     </div>
                 </div>
@@ -966,7 +967,7 @@ async function confirmSavePhotoFood() {
             <!-- Yükleniyor Göstergesi -->
             <div id="photoAnalyzingSpinner" class="d-none text-center py-4">
                 <div class="spinner-border text-info mb-2" role="status" style="width:2.5rem;height:2.5rem;"></div>
-                <div class="fw-semibold text-info" style="font-size:14px">Gemini Vision Tabağınızı İnceliyor...</div>
+                <div class="fw-semibold text-info" style="font-size:14px">Fotoğraf Analiz Ediliyor...</div>
                 <div class="small text-muted">Yiyecekler tespit ediliyor ve makrolar hesaplanıyor...</div>
             </div>
 
@@ -976,7 +977,7 @@ async function confirmSavePhotoFood() {
                     <span class="badge" style="background:rgba(34,197,94,.2);color:#4ade80;border:1px solid rgba(34,197,94,.3)">
                         <i class="bi bi-check-circle me-1"></i> Analiz Tamamlandı
                     </span>
-                    <small id="photoResultModel" class="text-muted" style="font-size:11px"></small>
+                    <small id="photoResultModel" class="text-muted d-none" style="font-size:11px"></small>
                 </div>
 
                 <div class="mb-2">

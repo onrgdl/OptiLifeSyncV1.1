@@ -80,7 +80,7 @@ try {
 
             $gemini = new GeminiService(
                 Config::get('GEMINI_API_KEY'),
-                Config::get('GEMINI_MODEL', 'gemini-2.5-flash')
+                Config::get('GEMINI_MODEL', 'gemini-3.5-flash')
             );
 
             // ── 1. Gemini'ye gönder ───────────────────────────────────
@@ -128,7 +128,7 @@ try {
 
             $gemini = new GeminiService(
                 Config::get('GEMINI_API_KEY'),
-                Config::get('GEMINI_MODEL', 'gemini-2.5-flash')
+                Config::get('GEMINI_MODEL', 'gemini-3.5-flash')
             );
 
             $macros = $gemini->analyzeFood($mealText);
@@ -159,7 +159,7 @@ try {
 
             $gemini = new GeminiService(
                 Config::get('GEMINI_API_KEY'),
-                Config::get('GEMINI_MODEL', 'gemini-2.5-flash')
+                Config::get('GEMINI_MODEL', 'gemini-3.5-flash')
             );
 
             $result = $gemini->analyzeFoodImage($img['base64'], $img['mime'], $userNotes);
@@ -192,7 +192,7 @@ try {
 
             $gemini = new GeminiService(
                 Config::get('GEMINI_API_KEY'),
-                Config::get('GEMINI_MODEL', 'gemini-2.5-flash')
+                Config::get('GEMINI_MODEL', 'gemini-3.5-flash')
             );
 
             $result = $gemini->analyzeFoodImage($img['base64'], $img['mime'], $userNotes);
