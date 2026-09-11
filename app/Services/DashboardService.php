@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+require_once __DIR__ . '/MetabolismCalculator.php';
+require_once __DIR__ . '/ReminderService.php';
+
 use PDO;
 use DateTime;
 use App\Services\MetabolismCalculator;

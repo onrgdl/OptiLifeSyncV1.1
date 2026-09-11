@@ -2,6 +2,8 @@
 declare(strict_types=1);
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/app/Services/MetabolismCalculator.php';
+require_once __DIR__ . '/app/Services/ReminderService.php';
 require_once __DIR__ . '/app/Services/DashboardService.php';
 
 use App\Services\DashboardService;
@@ -1038,6 +1040,7 @@ async function loadDashboard(forceFetch = false) {
         dashData = data;
         renderDashboard(data);
         checkAlarms(data.upcoming_alarms ?? []);
+    } catch (e) {
         const pollLbl = document.getElementById('pollLabel');
         if (pollLbl) pollLbl.textContent = '⚠️ Yeniden deneniyor…';
         console.error('Dashboard yüklenemedi:', e);
