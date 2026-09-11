@@ -118,13 +118,15 @@ try {
                 $curStr = $cur->format('Y-m-d');
                 $isoDay = (int)$cur->format('N');
 
-                $workout = $existingWorkouts[$curStr] ?? null;
-                $hasWorkout = ($workout !== null);
+                $dayWorkouts = $existingWorkouts[$curStr] ?? [];
+                $hasWorkout = !empty($dayWorkouts);
 
                 if ($hasWorkout) {
-                    $totalPlanned++;
-                    if (!empty($workout['tamamlandi_mi'])) {
-                        $totalCompleted++;
+                    foreach ($dayWorkouts as $w) {
+                        $totalPlanned++;
+                        if (!empty($w['tamamlandi_mi'])) {
+                            $totalCompleted++;
+                        }
                     }
                 }
 
@@ -136,7 +138,8 @@ try {
                     'is_today'         => ($curStr === $today),
                     'is_past'          => ($curStr < $today),
                     'has_workout'      => $hasWorkout,
-                    'workout'          => $workout,
+                    'workouts'         => $dayWorkouts,
+                    'workout'          => $dayWorkouts[0] ?? null,
                     'dynamic_macro'    => [
                         'active'         => $hasWorkout,
                         'extra_calories' => $hasWorkout ? 400 : 0,
@@ -158,6 +161,34 @@ try {
 
         // ── 2. ANTRENMAN KAYDET / GÜNCELLE ─────────────────────────────
         'save' => (function () use ($workoutService, $userId): void {
+            $workoutId  = !empty($_POST['workout_id']) ? (int)$_POST['workout_id'] : null;
+            $type       = trim($_POST['antrenman_tipi'] ?? '');
+            $difficulty = trim($_POST['zorluk_seviyesi'] ?? 'Orta');
+
+            // Eğer düzenleme modundaysak (belirli bir workout_id gönderilmişse)
+            if ($workoutId !== null && $workoutId > 0) {
+                $date = trim($_POST['tarih'] ?? '');
+                if (empty($date) || empty($type)) {
+                    http_response_code(422);
+                    echo json_encode([
+                        'ok'    => false,
+                        'error' => 'Geçerli bir tarih ve antrenman tipi gereklidir.',
+                    ], JSON_UNESCAPED_UNICODE);
+                    return;
+                }
+
+                $res = $workoutService->saveWorkout($userId, $date, $type, $difficulty, $workoutId);
+                echo json_encode([
+                    'ok'      => true,
+                    'message' => 'Antrenman başarıyla güncellendi.',
+                    'count'   => 1,
+                    'dates'   => [$date],
+                    'workout' => $res['workout'] ?? null,
+                ], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+
+            // Yeni antrenman planlama (tekli, çoklu gün ve 2-3-4 haftalık yinelenen plan)
             $rawDates = $_POST['tarihler'] ?? $_POST['tarih'] ?? [];
             if (!is_array($rawDates)) {
                 if (strpos((string)$rawDates, ',') !== false) {
@@ -171,9 +202,6 @@ try {
             }
             $dates = array_values(array_unique(array_filter($dates)));
 
-            $type       = trim($_POST['antrenman_tipi'] ?? '');
-            $difficulty = trim($_POST['zorluk_seviyesi'] ?? 'Orta');
-
             if (empty($dates) || empty($type)) {
                 http_response_code(422);
                 echo json_encode([
@@ -183,13 +211,20 @@ try {
                 return;
             }
 
+            $repeatWeeks = max(1, min(4, (int)($_POST['repeat_weeks'] ?? 1)));
             $savedCount = 0;
-            $lastRes = null;
-            foreach ($dates as $date) {
-                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-                    $lastRes = $workoutService->saveWorkout($userId, $date, $type, $difficulty);
+            $allSavedDates = [];
+
+            foreach ($dates as $baseDate) {
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $baseDate)) {
+                    continue;
+                }
+                for ($w = 0; $w < $repeatWeeks; $w++) {
+                    $targetDate = (new DateTime($baseDate))->modify("+{$w} weeks")->format('Y-m-d');
+                    $lastRes = $workoutService->saveWorkout($userId, $targetDate, $type, $difficulty);
                     if (!empty($lastRes['ok'])) {
                         $savedCount++;
+                        $allSavedDates[] = $targetDate;
                     }
                 }
             }
@@ -203,13 +238,16 @@ try {
                 return;
             }
 
+            $successMsg = $repeatWeeks > 1
+                ? "{$repeatWeeks} haftalık antrenman rutini başarıyla oluşturuldu! (Toplam {$savedCount} antrenman)"
+                : ($savedCount > 1 ? "{$savedCount} antrenman başarıyla planlandı." : "{$type} antrenmanı başarıyla kaydedildi! 💪");
+
             echo json_encode([
-                'ok'      => true,
-                'message' => $savedCount > 1 
-                    ? "{$savedCount} antrenman günü başarıyla planlandı." 
-                    : ($lastRes['message'] ?? 'Antrenman planı başarıyla kaydedildi.'),
-                'count'   => $savedCount,
-                'dates'   => $dates,
+                'ok'           => true,
+                'message'      => $successMsg,
+                'count'        => $savedCount,
+                'repeat_weeks' => $repeatWeeks,
+                'dates'        => array_values(array_unique($allSavedDates)),
             ], JSON_UNESCAPED_UNICODE);
         })(),
 

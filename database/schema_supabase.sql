@@ -79,9 +79,9 @@ CREATE TABLE IF NOT EXISTS workouts (
     tamamlandi_mi SMALLINT NOT NULL DEFAULT 0 CHECK (tamamlandi_mi IN (0, 1)),
     tamamlanma_saati TIME NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uk_workouts_user_date UNIQUE (user_id, tarih)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_workouts_user_date ON workouts(user_id, tarih);
 
 -- 3D. DİNAMİK MAKRO HEDEFLERİ (macro_targets)
 CREATE TABLE IF NOT EXISTS macro_targets (

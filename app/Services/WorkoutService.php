@@ -49,7 +49,7 @@ class WorkoutService
             FROM workouts
             WHERE user_id = :user_id
               AND tarih BETWEEN :start_date AND :end_date
-            ORDER BY tarih ASC
+            ORDER BY tarih ASC, id ASC
         ");
         $stmt->execute([
             ':user_id'    => $userId,
@@ -61,20 +61,40 @@ class WorkoutService
         $indexed = [];
         foreach ($rows as $row) {
             $row['tamamlandi_mi'] = (bool)$row['tamamlandi_mi'];
-            $indexed[$row['tarih']] = $row;
+            $indexed[$row['tarih']][] = $row;
         }
 
         return $indexed;
     }
 
     /**
-     * O günkü antrenman kaydını çeker.
+     * ID'ye göre antrenman kaydını çeker.
+     */
+    public function getWorkoutById(int $workoutId, int $userId): ?array
+    {
+        $stmt = $this->db->prepare("
+            SELECT * FROM workouts
+            WHERE id = :id AND user_id = :user_id
+            LIMIT 1
+        ");
+        $stmt->execute([':id' => $workoutId, ':user_id' => $userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            $row['tamamlandi_mi'] = (bool)$row['tamamlandi_mi'];
+            return $row;
+        }
+        return null;
+    }
+
+    /**
+     * O günkü ilk antrenman kaydını çeker (geriye dönük uyumluluk).
      */
     public function getWorkoutByDate(int $userId, string $date): ?array
     {
         $stmt = $this->db->prepare("
             SELECT * FROM workouts
             WHERE user_id = :user_id AND tarih = :tarih
+            ORDER BY id ASC
             LIMIT 1
         ");
         $stmt->execute([':user_id' => $userId, ':tarih' => $date]);
@@ -87,54 +107,101 @@ class WorkoutService
     }
 
     /**
-     * Bir güne antrenman kaydeder veya günceller (UPSERT).
+     * O günkü tüm antrenman kayıtlarını çeker.
+     */
+    public function getWorkoutsByDate(int $userId, string $date): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT * FROM workouts
+            WHERE user_id = :user_id AND tarih = :tarih
+            ORDER BY id ASC
+        ");
+        $stmt->execute([':user_id' => $userId, ':tarih' => $date]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$row) {
+            $row['tamamlandi_mi'] = (bool)$row['tamamlandi_mi'];
+        }
+        return $rows;
+    }
+
+    /**
+     * Bir güne antrenman kaydeder veya belirli bir kaydı günceller.
      * Otomatik olarak Dinamik Makroyu (+400 kcal, +30g protein) etkinleştirir.
      *
-     * @param  int    $userId
-     * @param  string $date       Y-m-d
-     * @param  string $type       Örn: 'Ağırlık', 'Kardiyo', 'HIIT', 'Pilates'
-     * @param  string $difficulty Örn: 'Kolay', 'Orta', 'Zor'
-     * @return array  Kayıt ve dinamik makro durumu
+     * @param  int       $userId
+     * @param  string    $date       Y-m-d
+     * @param  string    $type       Örn: 'Ağırlık', 'Kardiyo', 'HIIT', 'Pilates'
+     * @param  string    $difficulty Örn: 'Kolay', 'Orta', 'Zor'
+     * @param  int|null  $workoutId  Mevcut kaydı güncellemek için id (null ise yeni ekler/varsa günceller)
+     * @return array     Kayıt ve dinamik makro durumu
      */
-    public function saveWorkout(int $userId, string $date, string $type, string $difficulty = 'Orta'): array
+    public function saveWorkout(int $userId, string $date, string $type, string $difficulty = 'Orta', ?int $workoutId = null): array
     {
         $validDifficulties = ['Kolay', 'Orta', 'Zor'];
         if (!in_array($difficulty, $validDifficulties, true)) {
             $difficulty = 'Orta';
         }
 
-        $isPgsql = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql';
-        if ($isPgsql) {
+        if ($workoutId !== null && $workoutId > 0) {
             $stmt = $this->db->prepare("
-                INSERT INTO workouts (user_id, tarih, antrenman_tipi, zorluk_seviyesi, tamamlandi_mi)
-                VALUES (:user_id, :tarih, :antrenman_tipi, :zorluk_seviyesi, 0)
-                ON CONFLICT (user_id, tarih) DO UPDATE SET
-                    antrenman_tipi   = EXCLUDED.antrenman_tipi,
-                    zorluk_seviyesi  = EXCLUDED.zorluk_seviyesi,
+                UPDATE workouts
+                SET antrenman_tipi   = :antrenman_tipi,
+                    zorluk_seviyesi  = :zorluk_seviyesi,
                     updated_at       = CURRENT_TIMESTAMP
+                WHERE id = :id AND user_id = :user_id
             ");
+            $stmt->execute([
+                ':antrenman_tipi'  => $type,
+                ':zorluk_seviyesi' => $difficulty,
+                ':id'              => $workoutId,
+                ':user_id'         => $userId,
+            ]);
+            $targetId = $workoutId;
         } else {
-            $stmt = $this->db->prepare("
-                INSERT INTO workouts (user_id, tarih, antrenman_tipi, zorluk_seviyesi, tamamlandi_mi)
-                VALUES (:user_id, :tarih, :antrenman_tipi, :zorluk_seviyesi, 0)
-                ON DUPLICATE KEY UPDATE
-                    antrenman_tipi   = VALUES(antrenman_tipi),
-                    zorluk_seviyesi  = VALUES(zorluk_seviyesi),
-                    updated_at       = CURRENT_TIMESTAMP
+            // Aynı gün aynı tür antrenman zaten varsa mükerrer oluşturmamak için zorluğu güncelle
+            $check = $this->db->prepare("
+                SELECT id FROM workouts
+                WHERE user_id = :user_id AND tarih = :tarih AND antrenman_tipi = :antrenman_tipi
+                LIMIT 1
             ");
-        }
+            $check->execute([
+                ':user_id'        => $userId,
+                ':tarih'          => $date,
+                ':antrenman_tipi' => $type,
+            ]);
+            $existingId = $check->fetchColumn();
 
-        $stmt->execute([
-            ':user_id'         => $userId,
-            ':tarih'           => $date,
-            ':antrenman_tipi'  => $type,
-            ':zorluk_seviyesi' => $difficulty,
-        ]);
+            if ($existingId) {
+                $upd = $this->db->prepare("
+                    UPDATE workouts
+                    SET zorluk_seviyesi = :zorluk_seviyesi,
+                        updated_at      = CURRENT_TIMESTAMP
+                    WHERE id = :id
+                ");
+                $upd->execute([
+                    ':zorluk_seviyesi' => $difficulty,
+                    ':id'              => $existingId,
+                ]);
+                $targetId = (int)$existingId;
+            } else {
+                $ins = $this->db->prepare("
+                    INSERT INTO workouts (user_id, tarih, antrenman_tipi, zorluk_seviyesi, tamamlandi_mi)
+                    VALUES (:user_id, :tarih, :antrenman_tipi, :zorluk_seviyesi, 0)
+                ");
+                $ins->execute([
+                    ':user_id'         => $userId,
+                    ':tarih'           => $date,
+                    ':antrenman_tipi'  => $type,
+                    ':zorluk_seviyesi' => $difficulty,
+                ]);
+                $targetId = (int)$this->db->lastInsertId();
+            }
+        }
 
         // Günlük aktivite kaydı: daily_logs.workout_done = 1
         $macroResult = $this->syncDynamicMacro($userId, $date, true);
 
-        $workout = $this->getWorkoutByDate($userId, $date);
+        $workout = $this->getWorkoutById($targetId, $userId);
 
         return [
             'ok'            => true,
