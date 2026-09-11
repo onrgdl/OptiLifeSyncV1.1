@@ -330,19 +330,16 @@ button { cursor: pointer; border: none; background: none; }
     <!-- TOPBAR -->
     <header class="topbar">
         <div class="topbar-left">
-            <button class="hamburger btn-ghost btn-topbar" onclick="toggleSidebar()">
-                <i class="bi bi-list fs-5"></i>
-            </button>
             <div>
                 <div class="topbar-title">Günlük Dashboard</div>
                 <div class="topbar-sub" id="dateLabel">Yükleniyor…</div>
             </div>
         </div>
         <div class="topbar-right">
-            <!-- Hızlı Ekle -->
+            <!-- Hızlı Öğün Ekle -->
             <button class="btn-topbar btn-accent" data-bs-toggle="modal" data-bs-target="#quickAddModal">
                 <i class="bi bi-plus-lg"></i>
-                <span class="d-none d-sm-inline">Hızlı Ekle</span>
+                <span>Hızlı Öğün Ekle</span>
             </button>
         </div>
     </header>
@@ -704,10 +701,7 @@ button { cursor: pointer; border: none; background: none; }
     <div class="modal-content">
         <div class="modal-header">
             <div>
-                <h5 class="modal-title fw-bold">🤖 AI ile Öğün Analizi</h5>
-                <div style="font-size:12px;color:var(--muted)">
-                    Gemini AI · Serbest metin girin, makroları otomatik hesaplayın
-                </div>
+                <h5 class="modal-title fw-bold">🤖 Öğün Analizi</h5>
             </div>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
@@ -716,28 +710,20 @@ button { cursor: pointer; border: none; background: none; }
             <!-- Sekme: Besin Analizi / Takviye -->
             <div class="result-tabs d-flex gap-2 mb-4">
                 <button class="tab-btn active" id="tabBtnFood" onclick="switchModalTab('food', this)">
-                    🍗 Gemini Besin Analizi
+                    🍗 Besin Analizi
                 </button>
                 <button class="tab-btn" id="tabBtnSupp" onclick="switchModalTab('supp', this)">
-                    💊 Lokal Takviye
+                    💊 İlaçlar & Takviyeler
                 </button>
             </div>
 
             <!-- ── BÖLÜM 1: Gemini Serbest Metin ─────────────────── -->
             <div id="panelFood">
-                <!-- Fotoğraf Çek/Yükle CTA Banner -->
-                <div class="p-3 mb-3 d-flex align-items-center justify-content-between"
-                     style="background:linear-gradient(135deg,rgba(236,72,153,.12),rgba(139,92,246,.12));border:1px solid rgba(236,72,153,.3);border-radius:12px;cursor:pointer;transition:transform .15s, border-color .15s"
-                     onclick="openPhotoModalFromQuickAdd()">
-                    <div class="d-flex align-items-center gap-2">
-                        <span style="font-size:24px">📸</span>
-                        <div>
-                            <div style="font-size:13px;font-weight:600;color:#f472b6">Fotoğrafla Otomatik Tanı (Vision AI)</div>
-                            <div style="font-size:11px;color:var(--muted)">Tabağınızı çekin veya yükleyin, Gemini makroları otomatik hesaplasın</div>
-                        </div>
-                    </div>
-                    <span class="badge" style="background:rgba(236,72,153,.25);color:#f472b6;padding:6px 12px;border-radius:8px;font-weight:600">Kamera Aç →</span>
-                </div>
+                <!-- Fotoğrafla Analiz Butonu -->
+                <button type="button" class="btn btn-outline-light w-100 mb-3 py-2 d-flex align-items-center justify-content-center gap-2 rounded-3" onclick="openPhotoModalFromQuickAdd()">
+                    <i class="bi bi-camera-fill text-info"></i>
+                    <span class="fw-semibold">Öğünü fotoğrafla analiz et</span>
+                </button>
 
                 <!-- Metin Alanı -->
                 <div style="margin-bottom:12px">
@@ -757,12 +743,13 @@ button { cursor: pointer; border: none; background: none; }
                     <div style="flex:1">
                         <label style="font-size:12px;color:var(--muted);margin-bottom:6px;display:block">Öğün Tipi</label>
                         <select id="geminiMealType" class="meal-select">
-                            <option value="breakfast">🌅 Kahvaltı</option>
-                            <option value="lunch" selected>☀️ Öğle</option>
-                            <option value="dinner">🌙 Akşam</option>
-                            <option value="snack">🍎 Ara Öğün</option>
-                            <option value="pre_workout">⚡ Antrenman Öncesi</option>
-                            <option value="post_workout">💪 Antrenman Sonrası</option>
+                            <option value="" disabled selected>-- Öğün Seçiniz --</option>
+                            <option value="breakfast">Kahvaltı</option>
+                            <option value="lunch">Öğle</option>
+                            <option value="dinner">Akşam</option>
+                            <option value="snack">Ara</option>
+                            <option value="pre_workout">Antrenman Öncesi</option>
+                            <option value="post_workout">Sonrası</option>
                         </select>
                     </div>
                     <button onclick="previewGemini()" id="previewBtn"
@@ -890,12 +877,13 @@ button { cursor: pointer; border: none; background: none; }
                         <div class="mb-2">
                             <label class="form-label text-secondary small mb-1">Öğün Zamanı</label>
                             <select id="photoMealType" class="meal-select">
-                                <option value="breakfast">🌅 Kahvaltı</option>
-                                <option value="lunch" selected>☀️ Öğle Yemeği</option>
-                                <option value="dinner">🌙 Akşam Yemeği</option>
-                                <option value="snack">🍎 Ara Öğün</option>
-                                <option value="pre_workout">⚡ Antrenman Öncesi</option>
-                                <option value="post_workout">💪 Antrenman Sonrası</option>
+                                <option value="" disabled selected>-- Öğün Seçiniz --</option>
+                                <option value="breakfast">Kahvaltı</option>
+                                <option value="lunch">Öğle</option>
+                                <option value="dinner">Akşam</option>
+                                <option value="snack">Ara</option>
+                                <option value="pre_workout">Antrenman Öncesi</option>
+                                <option value="post_workout">Sonrası</option>
                             </select>
                         </div>
                         <div class="mb-3">

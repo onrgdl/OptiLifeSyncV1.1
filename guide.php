@@ -207,9 +207,6 @@ $activePage = 'guide';
     <!-- TOPBAR -->
     <header class="topbar">
         <div class="topbar-left">
-            <button class="hamburger btn-ghost btn-topbar" onclick="toggleSidebar()">
-                <i class="bi bi-list fs-5"></i>
-            </button>
             <div>
                 <div class="topbar-title">Sistem Kullanım Kılavuzu</div>
                 <div class="topbar-sub">OptiLifeSync V1.1 · Modül Rehberi ve Bilimsel Açıklamalar</div>

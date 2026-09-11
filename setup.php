@@ -54,9 +54,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['install'])) {
 <div class="main">
     <header class="topbar">
         <div class="topbar-left">
-            <button class="hamburger btn-ghost btn-topbar" onclick="toggleSidebar()">
-                <i class="bi bi-list fs-5"></i>
-            </button>
             <div>
                 <div class="topbar-title">Veritabanı Yönetimi</div>
                 <div class="topbar-sub">Tek Tıkla Tablo ve Şema Kurulumu</div>

@@ -408,9 +408,6 @@ $chartFat         = array_map(fn($d) => $d['consumed']['fat_g'], $days);
     <!-- Topbar -->
     <header class="topbar">
         <div class="topbar-left">
-            <button class="hamburger btn-ghost btn-topbar" onclick="toggleSidebar()">
-                <i class="bi bi-list fs-5"></i>
-            </button>
             <div>
                 <div class="topbar-title">Haftalık Sağlık & Performans Raporu</div>
                 <div class="topbar-sub"><?= date('d M', strtotime($weekStart)) ?> – <?= date('d M Y', strtotime($weekEnd)) ?> · <?= $weekNumber ?>. Hafta</div>

@@ -305,9 +305,6 @@ $deficits = $tracker->getDeficits($macroTarget);
 <div class="main">
     <header class="topbar">
         <div class="topbar-left">
-            <button class="hamburger btn-ghost btn-topbar" onclick="toggleSidebar()">
-                <i class="bi bi-list fs-5"></i>
-            </button>
             <div>
                 <div class="topbar-title">Beslenme & Takviye Modülü</div>
             </div>

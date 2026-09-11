@@ -226,9 +226,6 @@ $activePage = 'creator';
 <div class="main-wrapper">
     <div class="top-bar">
         <div class="d-flex align-items-center gap-3">
-            <button class="btn btn-sm btn-outline-secondary d-lg-none" onclick="toggleSidebar()">
-                <i class="bi bi-list fs-5"></i>
-            </button>
             <h5 class="mb-0 fw-bold d-flex align-items-center gap-2">
                 <span>👑</span> Creator Yönetici Paneli
             </h5>

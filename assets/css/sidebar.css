@@ -314,9 +314,7 @@ button, .btn, .nav-item, .bottom-nav-item, a {
         width: 100%;
     }
     .hamburger {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+        display: none !important;
     }
 }
 
