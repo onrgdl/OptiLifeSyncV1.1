@@ -276,7 +276,6 @@ $activePage = 'workout';
             </button>
             <div>
                 <div class="topbar-title">Spor & Antrenman Planı</div>
-                <div class="topbar-sub">OptiLifeSync · Haftalık Program & Aktivite Takibi</div>
             </div>
         </div>
         <div class="topbar-right">
@@ -391,20 +390,6 @@ $activePage = 'workout';
                 <div class="text-center py-5 text-secondary col-12">
                     <div class="spinner-border spinner-border-sm text-info me-2" role="status"></div>
                     Takvim verileri yükleniyor…
-                </div>
-            </div>
-        </div>
-
-        <!-- ── 3. BİLGİLENDİRME BANNERI ─────────────────────────── -->
-        <div class="p-3 rounded-4 border border-secondary border-opacity-25 mb-4" style="background:rgba(17,24,39,0.7);">
-            <div class="d-flex align-items-start gap-3">
-                <div class="fs-3 text-info">💡</div>
-                <div class="small text-secondary">
-                    <strong class="text-light">OptiLifeSync Spor Takip Modülü</strong>
-                    <ul class="mb-0 mt-1 ps-3">
-                        <li><strong>Aktivite Takibi:</strong> Planladığınız antrenmanları ve günlük spor disiplininizi haftalık takvim üzerinden kolayca kaydedebilir ve takip edebilirsiniz.</li>
-                        <li><strong>Sabit Beslenme Hedefleri:</strong> Antrenman kayıtları yalnızca spor takibi içindir; kalori ve makro hedefleriniz sabit kalarak diyet dengenizi korumanızı sağlar.</li>
-                    </ul>
                 </div>
             </div>
         </div>

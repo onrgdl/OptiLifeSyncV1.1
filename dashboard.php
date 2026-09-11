@@ -7,11 +7,14 @@ require_once __DIR__ . '/app/Services/DashboardService.php';
 use App\Services\DashboardService;
 
 $initialDashboardData = null;
+$weeklyBreakdown = null;
 if ($pdo && isset($userId) && $userId > 0) {
     try {
         $initialDashboardData = DashboardService::getDashboardData($pdo, (int)$userId);
+        $weeklyBreakdown      = DashboardService::getWeeklyBreakdown($pdo, (int)$userId);
     } catch (\Throwable $e) {
         $initialDashboardData = null;
+        $weeklyBreakdown      = null;
     }
 }
 ?>
@@ -32,18 +35,18 @@ if ($pdo && isset($userId) && $userId > 0) {
    GLOBAL RESET & TOKENS
 ═══════════════════════════════════════════════════════════ */
 :root {
-    --bg:          #080f1e;
-    --surface:     #111827;
-    --surface-2:   #1a2436;
-    --border:      rgba(255,255,255,.07);
+    --bg:          #0f172a;
+    --surface:     #1e293b;
+    --surface-2:   #283548;
+    --border:      rgba(255,255,255,.09);
     --accent:      #38bdf8;
     --accent-dim:  rgba(56,189,248,.12);
     --green:       #22c55e;
     --red:         #f87171;
     --yellow:      #facc15;
     --purple:      #c084fc;
-    --text:        #f1f5f9;
-    --muted:       #64748b;
+    --text:        #f8fafc;
+    --muted:       #94a3b8;
     --sidebar-w:   240px;
 }
 *, *::before, *::after { box-sizing: border-box; }
@@ -334,16 +337,6 @@ button { cursor: pointer; border: none; background: none; }
             </div>
         </div>
         <div class="topbar-right">
-            <!-- Spor Planı Linki -->
-            <a href="workout.php" class="btn-topbar btn-ghost text-light" title="Spor & Antrenman Planı">
-                <i class="bi bi-activity text-info"></i>
-                <span class="d-none d-sm-inline">Spor Planı</span>
-            </a>
-            <!-- Fotoğrafla Analiz (Gemini Vision) -->
-            <button class="btn-topbar" style="background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff;border:none" onclick="openPhotoModal()" title="Kamera veya görsel ile yemek analizi">
-                <i class="bi bi-camera-fill"></i>
-                <span class="d-none d-sm-inline">Fotoğrafla Analiz</span>
-            </button>
             <!-- Hızlı Ekle -->
             <button class="btn-topbar btn-accent" data-bs-toggle="modal" data-bs-target="#quickAddModal">
                 <i class="bi bi-plus-lg"></i>
@@ -568,6 +561,132 @@ button { cursor: pointer; border: none; background: none; }
                 </div>
             </div>
         </div>
+
+        <!-- ── HAFTANIN GÜNLÜK DÖKÜMÜ ─────────────────────────── -->
+        <?php if (!empty($weeklyBreakdown)): 
+            $days = $weeklyBreakdown['days'];
+            $daysWithFood = $weeklyBreakdown['days_with_food'];
+        ?>
+        <div class="row g-3 mt-1">
+            <div class="col-12">
+                <div class="card p-3 p-sm-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="mb-0 text-light fw-bold">
+                                <i class="bi bi-calendar-week me-2 text-info"></i>Haftanın Günlük Dökümü
+                            </h6>
+                            <span class="text-secondary small">Bu hafta kaydedilen besinler, kalori hedefleri ve spor aktiviteleri</span>
+                        </div>
+                        <span class="badge bg-secondary small"><?= $daysWithFood ?> gün veri kaydedildi</span>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm table-hover align-middle mb-0" style="background:transparent">
+                            <thead>
+                                <tr class="text-secondary" style="font-size: 12px; border-bottom: 1px solid var(--border);">
+                                    <th>Tarih</th>
+                                    <th>Spor Durumu</th>
+                                    <th>Alınan / Hedef</th>
+                                    <th>Fark</th>
+                                    <th style="color:#60a5fa">Protein</th>
+                                    <th style="color:#facc15">Karb</th>
+                                    <th style="color:#c084fc">Yağ</th>
+                                    <th>Öğünler</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($days as $idx => $d): 
+                                $isTodayClass = $d['is_today'] ? 'border-start border-3 border-info ps-2' : '';
+                                $diff = $d['diff_calories'];
+                            ?>
+                                <tr>
+                                    <td class="<?= $isTodayClass ?>">
+                                        <strong class="text-light"><?= $d['day_name'] ?></strong>
+                                        <div class="text-secondary small"><?= $d['short_date'] ?> <?php if ($d['is_today']): ?><span class="badge bg-info text-dark" style="font-size:9px">BUGÜN</span><?php endif; ?></div>
+                                    </td>
+
+                                    <!-- Spor Durumu -->
+                                    <td>
+                                        <?php if ($d['workout_done']): ?>
+                                            <span class="badge bg-success-subtle text-success border border-success small">
+                                                <i class="bi bi-check-circle-fill me-1"></i> <?= htmlspecialchars($d['workout']['antrenman_tipi'] ?? 'Tamamlandı') ?>
+                                            </span>
+                                        <?php elseif ($d['workout']): ?>
+                                            <span class="badge bg-warning-subtle text-warning border border-warning small">
+                                                <i class="bi bi-clock me-1"></i> Planlandı
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="badge bg-secondary-subtle text-muted border border-secondary small">
+                                                <i class="bi bi-moon me-1"></i> Dinlenme
+                                            </span>
+                                        <?php endif; ?>
+                                    </td>
+
+                                    <!-- Alınan / Hedef Kalori -->
+                                    <td>
+                                        <div>
+                                            <strong class="text-light"><?= number_format($d['consumed']['calories'], 0) ?></strong>
+                                            <span class="text-secondary">/ <?= number_format($d['target']['calories'], 0) ?> kcal</span>
+                                        </div>
+                                        <div class="progress mt-1" style="height: 4px; max-width: 130px; background: rgba(255,255,255,0.06);">
+                                            <div class="progress-bar bg-danger" style="width: <?= min(100, $d['adherence_pct']) ?>%"></div>
+                                        </div>
+                                    </td>
+
+                                    <!-- Fark -->
+                                    <td>
+                                        <?php if ($d['consumed']['calories'] == 0): ?>
+                                            <span class="text-muted small">—</span>
+                                        <?php elseif ($diff > 0): ?>
+                                            <span class="badge bg-warning-subtle text-warning border border-warning small">+<?= number_format($diff, 0) ?> kcal</span>
+                                        <?php elseif ($diff < 0): ?>
+                                            <span class="badge bg-info-subtle text-info border border-info small"><?= number_format($diff, 0) ?> kcal</span>
+                                        <?php else: ?>
+                                            <span class="badge bg-success-subtle text-success border border-success small">Hedefte</span>
+                                        <?php endif; ?>
+                                    </td>
+
+                                    <!-- Makrolar -->
+                                    <td><span class="text-primary fw-semibold"><?= round($d['consumed']['protein_g'], 1) ?>g</span></td>
+                                    <td><span class="text-warning fw-semibold"><?= round($d['consumed']['carbs_g'], 1) ?>g</span></td>
+                                    <td><span style="color:#c084fc;" class="fw-semibold"><?= round($d['consumed']['fat_g'], 1) ?>g</span></td>
+
+                                    <!-- Öğünler Mini Liste / Popover -->
+                                    <td>
+                                        <?php if (!empty($d['food_logs'])): ?>
+                                            <button class="btn btn-sm btn-outline-secondary py-0 px-2 small" type="button" data-bs-toggle="collapse" data-bs-target="#dash-meals-<?= $idx ?>" aria-expanded="false">
+                                                <?= count($d['food_logs']) ?> öğün <i class="bi bi-chevron-down ms-1"></i>
+                                            </button>
+                                        <?php else: ?>
+                                            <span class="text-muted small">Kayıt yok</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+
+                                <?php if (!empty($d['food_logs'])): ?>
+                                <tr class="collapse" id="dash-meals-<?= $idx ?>">
+                                    <td colspan="8" class="bg-dark bg-opacity-50 p-3">
+                                        <div class="small fw-semibold text-secondary mb-2"><i class="bi bi-list-ul me-1"></i><?= $d['day_name'] ?> Günü Tüketilen Öğünler:</div>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <?php foreach ($d['food_logs'] as $f): ?>
+                                                <div class="px-2 py-1 rounded bg-black bg-opacity-40 border border-secondary border-opacity-25 small text-light">
+                                                    <strong><?= htmlspecialchars($f['food_label']) ?></strong>
+                                                    <span class="text-muted">(<?= $f['calories'] ?> kcal · <?= $f['protein_g'] ?>p / <?= $f['carbs_g'] ?>k / <?= $f['fat_g'] ?>y)</span>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endif; ?>
+
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
 
     </div><!-- /content -->
 </div><!-- /main -->

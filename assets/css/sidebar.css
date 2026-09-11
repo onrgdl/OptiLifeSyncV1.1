@@ -2,18 +2,18 @@
    OptiLifeSync - Global Sidebar & Ortak Layout Stilleri
 ═══════════════════════════════════════════════════════════ */
 :root {
-    --bg:          #080f1e;
-    --surface:     #111827;
-    --surface-2:   #1a2436;
-    --border:      rgba(255, 255, 255, 0.07);
+    --bg:          #0f172a;
+    --surface:     #1e293b;
+    --surface-2:   #283548;
+    --border:      rgba(255, 255, 255, 0.09);
     --accent:      #38bdf8;
     --accent-dim:  rgba(56, 189, 248, 0.12);
     --green:       #22c55e;
     --red:         #f87171;
     --yellow:      #facc15;
     --purple:      #c084fc;
-    --text:        #f1f5f9;
-    --muted:       #64748b;
+    --text:        #f8fafc;
+    --muted:       #94a3b8;
     --sidebar-w:   240px;
 }
 

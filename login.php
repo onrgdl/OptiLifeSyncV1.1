@@ -80,15 +80,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <style>
         :root {
-            --bg: #080f1e;
-            --surface: #111827;
-            --surface-2: #1e293b;
-            --border: rgba(255,255,255,.08);
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface-2: #283548;
+            --border: rgba(255,255,255,.09);
             --accent: #38bdf8;
             --green: #22c55e;
             --yellow: #facc15;
             --red: #f87171;
-            --text: #f1f5f9;
+            --text: #f8fafc;
             --muted: #94a3b8;
         }
 

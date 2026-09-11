@@ -182,7 +182,6 @@ $typeLabels = [
             </button>
             <div>
                 <div class="topbar-title">İlaç & Takviye Yönetimi</div>
-                <div class="topbar-sub">Alarm saatleri belirle, otomatik tarayıcı bildirimi al</div>
             </div>
         </div>
         <div class="topbar-right">

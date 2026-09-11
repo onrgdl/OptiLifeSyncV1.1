@@ -190,4 +190,140 @@ class DashboardService
             'daily_log_id'    => (int)($dailyLog['id'] ?? 0),
         ];
     }
+
+    /**
+     * Haftalık 7 günlük (Pazartesi - Pazar) detay dökümünü ve özetini döner.
+     */
+    public static function getWeeklyBreakdown(PDO $pdo, int $userId, ?string $refDateStr = null): array
+    {
+        $today = date('Y-m-d');
+        $refDateStr = $refDateStr ?: $today;
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $refDateStr)) {
+            $refDateStr = $today;
+        }
+
+        try {
+            $refDate = new DateTime($refDateStr);
+        } catch (\Throwable) {
+            $refDate = new DateTime($today);
+        }
+
+        $dayOfWeek = (int)$refDate->format('N');
+        $monday    = (clone $refDate)->modify('-' . ($dayOfWeek - 1) . ' days');
+        $sunday    = (clone $monday)->modify('+6 days');
+
+        $weekStart = $monday->format('Y-m-d');
+        $weekEnd   = $sunday->format('Y-m-d');
+
+        $profile = self::getUserProfile($pdo, $userId);
+        $age     = self::calcAge($profile['birth_date'] ?? '1996-01-01');
+
+        $calc = new MetabolismCalculator(
+            (float)($profile['weight_kg'] ?? 70),
+            (float)($profile['height_cm'] ?? 170),
+            $age,
+            $profile['gender'] ?? 'male',
+            $profile['activity_level'] ?? 'moderately_active',
+            $profile['goal'] ?? 'maintain'
+        );
+        $targetMacros = $calc->getDailyMacros(false);
+
+        // 1. daily_logs
+        $dailyLogs = [];
+        $stmt = $pdo->prepare("SELECT * FROM daily_logs WHERE user_id = ? AND log_date BETWEEN ? AND ?");
+        $stmt->execute([$userId, $weekStart, $weekEnd]);
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $dailyLogs[$r['log_date']] = $r;
+        }
+
+        // 2. workouts
+        $workouts = [];
+        $stmt = $pdo->prepare("SELECT * FROM workouts WHERE user_id = ? AND tarih BETWEEN ? AND ?");
+        $stmt->execute([$userId, $weekStart, $weekEnd]);
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $workouts[$r['tarih']] = $r;
+        }
+
+        // 3. food_logs
+        $foodLogsByDate = [];
+        $stmt = $pdo->prepare("
+            SELECT fl.*, dl.log_date
+            FROM food_logs fl
+            JOIN daily_logs dl ON fl.daily_log_id = dl.id
+            WHERE dl.user_id = ? AND dl.log_date BETWEEN ? AND ?
+            ORDER BY fl.logged_at ASC
+        ");
+        $stmt->execute([$userId, $weekStart, $weekEnd]);
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $foodLogsByDate[$r['log_date']][] = $r;
+        }
+
+        $dayNamesTr = [
+            1 => 'Pazartesi', 2 => 'Salı', 3 => 'Çarşamba',
+            4 => 'Perşembe', 5 => 'Cuma', 6 => 'Cumartesi', 7 => 'Pazar'
+        ];
+
+        $days = [];
+        $daysWithFood = 0;
+
+        for ($i = 0; $i < 7; $i++) {
+            $cur     = (clone $monday)->modify("+{$i} days");
+            $dateStr = $cur->format('Y-m-d');
+            $isoDay  = (int)$cur->format('N');
+
+            $w   = $workouts[$dateStr] ?? null;
+            $dl  = $dailyLogs[$dateStr] ?? null;
+            $fls = $foodLogsByDate[$dateStr] ?? [];
+
+            $workoutCompleted = ($w !== null && !empty($w['tamamlandi_mi'])) || (!empty($dl['workout_done']));
+
+            $calConsumed  = (float)($dl['total_calories']  ?? 0);
+            $protConsumed = (float)($dl['total_protein_g'] ?? 0);
+            $carbConsumed = (float)($dl['total_carbs_g']   ?? 0);
+            $fatConsumed  = (float)($dl['total_fat_g']     ?? 0);
+
+            if ($calConsumed == 0 && count($fls) > 0) {
+                foreach ($fls as $fl) {
+                    $calConsumed  += (float)$fl['calories'];
+                    $protConsumed += (float)$fl['protein_g'];
+                    $carbConsumed += (float)$fl['carbs_g'];
+                    $fatConsumed  += (float)$fl['fat_g'];
+                }
+            }
+
+            if ($calConsumed > 0 || count($fls) > 0) {
+                $daysWithFood++;
+            }
+
+            $diffCal      = $calConsumed - $targetMacros['calories'];
+            $adherencePct = $targetMacros['calories'] > 0 ? round(($calConsumed / $targetMacros['calories']) * 100, 1) : 0;
+
+            $days[] = [
+                'date'           => $dateStr,
+                'day_name'       => $dayNamesTr[$isoDay],
+                'short_date'     => $cur->format('d/m'),
+                'is_today'       => ($dateStr === $today),
+                'is_past'        => ($dateStr < $today),
+                'workout'        => $w,
+                'workout_done'   => $workoutCompleted,
+                'target'         => $targetMacros,
+                'consumed'       => [
+                    'calories'  => $calConsumed,
+                    'protein_g' => $protConsumed,
+                    'carbs_g'   => $carbConsumed,
+                    'fat_g'     => $fatConsumed,
+                ],
+                'diff_calories'  => $diffCal,
+                'adherence_pct'  => $adherencePct,
+                'food_logs'      => $fls,
+            ];
+        }
+
+        return [
+            'week_start'     => $weekStart,
+            'week_end'       => $weekEnd,
+            'days'           => $days,
+            'days_with_food' => $daysWithFood,
+        ];
+    }
 }

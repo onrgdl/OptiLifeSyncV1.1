@@ -320,22 +320,6 @@ try {
                         </div>
                     </div>
                 </div>
-
-                <!-- BİLGİLENDİRME PANELİ -->
-                <div class="card p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <i class="bi bi-info-circle text-info fs-5"></i>
-                        <h6 class="text-light mb-0 fw-semibold">Metabolizma & Makro Hesaplama İlkeleri</h6>
-                    </div>
-                    <p class="text-secondary small mb-2">
-                        Değerleriniz uluslararası <strong>Mifflin-St Jeor</strong> formülü ve <strong>Atwater termodinamik enerji sistemi</strong> (1g Protein = 4 kcal, 1g Karbonhidrat = 4 kcal, 1g Yağ = 9 kcal) kullanılarak biyokimyasal olarak %100 tutarlı biçimde hesaplanır.
-                    </p>
-                    <div class="d-flex flex-wrap gap-2 mt-1">
-                        <span class="badge bg-dark border border-secondary text-secondary">BMR: Temel Yaşamsal İhtiyaç</span>
-                        <span class="badge bg-dark border border-secondary text-secondary">TDEE: BMR × Aktivite Düzeyi</span>
-                        <span class="badge bg-dark border border-info text-info">Hedef: Sürdürülebilir Kalori Dengesi</span>
-                    </div>
-                </div>
             <?php endif; ?>
         </div>
     </div>

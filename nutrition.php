@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['weight']) && $profile
 
 // ── Form verileri ────────────────────────────────────────────────────
 $foodQuery   = trim($_POST['food_query']   ?? '');
-$mealType    = $_POST['meal_type']         ?? 'lunch';
+$mealType    = trim($_POST['meal_type']    ?? '');
 $suppQuery   = trim($_POST['supp_query']   ?? '');
 $saveToDb    = isset($_POST['save_to_db']);
 
@@ -153,7 +153,7 @@ if ($foodQuery !== '') {
                 'food_id'        => 'gemini_' . md5($foodQuery . microtime()),
                 'food_label'     => $foodQuery,
                 'porsiyon_ozeti' => $macros['porsiyon_ozeti'] ?? '',
-                'meal_type'      => $mealType,
+                'meal_type'      => !empty($mealType) ? $mealType : 'snack',
                 'quantity'       => 1,
                 'unit'           => 'porsiyon',
                 'source'         => 'gemini_ai',
@@ -183,7 +183,7 @@ if ($foodQuery !== '') {
                     INSERT INTO food_logs (daily_log_id, meal_type, food_id, food_label, quantity, unit, calories, protein_g, carbs_g, fat_g)
                     VALUES (?, ?, ?, ?, 1, 'porsiyon', ?, ?, ?, ?)
                 ");
-                $insFood->execute([$dId, $mealType, $selectedFood['food_id'], $selectedFood['food_label'], $selectedFood['calories'], $selectedFood['protein_g'], $selectedFood['carbs_g'], $selectedFood['fat_g']]);
+                $insFood->execute([$dId, (!empty($mealType) ? $mealType : 'snack'), $selectedFood['food_id'], $selectedFood['food_label'], $selectedFood['calories'], $selectedFood['protein_g'], $selectedFood['carbs_g'], $selectedFood['fat_g']]);
 
                 // daily_logs toplamlarını güncelle
                 $pdo->prepare("
@@ -310,7 +310,6 @@ $deficits = $tracker->getDeficits($macroTarget);
             </button>
             <div>
                 <div class="topbar-title">Beslenme & Takviye Modülü</div>
-                <div class="topbar-sub">OptiLifeSync · Gemini AI Destekli Besin Analizi</div>
             </div>
         </div>
         <div class="topbar-right d-flex gap-2">
@@ -387,21 +386,13 @@ $deficits = $tracker->getDeficits($macroTarget);
 
             <!-- Besin Analizi (Gemini AI) -->
             <div class="card p-3 mb-3">
-                <h6 class="mb-3"><i class="bi bi-stars me-1 text-info"></i>Öğün Analizi <span class="badge badge-ai ms-1 small">Gemini AI</span></h6>
+                <h6 class="mb-3"><i class="bi bi-stars me-1 text-info"></i>Öğün Analizi</h6>
 
-                <!-- Fotoğraf Çek/Yükle CTA -->
-                <div class="p-2 mb-3 d-flex align-items-center justify-content-between rounded"
-                     style="background:linear-gradient(135deg,rgba(236,72,153,.12),rgba(139,92,246,.12));border:1px solid rgba(236,72,153,.3);cursor:pointer;"
-                     onclick="openPhotoModal()">
-                    <div class="d-flex align-items-center gap-2">
-                        <span style="font-size:20px">📸</span>
-                        <div>
-                            <div style="font-size:12px;font-weight:600;color:#f472b6">Fotoğraf Çek / Yükle (Vision AI)</div>
-                            <div style="font-size:10px;color:var(--muted)">Tabağınızı fotoğraflayarak analiz edin</div>
-                        </div>
-                    </div>
-                    <span class="badge" style="background:rgba(236,72,153,.25);color:#f472b6;font-size:10px;padding:5px 8px;border-radius:6px">Kamera Aç →</span>
-                </div>
+                <!-- Fotoğrafla Analiz Butonu -->
+                <button type="button" class="btn btn-outline-light w-100 mb-3 py-2 d-flex align-items-center justify-content-center gap-2 rounded-3" onclick="openPhotoModal()">
+                    <i class="bi bi-camera-fill text-info"></i>
+                    <span class="fw-semibold">Öğünü fotoğrafla analiz et</span>
+                </button>
 
                 <div class="mb-2">
                     <label class="form-label text-secondary small">Veya Serbest Metin Olarak Yazın:</label>
@@ -410,6 +401,7 @@ $deficits = $tracker->getDeficits($macroTarget);
                 <div class="mb-2">
                     <label class="form-label text-secondary small">Öğün Zamanı:</label>
                     <select name="meal_type" class="form-select form-select-sm">
+                        <option value="" <?= empty($mealType) ? 'selected' : '' ?> disabled>-- Öğün Seçiniz --</option>
                         <?php foreach (['breakfast'=>'Kahvaltı','lunch'=>'Öğle','dinner'=>'Akşam','snack'=>'Ara','pre_workout'=>'Antrenman Öncesi','post_workout'=>'Sonrası'] as $k=>$v): ?>
                         <option value="<?= $k ?>" <?= $mealType===$k?'selected':'' ?>><?= $v ?></option>
                         <?php endforeach; ?>
@@ -428,9 +420,8 @@ $deficits = $tracker->getDeficits($macroTarget);
 
             <!-- Takviye Arama (Lokal) -->
             <div class="card p-3 mb-3">
-                <h6 class="mb-3"><i class="bi bi-capsule me-1 text-success"></i>Takviye Ekle <span class="badge badge-local ms-1 small">Lokal DB</span></h6>
+                <h6 class="mb-3"><i class="bi bi-capsule me-1 text-success"></i>Takviye Ekle</h6>
                 <input type="text" name="supp_query" id="supp_query" class="form-control form-control-sm" placeholder="Takviye adı (örn: Whey, D3, Kreatin)" value="<?= htmlspecialchars($suppQuery) ?>">
-                <small class="text-secondary mt-1 d-block">supplements tablosundan otomatik çeker</small>
                 <?php if ($suppError): ?>
                     <div class="alert alert-danger mt-2 py-1 small mb-0"><?= htmlspecialchars($suppError) ?></div>
                 <?php endif; ?>
@@ -570,15 +561,10 @@ $deficits = $tracker->getDeficits($macroTarget);
             <!-- Günlük Detay Breakdown -->
             <div class="card p-3 mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="mb-0">
-                        <i class="bi bi-list-check me-1 text-info"></i> Gün İçi Tüketim Listesi
-                        <span class="badge bg-secondary ms-1 small"><?= count($deficits['entry_breakdown']) ?> kayıt</span>
+                    <h6 class="mb-0 text-light fw-bold">
+                        <i class="bi bi-list-check me-2 text-info"></i>Gün İçi Tüketim Listesi
+                        <span class="badge bg-secondary ms-2 small"><?= count($deficits['entry_breakdown']) ?> kayıt</span>
                     </h6>
-                    <?php if (!empty($todayFoodLogs)): ?>
-                    <span class="text-secondary small d-none d-sm-inline">
-                        <i class="bi bi-info-circle me-1"></i>Kayıtları silmek için sağdaki çöp kutusuna tıklayın
-                    </span>
-                    <?php endif; ?>
                 </div>
 
                 <?php if (empty($deficits['entry_breakdown'])): ?>
@@ -589,16 +575,15 @@ $deficits = $tracker->getDeficits($macroTarget);
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">
-                        <table class="table table-dark table-sm align-middle mb-0">
+                        <table class="table table-dark table-sm table-hover align-middle mb-0" style="background:transparent">
                             <thead>
-                                <tr class="text-secondary" style="font-size:12px">
+                                <tr class="text-secondary" style="font-size:12px; border-bottom: 1px solid var(--border);">
                                     <th>Besin</th>
                                     <th>Öğün</th>
-                                    <th>Kaynak</th>
-                                    <th>Kalori</th>
-                                    <th>Protein</th>
-                                    <th>Karb</th>
-                                    <th>Yağ</th>
+                                    <th style="color:#f87171">Kalori</th>
+                                    <th style="color:#60a5fa">Protein</th>
+                                    <th style="color:#facc15">Karb</th>
+                                    <th style="color:#c084fc">Yağ</th>
                                     <th>Saat</th>
                                     <th class="text-end">İşlem</th>
                                 </tr>
@@ -617,17 +602,10 @@ $deficits = $tracker->getDeficits($macroTarget);
                                             <?= $mealLabel ?>
                                         </span>
                                     </td>
-                                    <td>
-                                        <?php if ($row['source'] === 'gemini_ai'): ?>
-                                            <span class="badge badge-ai small">Önizleme</span>
-                                        <?php else: ?>
-                                            <span class="badge bg-dark border border-secondary text-info small">Kayıtlı</span>
-                                        <?php endif; ?>
-                                    </td>
                                     <td class="m-calorie fw-bold"><?= $row['calories'] ?> kcal</td>
-                                    <td class="m-protein"><?= $row['protein'] ?>g</td>
-                                    <td class="m-carb"><?= $row['carbs'] ?>g</td>
-                                    <td class="m-fat"><?= $row['fat'] ?>g</td>
+                                    <td class="m-protein fw-semibold"><?= $row['protein'] ?>g</td>
+                                    <td class="m-carb fw-semibold"><?= $row['carbs'] ?>g</td>
+                                    <td class="m-fat fw-semibold"><?= $row['fat'] ?>g</td>
                                     <td class="text-secondary small"><?= $timeStr ?></td>
                                     <td class="text-end">
                                         <?php if (!empty($row['id'])): ?>
