@@ -697,7 +697,7 @@ function renderCalendar(data) {
                                     <i class="bi bi-three-dots-vertical"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end shadow border" style="font-size:0.8rem; background:#ffffff;">
-                                    <li><a class="dropdown-item py-1" href="#" onclick="openEditModal(${w.id}, '${day.date}', '${escapeHtml(w.antrenman_tipi)}', '${w.zorluk_seviyesi}')"><i class="bi bi-pencil text-primary me-2"></i>Düzenle</a></li>
+                                    <li><a class="dropdown-item py-1" href="#" data-wid="${w.id}" data-wdate="${escapeHtml(day.date)}" data-wtype="${escapeHtml(w.antrenman_tipi)}" data-wdiff="${escapeHtml(w.zorluk_seviyesi)}" onclick="handleEditWorkoutClick(this, event)"><i class="bi bi-pencil text-primary me-2"></i>Düzenle</a></li>
                                     <li><a class="dropdown-item py-1 text-danger" href="#" onclick="confirmDeleteWorkout(${w.id})"><i class="bi bi-trash me-2"></i>Kaldır</a></li>
                                 </ul>
                             </div>
@@ -1210,9 +1210,18 @@ function getTypeIcon(type) {
     return '💪';
 }
 
+function handleEditWorkoutClick(el, e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const id = parseInt(el.getAttribute('data-wid'), 10);
+    const date = el.getAttribute('data-wdate') || '';
+    const type = el.getAttribute('data-wtype') || '';
+    const diff = el.getAttribute('data-wdiff') || '';
+    openEditModal(id, date, type, diff);
+}
+
 function escapeHtml(str) {
     if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 </script>
 

@@ -50,40 +50,53 @@ self.addEventListener('activate', (event) => {
 // 3. İstek Yakalama (Fetch)
 self.addEventListener('fetch', (event) => {
     const request = event.request;
+    const url = new URL(request.url);
 
-    // Sadece GET isteklerini önbellekle
+    // Sadece GET isteklerini işle
     if (request.method !== 'GET') {
         return;
     }
 
-    // API çağrıları veya PHP sayfaları için: Önce Ağ (Network First), Hata alırsa Önbellek
+    // Güvenlik & Gizlilik: .php uzantılı sayfalar, /api/ uç noktaları ve dinamik sayfalar asla önbelleğe alınmaz!
+    const isDynamic = url.pathname.endsWith('.php') || 
+                      url.pathname.includes('/api/') || 
+                      url.search.length > 0;
+
+    if (isDynamic) {
+        // Doğrudan ağa git, çevrimdışıysa statik çevrimdışı mesajı döndür
+        event.respondWith(
+            fetch(request).catch(() => {
+                if (request.headers.get('accept')?.includes('text/html')) {
+                    return new Response(
+                        '<div style="font-family:sans-serif;padding:30px;text-align:center;background:#080f1e;color:#fff;min-height:100vh;"><h2>📱 OptiLifeSync Çevrimdışı</h2><p>İnternet bağlantınızı kontrol edip tekrar deneyin.</p></div>',
+                        { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+                    );
+                }
+                return new Response(JSON.stringify({ ok: false, error: 'Çevrimdışı' }), {
+                    headers: { 'Content-Type': 'application/json' },
+                    status: 503
+                });
+            })
+        );
+        return;
+    }
+
+    // Statik varlıklar (CSS, JS, Görseller, İkonlar) için Cache-First veya Network-First
     event.respondWith(
-        fetch(request)
-            .then((networkResponse) => {
-                // Başarılı cevabı arka planda önbelleğe al
-                if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+        caches.match(request).then((cachedResponse) => {
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+            return fetch(request).then((networkResponse) => {
+                if (networkResponse && networkResponse.status === 200) {
                     const responseClone = networkResponse.clone();
                     caches.open(CACHE_NAME).then((cache) => {
                         cache.put(request, responseClone);
                     });
                 }
                 return networkResponse;
-            })
-            .catch(() => {
-                // Çevrimdışıyken önbellekten sun
-                return caches.match(request).then((cachedResponse) => {
-                    if (cachedResponse) {
-                        return cachedResponse;
-                    }
-                    // Fallback sayfası
-                    if (request.headers.get('accept').includes('text/html')) {
-                        return caches.match('dashboard.php') || new Response(
-                            '<div style="font-family:sans-serif;padding:30px;text-align:center;background:#080f1e;color:#fff;min-height:100vh;"><h2>📱 OptiLifeSync Çevrimdışı</h2><p>İnternet bağlantınızı kontrol edip tekrar deneyin.</p></div>',
-                            { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-                        );
-                    }
-                });
-            })
+            });
+        })
     );
 });
 

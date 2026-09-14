@@ -149,17 +149,12 @@ PROMPT;
         ];
 
         // ── API İsteği Gönder (Model Fallback Destekli) ─────────────
-        $candidateModels = array_unique([$this->model, 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite']);
+        $candidateModels = array_unique([$this->model, 'gemini-2.5-flash', 'gemini-1.5-flash']);
         $lastException   = null;
 
         foreach ($candidateModels as $currentModel) {
             try {
-                $endpoint = sprintf(
-                    '%s/%s:generateContent?key=%s',
-                    self::API_BASE,
-                    $currentModel,
-                    urlencode($this->apiKey)
-                );
+                $endpoint = sprintf('%s/%s:generateContent', self::API_BASE, $currentModel);
                 $rawResponse = $this->curlPost($endpoint, $requestBody);
                 $result = $this->parseResponse($rawResponse, $mealText);
                 $result['model'] = $currentModel;
@@ -233,18 +228,13 @@ PROMPT;
             ],
         ];
 
-        // Görsel analizi için önce hızlı multimodal lite modelleri dene (1.5s - 3.5s), ardından fallback modeller
-        $candidateModels = array_unique(['gemini-2.5-flash-lite', 'gemini-3.1-flash-lite', $this->model, 'gemini-3.5-flash', 'gemini-flash-latest']);
+        // Görsel analizi için multimodal flash modelleri kullan
+        $candidateModels = array_unique([$this->model, 'gemini-2.5-flash', 'gemini-1.5-flash']);
         $lastException   = null;
 
         foreach ($candidateModels as $currentModel) {
             try {
-                $endpoint = sprintf(
-                    '%s/%s:generateContent?key=%s',
-                    self::API_BASE,
-                    $currentModel,
-                    urlencode($this->apiKey)
-                );
+                $endpoint = sprintf('%s/%s:generateContent', self::API_BASE, $currentModel);
                 $rawResponse = $this->curlPost($endpoint, $requestBody);
                 $result = $this->parseImageResponse($rawResponse, $userNotes);
                 $result['model'] = $currentModel;
@@ -303,17 +293,12 @@ PROMPT;
             ],
         ];
 
-        $candidateModels = array_unique([$this->model, 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite']);
+        $candidateModels = array_unique([$this->model, 'gemini-2.5-flash', 'gemini-1.5-flash']);
         $lastException   = null;
 
         foreach ($candidateModels as $currentModel) {
             try {
-                $endpoint = sprintf(
-                    '%s/%s:generateContent?key=%s',
-                    self::API_BASE,
-                    $currentModel,
-                    urlencode($this->apiKey)
-                );
+                $endpoint = sprintf('%s/%s:generateContent', self::API_BASE, $currentModel);
                 $rawResponse = $this->curlPost($endpoint, $requestBody);
                 $wrapper = json_decode($rawResponse, true);
                 $text = $wrapper['candidates'][0]['content']['parts'][0]['text'] ?? null;
@@ -601,6 +586,7 @@ PROMPT;
                 'Content-Type: application/json',
                 'Accept: application/json',
                 'Content-Length: ' . strlen($jsonBody),
+                'x-goog-api-key: ' . $this->apiKey,
             ],
         ]);
 

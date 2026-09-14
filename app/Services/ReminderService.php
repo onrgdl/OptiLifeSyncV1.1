@@ -376,7 +376,7 @@ class ReminderService
         $stmt = $this->db->prepare("
             UPDATE supplements
             SET is_active = 0,
-                end_date  = CURRENT_DATE(),
+                end_date  = CURRENT_DATE,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = :id AND user_id = :user_id
         ");
@@ -401,12 +401,13 @@ class ReminderService
 
     /**
      * Bir reminder'ı aktif/pasif yapar.
+     * MySQL, PostgreSQL ve SQLite ile %100 uyumlu CASE WHEN ifadesi kullanılır.
      */
     public function toggleReminder(int $reminderId, int $userId): bool
     {
         $stmt = $this->db->prepare("
             UPDATE reminders
-               SET is_active = IF(is_active = 1, 0, 1)
+               SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END
              WHERE id = :id AND user_id = :user_id
         ");
         $stmt->execute([':id' => $reminderId, ':user_id' => $userId]);

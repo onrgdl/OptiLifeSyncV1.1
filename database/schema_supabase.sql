@@ -222,12 +222,21 @@ BEFORE UPDATE ON daily_logs
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================
--- BAŞLANGIÇ DEMO VERİLERİ (USER ID: 1)
+-- BAŞLANGIÇ VERİLERİ — GÜVENLIK NOTU
 -- ============================================================
--- 1. Demo / Creator Kullanıcı (Kullanıcı Adı: onrgdl, PIN: 1234)
-INSERT INTO users (id, name, username, role, email, password_hash, pin_hash, recovery_code, gender, birth_date, height_cm, weight_kg, goal, activity_level)
-VALUES (1, 'onrgdl (Creator)', 'onrgdl', 'creator', 'onrgdl@optilifesync.local', 'demo', '$2y$10$7PmDsAxCmBGqEjynCZWfS.pBrRdw3muGH6Fm/hk0wYQDNwmjlC2uO', 'REC-CREATOR-9999', 'female', '1995-01-01', 165.00, 61.00, 'lose', 'sedentary')
-ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role, pin_hash = EXCLUDED.pin_hash, height_cm = EXCLUDED.height_cm, weight_kg = EXCLUDED.weight_kg, gender = EXCLUDED.gender, goal = EXCLUDED.goal, activity_level = EXCLUDED.activity_level;
+-- Creator hesabı artık şemada sabit PIN/recovery_code ile OLUŞTURULMAZ.
+-- Kurulum sonrası Creator hesabını elle oluşturun:
+--   1. Uygulamada /login → Kayıt Ol ile 'onrgdl' kullanıcısını kaydedin
+--   2. Ardından aşağıdaki SQL ile role'ü creator yapın:
+--      UPDATE users SET role = 'creator' WHERE username = 'onrgdl';
+-- Alternatif (Supabase SQL Editor):
+--   INSERT INTO users (name, username, role, email, pin_hash, recovery_code, gender, birth_date, height_cm, weight_kg, goal, activity_level)
+--   VALUES ('Creator', 'onrgdl', 'creator', 'onrgdl@optilifesync.local',
+--           crypt('YENİ_PIN_BURAYA', gen_salt('bf')),
+--           'REC-' || upper(encode(gen_random_bytes(4),'hex')) || '-' || upper(encode(gen_random_bytes(4),'hex')),
+--           'female', '1995-01-01', 165.00, 61.00, 'lose', 'sedentary')
+--   ON CONFLICT (username) DO NOTHING;
+
 
 -- 2. Dinamik Makro Hedefleri
 INSERT INTO macro_targets (user_id, day_type, calories, protein_g, carbs_g, fat_g, extra_calories, extra_protein_g, source)

@@ -58,9 +58,12 @@ $sbInitial = strtoupper(substr($sbUsername, 0, 1));
         <div class="p-2 mx-3 mb-2 rounded-3 text-center" style="background: rgba(234, 179, 8, 0.15); border: 1px solid rgba(234, 179, 8, 0.4); font-size: 11px;">
             <div class="text-warning fw-bold"><i class="bi bi-eye-fill me-1"></i> Göz Atma Modu</div>
             <div class="text-light text-truncate mb-1">@<?= htmlspecialchars($sbUsername) ?></div>
-            <a href="creator.php?action=stop_impersonate" class="btn btn-warning btn-sm py-0 px-2 fw-bold" style="font-size: 10px;">
-                Creator'a Dön
-            </a>
+            <form method="POST" action="creator.php" class="d-inline">
+                <input type="hidden" name="action" value="stop_impersonate">
+                <button type="submit" class="btn btn-warning btn-sm py-0 px-2 fw-bold" style="font-size: 10px;">
+                    Creator'a Dön
+                </button>
+            </form>
         </div>
     <?php endif; ?>
 

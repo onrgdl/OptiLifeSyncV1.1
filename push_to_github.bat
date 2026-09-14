@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul
 title OptiLifeSync - GitHub Senkronizasyon Araci
 
@@ -48,7 +48,7 @@ echo [2/3] Commit kaydediliyor...
 "%GIT_CMD%" commit -m "update: OptiLifeSync latest release" >nul 2>&1
 
 echo [3/3] GitHub'a gonderiliyor (Push)...
-"%GIT_CMD%" push -u origin main --force
+"%GIT_CMD%" push -u origin main
 
 if %errorlevel% equ 0 (
     echo.

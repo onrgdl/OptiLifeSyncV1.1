@@ -30,7 +30,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $result = $authService->login($username, $pin);
         if ($result['ok']) {
-            $dest = !empty($_POST['redirect']) ? $_POST['redirect'] : 'dashboard.php';
+            $rawDest = (string)($_POST['redirect'] ?? 'dashboard.php');
+            $dest = 'dashboard.php';
+            // Sadece yerel dosyalara izin ver (açık yönlendirme engeli)
+            if ($rawDest !== '' && !preg_match('#^(https?:|//|javascript:)#i', $rawDest)) {
+                $clean = ltrim($rawDest, '/');
+                if (preg_match('/^[a-zA-Z0-9_\-\./]+\.php(\?[a-zA-Z0-9_=&%-]*)?$/', $clean)) {
+                    $dest = $clean;
+                }
+            }
             header("Location: {$dest}");
             exit;
         } else {
@@ -337,7 +345,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                     <div class="input-group">
                         <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-shield-lock"></i></span>
-                        <input type="password" name="pin" id="login_pin" class="form-control" placeholder="••••" pattern="[0-9]*" inputmode="numeric" required autocomplete="current-password">
+                        <input type="password" name="pin" id="login_pin" class="form-control" placeholder="••••••••" required autocomplete="current-password">
                         <button class="btn btn-outline-secondary" type="button" onclick="togglePinVisibility('login_pin')">
                             <i class="bi bi-eye"></i>
                         </button>
@@ -347,10 +355,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <button type="submit" class="btn btn-auth">
                     <i class="bi bi-box-arrow-in-right me-1"></i> Giriş Yap
                 </button>
-
-                <div class="text-center mt-3 small text-muted">
-                    İlk giriş: Creator kullanıcı adı <strong>onrgdl</strong>, PIN <strong>1234</strong>
-                </div>
             </form>
         </div>
 
@@ -374,10 +378,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">PIN Kodu Belirleyin <span class="text-danger">*</span></label>
+                    <label class="form-label">PIN / Parola Belirleyin <span class="text-danger">*</span></label>
                     <div class="input-group">
                         <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-key-fill"></i></span>
-                        <input type="password" name="reg_pin" id="reg_pin" class="form-control" placeholder="En az 4 haneli PIN" pattern="[0-9]*" inputmode="numeric" minlength="4" required>
+                        <input type="password" name="reg_pin" id="reg_pin" class="form-control" placeholder="En az 6 haneli PIN / Parola" minlength="6" required>
                         <button class="btn btn-outline-secondary" type="button" onclick="togglePinVisibility('reg_pin')">
                             <i class="bi bi-eye"></i>
                         </button>
@@ -412,7 +416,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label class="form-label">Yeni PIN Kodu</label>
                     <div class="input-group">
                         <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-key"></i></span>
-                        <input type="password" name="reset_pin" id="reset_pin" class="form-control" placeholder="Yeni 4 haneli PIN" minlength="4" required>
+                        <input type="password" name="reset_pin" id="reset_pin" class="form-control" placeholder="Yeni en az 6 haneli PIN" minlength="6" required>
                         <button class="btn btn-outline-secondary" type="button" onclick="togglePinVisibility('reset_pin')">
                             <i class="bi bi-eye"></i>
                         </button>

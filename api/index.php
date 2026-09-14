@@ -36,8 +36,8 @@ $routes = [
     'login'          => 'login.php',
     'logout'         => 'logout.php',
     'creator'        => 'creator.php',
-    'setup'          => 'setup.php',
-    'setup-supabase' => 'api/setup_supabase.php',
+    // 'setup' ve 'setup-supabase' route'ları güvenlik nedeniyle kaldırıldı.
+    // Bu dosyalara web üzerinden erişim artık mümkün değil.
 ];
 
 $cleanSlug = preg_replace('/\.php$/i', '', strtolower($path));

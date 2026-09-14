@@ -477,10 +477,13 @@ class OptiAlarmEngine {
             return true;
         } else {
             if (window.Swal) {
+                const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+                const safeTime = esc(timeStr);
+                const safeLabel = esc(label);
                 Swal.fire({
                     icon: 'info',
                     title: '📱 Telefon Alarmı',
-                    html: `Telefonunuzun dahili saatine saat <strong>${timeStr}</strong> için <strong>${label}</strong> alarmı kurmak üzeresiniz.<br><br><small class="text-secondary">Android cihazlarda bu buton doğrudan telefonun kendi Saat / Alarm uygulamasını açıp alarmı kurar.</small>`,
+                    html: `Telefonunuzun dahili saatine saat <strong>${safeTime}</strong> için <strong>${safeLabel}</strong> alarmı kurmak üzeresiniz.<br><br><small class="text-secondary">Android cihazlarda bu buton doğrudan telefonun kendi Saat / Alarm uygulamasını açıp alarmı kurar.</small>`,
                     confirmButtonText: 'Anladım',
                     confirmButtonColor: '#0284c7',
                     background: '#ffffff',

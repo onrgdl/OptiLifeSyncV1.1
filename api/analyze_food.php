@@ -153,7 +153,10 @@ try {
         // ─────────────────────────────────────────────────────────────
         // FOTOĞRAFLA ANALİZ (Önizleme)
         // ─────────────────────────────────────────────────────────────
-        'analyze_image' => (function () use ($mealType): void {
+        'analyze_image' => (function () use ($pdo, $userId, $today, $mealType): void {
+            // Günlük fotoğraf kotası kontrolü (kullanıcı başı maks 8 analiz)
+            checkAndIncrementAiQuota($pdo, $userId, $today, 8);
+
             $userNotes = trim($_POST['notes'] ?? $_POST['user_notes'] ?? '');
             $img = getUploadedImageBase64();
 
@@ -187,6 +190,9 @@ try {
         // FOTOĞRAFLA ANALİZ ET VE DOĞRUDAN KAYDET
         // ─────────────────────────────────────────────────────────────
         'analyze_image_save' => (function () use ($pdo, $userId, $today, $mealType): void {
+            // Günlük fotoğraf kotası kontrolü (kullanıcı başı maks 8 analiz)
+            checkAndIncrementAiQuota($pdo, $userId, $today, 8);
+
             $userNotes = trim($_POST['notes'] ?? $_POST['user_notes'] ?? '');
             $img = getUploadedImageBase64();
 
@@ -499,13 +505,16 @@ function getDailyTotals(PDO $pdo, int $dailyLogId): array
 
 /**
  * Yüklenen görsel verisini (dosya upload veya base64) doğrular ve base64 + mime döndürür.
+ * 4 MB boyut sınırı ve güvenli MIME türü kontrolü uygular.
  */
 function getUploadedImageBase64(): array
 {
+    $allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+
     if (isset($_FILES['food_image']) && $_FILES['food_image']['error'] === UPLOAD_ERR_OK) {
         $tmp = $_FILES['food_image']['tmp_name'];
-        if ($_FILES['food_image']['size'] > 10 * 1024 * 1024) {
-            throw new \InvalidArgumentException('Yüklenen fotoğraf 10MB\'dan küçük olmalıdır.');
+        if ($_FILES['food_image']['size'] > 4 * 1024 * 1024) {
+            throw new \InvalidArgumentException('Yüklenen fotoğraf 4 MB\'dan küçük olmalıdır.');
         }
         $mime = 'image/jpeg';
         if (function_exists('finfo_open')) {
@@ -517,6 +526,11 @@ function getUploadedImageBase64(): array
             $detected = mime_content_type($tmp);
             if (!empty($detected)) $mime = $detected;
         }
+
+        if (!in_array(strtolower($mime), $allowedMimes, true)) {
+            throw new \InvalidArgumentException('Desteklenmeyen dosya formatı. Lütfen JPEG, PNG veya WEBP formatında bir görsel yükleyin.');
+        }
+
         $content = file_get_contents($tmp);
         if ($content === false) {
             throw new \RuntimeException('Görsel dosyası okunamadı.');
@@ -529,11 +543,21 @@ function getUploadedImageBase64(): array
 
     $raw = $_POST['image_data'] ?? $_POST['image_base64'] ?? '';
     if (!empty($raw)) {
+        // 4 MB binary karşılığı yaklaşık 5.8 MB base64 karakter
+        if (strlen($raw) > 5800000) {
+            throw new \InvalidArgumentException('Görsel boyutu çok büyük. Lütfen 4 MB\'tan küçük bir fotoğraf yükleyin.');
+        }
+
         $mime = 'image/jpeg';
         if (preg_match('/^data:(image\/[a-zA-Z0-9\+\-]+);base64,(.+)$/', $raw, $m)) {
             $mime = $m[1];
             $raw  = $m[2];
         }
+
+        if (!in_array(strtolower($mime), $allowedMimes, true)) {
+            throw new \InvalidArgumentException('Desteklenmeyen görsel formatı. Lütfen JPEG, PNG veya WEBP formatında bir görsel yükleyin.');
+        }
+
         return [
             'base64' => $raw,
             'mime'   => $mime,
@@ -541,5 +565,70 @@ function getUploadedImageBase64(): array
     }
 
     throw new \InvalidArgumentException('Lütfen bir yemek fotoğrafı yükleyin veya kameranızla çekin.');
+}
+
+/**
+ * Kullanıcı başına günlük fotoğraflı AI analiz kotasını kontrol eder ve artırır.
+ * Maksimum kota aşıldığında 429 yanıtı döndürerek işlemi sonlandırır.
+ */
+function checkAndIncrementAiQuota(PDO $pdo, int $userId, string $date, int $maxQuota = 8): void
+{
+    try {
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'pgsql') {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS ai_usage_logs (
+                    user_id INT NOT NULL,
+                    usage_date DATE NOT NULL,
+                    photo_count INT NOT NULL DEFAULT 0,
+                    PRIMARY KEY (user_id, usage_date)
+                )
+            ");
+        } else {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS `ai_usage_logs` (
+                    `user_id` INT NOT NULL,
+                    `usage_date` DATE NOT NULL,
+                    `photo_count` INT NOT NULL DEFAULT 0,
+                    PRIMARY KEY (`user_id`, `usage_date`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        }
+    } catch (\Throwable) {}
+
+    // Günlük kullanım sayısını sorgula
+    $stmt = $pdo->prepare("SELECT photo_count FROM ai_usage_logs WHERE user_id = :uid AND usage_date = :dt LIMIT 1");
+    $stmt->execute([':uid' => $userId, ':dt' => $date]);
+    $current = (int)$stmt->fetchColumn();
+
+    if ($current >= $maxQuota) {
+        http_response_code(429);
+        echo json_encode([
+            'ok' => false,
+            'error' => "Günlük fotoğraflı AI analiz kotanıza ({$maxQuota}/{$maxQuota}) ulaştınız. Yarın tekrar deneyebilir veya öğününüzü serbest metin olarak ekleyebilirsiniz.",
+            'quota_exceeded' => true,
+            'current' => $current,
+            'max' => $maxQuota
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // Kotayı artır
+    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    if ($driver === 'pgsql') {
+        $up = $pdo->prepare("
+            INSERT INTO ai_usage_logs (user_id, usage_date, photo_count)
+            VALUES (:uid, :dt, 1)
+            ON CONFLICT (user_id, usage_date) DO UPDATE SET photo_count = ai_usage_logs.photo_count + 1
+        ");
+        $up->execute([':uid' => $userId, ':dt' => $date]);
+    } else {
+        $up = $pdo->prepare("
+            INSERT INTO ai_usage_logs (user_id, usage_date, photo_count)
+            VALUES (:uid, :dt, 1)
+            ON DUPLICATE KEY UPDATE photo_count = photo_count + 1
+        ");
+        $up->execute([':uid' => $userId, ':dt' => $date]);
+    }
 }
 

@@ -73,7 +73,9 @@ final class Config
         'APP_ENV'       => 'production',
         'APP_DEBUG'     => 'false',
         'APP_TIMEZONE'  => 'Europe/Istanbul',
-        'APP_SECRET'    => 'OptiLifeSync_HMAC_Secret_2026_d9e7a8f1b2c3e4a5',
+        // APP_SECRET burada varsayılan değer bırakılmaz (fail-closed güvenlik politikası).
+        // .env veya Vercel ortam değişkenlerinde zorunlu olarak tanımlanmalıdır.
+        // Üretmek için: php -r "echo bin2hex(random_bytes(32));"
 
     ];
 

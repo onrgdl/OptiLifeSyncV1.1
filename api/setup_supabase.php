@@ -90,19 +90,18 @@ if (($action === 'install' || $action === 'migrate') && $pdo && $isPgsql) {
             $pdo->exec("ALTER TABLE users ALTER COLUMN height_cm SET DEFAULT 175.00;");
             $pdo->exec("ALTER TABLE users ALTER COLUMN weight_kg SET DEFAULT 75.00;");
 
-            $creatorPinHash = password_hash('1234', PASSWORD_DEFAULT);
+            // Güvenlik: PIN ve recovery_code artık sabit değerle ayarlanmıyor.
+            // Creator rolü yalnızca role alanı güncellenerek atanır.
             $update = $pdo->prepare("
                 UPDATE users 
-                SET username = 'onrgdl',
-                    name = 'onrgdl (Creator)',
-                    role = 'creator',
-                    pin_hash = COALESCE(pin_hash, :pin_hash),
-                    recovery_code = COALESCE(recovery_code, 'REC-CREATOR-9999')
+                SET username = COALESCE(username, 'onrgdl'),
+                    name = COALESCE(name, 'Creator'),
+                    role = 'creator'
                 WHERE id = 1
             ");
-            $update->execute([':pin_hash' => $creatorPinHash]);
+            $update->execute();
             $installSuccess = true;
-            $installMessage = "Supabase users tablosu başarıyla güncellendi (onrgdl Creator yetkisi tanımlandı)! 👑";
+            $installMessage = "Supabase users tablosu başarıyla güncellendi (id=1 Creator yetkisi tanımlandı). Lütfen PIN ve kurtarma kodunu uygulamadan güncelleyin.";
         } else {
             $sqlPath = dirname(__DIR__) . '/database/schema_supabase.sql';
             if (!file_exists($sqlPath)) {

@@ -1320,11 +1320,17 @@ function renderMeals(meals) {
                 <div class="meal-type">${MEAL_LABELS[m.meal_type]||m.meal_type} · <span style="font-size:11px;color:var(--muted)">${m.protein_g||0}p · ${m.carbs_g||0}k · ${m.fat_g||0}y</span></div>
             </div>
             <div class="meal-cal text-nowrap">${fmt(m.calories)} kcal</div>
-            <button class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="deleteDashboardMeal(${m.id}, '${esc(m.food_label).replace(/'/g, "\\'")}')" title="Bu öğünü sil" style="text-decoration:none;opacity:0.8;font-size:14px">
+            <button class="btn btn-sm btn-link text-danger p-0 ms-2" data-meal-id="${m.id}" data-food-label="${esc(m.food_label)}" onclick="deleteDashboardMealBtn(this)" title="Bu öğünü sil" style="text-decoration:none;opacity:0.8;font-size:14px">
                 <i class="bi bi-trash3"></i>
             </button>
         </div>
     </div>`).join('');
+}
+
+function deleteDashboardMealBtn(btn) {
+    const mealId = parseInt(btn.getAttribute('data-meal-id'), 10);
+    const foodName = btn.getAttribute('data-food-label') || 'Bu öğün';
+    deleteDashboardMeal(mealId, foodName);
 }
 
 async function deleteDashboardMeal(mealId, foodName) {
@@ -2067,8 +2073,9 @@ async function confirmSavePhotoFood() {
 // ─── YARDIMCILAR ─────────────────────────────────────────────────────
 const fmt = v => parseFloat(v||0).toLocaleString('tr-TR', {maximumFractionDigits:1});
 const setText = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
-const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 const now = () => new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});
+
 const formatDate = d => new Date(d+'T00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'});
 
 // ─── BAŞLATMA ────────────────────────────────────────────────────────

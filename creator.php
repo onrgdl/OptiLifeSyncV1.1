@@ -10,7 +10,7 @@ use App\Services\AuthService;
 $authService = new AuthService($pdo);
 
 // Eğer kullanıcı Creator değil ama göz atma modundaysa ve geri dönmek istiyorsa
-if (isset($_GET['action']) && $_GET['action'] === 'stop_impersonate') {
+if ((isset($_POST['action']) && $_POST['action'] === 'stop_impersonate') || (isset($_GET['action']) && $_GET['action'] === 'stop_impersonate')) {
     $authService->stopImpersonating();
     header("Location: creator.php");
     exit;
@@ -23,7 +23,7 @@ $currentUser = AuthService::getCurrentUser();
 $error = null;
 $success = null;
 
-// POST İşlemleri (PIN Sıfırlama, Silme, Impersonate)
+// POST İşlemleri (PIN Sıfırlama, Silme, Impersonate, Purge)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $targetId = (int)($_POST['target_user_id'] ?? 0);
@@ -52,30 +52,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = $res['error'];
         }
     } elseif ($action === 'purge_data') {
-        try {
-            $driver = $pdo ? $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) : '';
-            if ($driver === 'sqlite') {
-                $pdo->exec("DELETE FROM food_logs; DELETE FROM supplement_logs; DELETE FROM daily_logs; DELETE FROM reminders; DELETE FROM workouts; DELETE FROM supplements;");
-            } elseif ($driver === 'pgsql') {
-                $pdo->exec("TRUNCATE TABLE food_logs, supplement_logs, daily_logs, reminders, workouts, supplements CASCADE;");
+        $creatorPin = (string)($_POST['creator_pin'] ?? '');
+        if ($creatorPin === '') {
+            $error = 'Veri sıfırlama işlemi için Creator PIN kodunuzu girmeniz zorunludur.';
+        } else {
+            $stmt = $pdo->prepare("SELECT pin_hash FROM users WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => AuthService::getCurrentUserId()]);
+            $hash = $stmt->fetchColumn();
+            if (!$hash || !password_verify($creatorPin, $hash)) {
+                $error = 'Hatalı Creator PIN kodu! Tüm log verilerini sıfırlama işlemi iptal edildi.';
             } else {
-                $pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
-                $pdo->exec("TRUNCATE TABLE food_logs;");
-                $pdo->exec("TRUNCATE TABLE supplement_logs;");
-                $pdo->exec("TRUNCATE TABLE daily_logs;");
-                $pdo->exec("TRUNCATE TABLE reminders;");
-                $pdo->exec("TRUNCATE TABLE workouts;");
-                $pdo->exec("TRUNCATE TABLE supplements;");
-                $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
-            }
+                try {
+                    $driver = $pdo ? $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) : '';
+                    if ($driver === 'sqlite') {
+                        $pdo->exec("DELETE FROM food_logs; DELETE FROM supplement_logs; DELETE FROM daily_logs; DELETE FROM reminders; DELETE FROM workouts; DELETE FROM supplements;");
+                    } elseif ($driver === 'pgsql') {
+                        $pdo->exec("TRUNCATE TABLE food_logs, supplement_logs, daily_logs, reminders, workouts, supplements CASCADE;");
+                    } else {
+                        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
+                        $pdo->exec("TRUNCATE TABLE food_logs;");
+                        $pdo->exec("TRUNCATE TABLE supplement_logs;");
+                        $pdo->exec("TRUNCATE TABLE daily_logs;");
+                        $pdo->exec("TRUNCATE TABLE reminders;");
+                        $pdo->exec("TRUNCATE TABLE workouts;");
+                        $pdo->exec("TRUNCATE TABLE supplements;");
+                        $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
+                    }
 
-            // Reset profile baseline to 70kg, 170cm, 30yo (1996-01-01), male
-            if ($pdo) {
-                $pdo->exec("UPDATE users SET weight_kg = 70.00, height_cm = 170.00, birth_date = '1996-01-01', gender = 'male', activity_level = 'moderately_active', goal = 'maintain'");
+                    // Reset profile baseline to 70kg, 170cm, 30yo (1996-01-01), male
+                    if ($pdo) {
+                        $pdo->exec("UPDATE users SET weight_kg = 70.00, height_cm = 170.00, birth_date = '1996-01-01', gender = 'male', activity_level = 'moderately_active', goal = 'maintain'");
+                    }
+                    $success = "Tüm aktivite ve log verileri başarıyla temizlendi. Mevcut kullanıcılar korundu ve profil başlangıç değerleri eşitlendi.";
+                } catch (\Throwable $e) {
+                    $error = "Veri temizleme sırasında hata oluştu: " . htmlspecialchars($e->getMessage());
+                }
             }
-            $success = "Tüm aktivite ve log verileri başarıyla temizlendi. Mevcut kullanıcılar korundu ve profil başlangıç değerleri (70 kg, 170 cm, 30 yaş, Erkek) olarak eşitlendi.";
-        } catch (\Throwable $e) {
-            $error = "Veri temizleme sırasında hata oluştu: " . $e->getMessage();
         }
     }
 }
@@ -267,8 +279,9 @@ $activePage = 'creator';
                     <div class="fs-4 fw-bold text-info"><?= count($allUsers) ?></div>
                     <div class="small text-secondary" style="font-size:11px">Toplam Kullanıcı</div>
                 </div>
-                <form method="POST" action="creator.php" id="purgeDataForm" class="d-inline" onsubmit="return confirm('DİKKAT! Mevcut kullanıcı hesapları KORUNACAK, ancak sisteme bugüne kadar girilmiş tüm öğün, takviye, alarm ve antrenman verileri tamamen silinecektir. Ayrıca profiller 70 kg, 170 cm, 30 yaş, erkek olarak sıfırlanacaktır. Bu işlemi onaylıyor musunuz?');">
+                <form method="POST" action="creator.php" id="purgeDataForm" class="d-inline" onsubmit="return confirmPurgeData(event);">
                     <input type="hidden" name="action" value="purge_data">
+                    <input type="hidden" name="creator_pin" id="purgeCreatorPin" value="">
                     <button type="submit" class="btn btn-danger btn-sm px-3 py-2 fw-semibold d-flex align-items-center gap-2 shadow-sm rounded-3">
                         <i class="bi bi-trash3-fill"></i>
                         <span>Tüm Log Verilerini Sıfırla</span>
@@ -295,7 +308,6 @@ $activePage = 'creator';
                             <th>Rol</th>
                             <th>Fiziksel Profil</th>
                             <th>Aktivite & Veriler</th>
-                            <th>Kurtarma Kodu</th>
                             <th>Kayıt Tarihi</th>
                             <th class="text-end">İşlemler</th>
                         </tr>
@@ -336,11 +348,6 @@ $activePage = 'creator';
                                         💪 <strong><?= $u['total_workouts'] ?></strong> spor · 
                                         💊 <strong><?= $u['total_supplements'] ?></strong> ilaç
                                     </div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-dark border border-secondary text-warning font-monospace" style="user-select:all;">
-                                        <?= htmlspecialchars($u['recovery_code'] ?? '—') ?>
-                                    </span>
                                 </td>
                                 <td class="text-secondary small">
                                     <?= date('d.m.Y H:i', strtotime($u['created_at'])) ?>
@@ -415,12 +422,48 @@ $activePage = 'creator';
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 function openResetModal(userId, username) {
     document.getElementById('modal_target_user_id').value = userId;
     document.getElementById('modal_target_name').textContent = '@' + username;
     const modal = new bootstrap.Modal(document.getElementById('resetPinModal'));
     modal.show();
+}
+
+async function confirmPurgeData(e) {
+    e.preventDefault();
+    if (typeof Swal !== 'undefined') {
+        const { value: pin } = await Swal.fire({
+            title: 'Tüm Log Verilerini Sıfırla?',
+            text: 'DİKKAT! Bu işlem geri alınamaz. Kullanıcı hesapları korunur, ancak tüm yemek, spor, takviye ve alarmlar silinir. İşlemi onaylamak için Creator PIN kodunuzu girin:',
+            input: 'password',
+            inputPlaceholder: 'Creator PIN kodunuz',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Evet, Sıfırla',
+            cancelButtonText: 'Vazgeç',
+            background: '#111827',
+            color: '#f8fafc',
+            inputValidator: (value) => {
+                if (!value) return 'PIN kodunuzu girmelisiniz!';
+            }
+        });
+
+        if (pin) {
+            document.getElementById('purgeCreatorPin').value = pin;
+            document.getElementById('purgeDataForm').submit();
+        }
+    } else {
+        const pin = prompt('DİKKAT! Bu işlem geri alınamaz. Lütfen onaylamak için Creator PIN kodunuzu girin:');
+        if (pin) {
+            document.getElementById('purgeCreatorPin').value = pin;
+            document.getElementById('purgeDataForm').submit();
+        }
+    }
+    return false;
 }
 </script>
 

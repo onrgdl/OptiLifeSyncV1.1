@@ -19,28 +19,36 @@ require_once __DIR__ . '/../../config/app.php';
  * 2. Basit kullanıcı kaydı (Yalnızca Username + PIN)
  * 3. PIN unutulması durumunda:
  *    a) Kurtarma Kodu (Recovery Code) ile kullanıcının kendi PIN'ini sıfırlaması
- *    b) Creator (onrgdl) tarafından tek tıkla PIN sıfırlama
+ *    b) Creator tarafından tek tıkla PIN sıfırlama
  * 4. Creator Yönetici İşlemleri (Tüm kullanıcıları görme, silme, kullanıcı paneline göz atma)
  * 5. Katı Veri İzolasyonu (Kimse kimsenin planını göremez)
  */
 class AuthService
 {
-    private PDO $db;
+    private ?PDO $db;
     private const AUTH_COOKIE_NAME = 'optilife_auth';
     private const AUTH_COOKIE_DAYS = 30;
 
-    public function __construct(PDO $db)
+    public function __construct(?PDO $db = null)
     {
         $this->db = $db;
         self::startSession();
     }
 
     /**
-     * Güvenli HMAC anahtarı döner
+     * Güvenli HMAC anahtarı döner.
+     * APP_SECRET tanımlı değilse RuntimeException fırlatır (fail-closed güvenlik politikası).
      */
     public static function getSecretKey(): string
     {
-        $customKey = (string)\Config::get('APP_SECRET', 'OptiLifeSync_HMAC_Secret_2026_d9e7a8f1b2c3e4a5');
+        $customKey = (string)\Config::get('APP_SECRET', '');
+        if ($customKey === '') {
+            throw new \RuntimeException(
+                'APP_SECRET ortam değişkeni tanımlı değil. ' .
+                '.env dosyasına veya Vercel ortam değişkenlerine ekleyin. ' .
+                'Üretmek için: php -r "echo bin2hex(random_bytes(32));"'
+            );
+        }
         return hash('sha256', 'optilife_hmac_secret_salt_2026_' . $customKey);
     }
 
@@ -125,7 +133,8 @@ class AuthService
     }
 
     /**
-     * İmzalı çerezden kullanıcı oturumunu doğrular ve geri yükler
+     * İmzalı çerezden kullanıcı oturumunu doğrular ve geri yükler.
+     * Yalnızca tek geçerli APP_SECRET ile imzalanan çerezler kabul edilir.
      */
     public static function restoreSessionFromCookie(string $token): bool
     {
@@ -136,15 +145,16 @@ class AuthService
         }
         [$encoded, $sig] = $parts;
 
-        // HMAC imza doğrulaması (Hem yeni sabit secret hem eski secret ile çift kontrol)
-        $expectedSig = hash_hmac('sha256', $encoded, self::getSecretKey());
+        // HMAC imza doğrulaması — anahtar yoksa veya geçersizse oturumu geri yükleme
+        try {
+            $secretKey = self::getSecretKey();
+        } catch (\Throwable) {
+            return false;
+        }
+
+        $expectedSig = hash_hmac('sha256', $encoded, $secretKey);
         if (!hash_equals($expectedSig, $sig)) {
-            $dbUrl = \Config::get('DATABASE_URL') ?: 'optilife_local_salt_secret';
-            $legacySecret = hash('sha256', 'optilife_serverless_hmac_2026_' . $dbUrl);
-            $legacySig = hash_hmac('sha256', $encoded, $legacySecret);
-            if (!hash_equals($legacySig, $sig)) {
-                return false;
-            }
+            return false;
         }
 
         $json = self::base64UrlDecode($encoded);
@@ -245,13 +255,15 @@ class AuthService
 
     /**
      * Oturumdaki kullanıcı Creator mı?
+     * Yalnızca DB'den gelen role === 'creator' alanına bakılır.
+     * id===1 ve username==='onrgdl' kısayolları güvenlik açığı oluşturduğu için kaldırıldı.
      */
     public static function isCreator(): bool
     {
         self::startSession();
         $user = $_SESSION['user'] ?? null;
         if (!$user) return false;
-        return ($user['role'] ?? '') === 'creator' || ($user['username'] ?? '') === 'onrgdl' || (int)($user['id'] ?? 0) === 1;
+        return ($user['role'] ?? '') === 'creator';
     }
 
     /**
@@ -335,37 +347,34 @@ class AuthService
             }
         }
 
+        // Giriş yalnızca username ile — name alanı artık kullanılmıyor (kullanıcı adı tarama saldırısını önler)
         $stmt = $this->db->prepare("
             SELECT id, name, username, role, pin_hash, password_hash, email, recovery_code
             FROM users
-            WHERE LOWER(username) = LOWER(:u) OR LOWER(name) = LOWER(:u2)
+            WHERE LOWER(username) = LOWER(:u)
             LIMIT 1
         ");
-        $stmt->execute([':u' => $username, ':u2' => $username]);
+        $stmt->execute([':u' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$user) {
-            return ['ok' => false, 'error' => 'Kullanıcı bulunamadı. Lütfen kayıt olun.'];
+            // Kullanıcı adı bulunamadı mesajını kasıtlı olarak genel tutuyoruz (kullanıcı adı taramasını engeller)
+            return ['ok' => false, 'error' => 'Kullanıcı adı veya PIN hatalı.'];
         }
 
-        // PIN Doğrulama
+        // PIN Doğrulama — 1234 arka kapısı kaldırıldı
         $valid = false;
         if (!empty($user['pin_hash']) && password_verify($pin, $user['pin_hash'])) {
             $valid = true;
         } elseif (!empty($user['password_hash']) && password_verify($pin, $user['password_hash'])) {
             $valid = true;
-        } elseif ($pin === '1234' && (empty($user['pin_hash']) || (int)$user['id'] === 1)) {
-            $valid = true;
-            $hash = password_hash($pin, PASSWORD_DEFAULT);
-            $uStmt = $this->db->prepare("UPDATE users SET pin_hash = ? WHERE id = ?");
-            $uStmt->execute([$hash, $user['id']]);
         }
 
         if (!$valid) {
             $_SESSION['login_failed_attempts'] = $failedAttempts + 1;
             $_SESSION['login_last_failed_time'] = time();
             $remainingAttempts = max(0, 5 - ($failedAttempts + 1));
-            $msg = 'Hatalı PIN kodu girdiniz.';
+            $msg = 'Kullanıcı adı veya PIN hatalı.';
             if ($remainingAttempts > 0 && $remainingAttempts <= 3) {
                 $msg .= " ({$remainingAttempts} deneme hakkınız kaldı)";
             } elseif ($remainingAttempts === 0) {
@@ -397,8 +406,9 @@ class AuthService
             return ['ok' => false, 'error' => 'Kullanıcı adı sadece harf, rakam, nokta ve alt çizgi içerebilir.'];
         }
 
-        if (strlen($pin) < 4) {
-            return ['ok' => false, 'error' => 'PIN kodu en az 4 haneli olmalıdır.'];
+        // Yeni kayıtlar için minimum PIN 6 hane
+        if (strlen($pin) < 6) {
+            return ['ok' => false, 'error' => 'PIN kodu en az 6 haneli olmalıdır.'];
         }
 
         // Kullanıcı adı çakışma kontrolü
@@ -414,8 +424,8 @@ class AuthService
         $displayName = $name !== '' ? $name : $username;
         $email = $username . '@optilifesync.local';
 
-        // Creator kontrolü: İlk kullanıcı veya 'onrgdl' ise creator yap
-        $role = ($username === 'onrgdl') ? 'creator' : 'user';
+        // Rol her zaman 'user' — Creator rolü yalnızca DB'de elle atanır
+        $role = 'user';
 
         $stmt = $this->db->prepare("
             INSERT INTO users (
@@ -481,8 +491,9 @@ class AuthService
             return ['ok' => false, 'error' => 'Tüm alanları doldurmanız gerekmektedir.'];
         }
 
-        if (strlen($newPin) < 4) {
-            return ['ok' => false, 'error' => 'Yeni PIN en az 4 haneli olmalıdır.'];
+        // Yeni PIN için minimum 6 hane (yalnızca PIN sıfırlamada)
+        if (strlen($newPin) < 6) {
+            return ['ok' => false, 'error' => 'Yeni PIN en az 6 haneli olmalıdır.'];
         }
 
         $stmt = $this->db->prepare("
@@ -502,8 +513,9 @@ class AuthService
         $cleanInput = str_replace(['-', ' '], '', $recoveryCode);
         $cleanStored = str_replace(['-', ' '], '', $storedCode);
 
-        if ($cleanInput !== $cleanStored) {
-            return ['ok' => false, 'error' => 'Kurtarma kodu hatalı! Lütfen kaydettiğiniz kodu kontrol edin veya Creator (onrgdl) ile iletişime geçin.'];
+        // Sabit zamanlı karşılaştırma (timing attack önlemi)
+        if (!hash_equals($cleanStored, $cleanInput)) {
+            return ['ok' => false, 'error' => 'Kurtarma kodu hatalı! Lütfen kaydettiğiniz kodu kontrol edin.'];
         }
 
         // Yeni PIN'i kaydet ve yeni bir kurtarma kodu üret
@@ -546,11 +558,12 @@ class AuthService
         $stmt = $this->db->prepare("UPDATE users SET pin_hash = :pin WHERE id = :id");
         $stmt->execute([':pin' => $pinHash, ':id' => $targetUserId]);
 
-        return ['ok' => true, 'message' => "Kullanıcının PIN kodu başarıyla '{$newPin}' olarak güncellendi."];
+        return ['ok' => true, 'message' => "Kullanıcının PIN kodu başarıyla güncellendi."];
     }
 
     /**
      * Creator Yetkisi: Tüm kullanıcıları istatistikleriyle birlikte listeleme
+     * Güvenlik: recovery_code artık döndürülmüyor
      */
     public function creatorGetAllUsers(): array
     {
@@ -561,7 +574,7 @@ class AuthService
         $stmt = $this->db->query("
             SELECT 
                 u.id, u.name, u.username, u.role, u.email, u.gender, u.birth_date,
-                u.height_cm, u.weight_kg, u.goal, u.activity_level, u.recovery_code, u.created_at,
+                u.height_cm, u.weight_kg, u.goal, u.activity_level, u.created_at,
                 (SELECT COUNT(*) FROM food_logs fl JOIN daily_logs dl ON fl.daily_log_id = dl.id WHERE dl.user_id = u.id) as total_meals,
                 (SELECT COUNT(*) FROM workouts w WHERE w.user_id = u.id) as total_workouts,
                 (SELECT COUNT(*) FROM supplements s WHERE s.user_id = u.id AND s.is_active = 1) as total_supplements,
@@ -582,8 +595,8 @@ class AuthService
             return ['ok' => false, 'error' => 'Bu işlem için Creator yetkisi gereklidir.'];
         }
 
-        if ($targetUserId === 1 || $targetUserId === self::getCurrentUserId()) {
-            return ['ok' => false, 'error' => 'Creator ana hesabı silinemez.'];
+        if ($targetUserId === self::getCurrentUserId()) {
+            return ['ok' => false, 'error' => 'Kendi hesabınızı silemezsiniz.'];
         }
 
         $stmt = $this->db->prepare("DELETE FROM users WHERE id = :id AND role != 'creator'");
@@ -601,7 +614,8 @@ class AuthService
             return ['ok' => false, 'error' => 'Yetkisiz işlem.'];
         }
 
-        $stmt = $this->db->prepare("SELECT id, name, username, role, email, recovery_code FROM users WHERE id = :id LIMIT 1");
+        // Güvenlik: recovery_code artık çekilmiyor
+        $stmt = $this->db->prepare("SELECT id, name, username, role, email FROM users WHERE id = :id LIMIT 1");
         $stmt->execute([':id' => $targetUserId]);
         $targetUser = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -651,13 +665,14 @@ class AuthService
                 $params["secure"], $params["httponly"]
             );
         }
-        // İmzalı kalıcı auth çerezini de sıfırla
+        // İmzalı kalıcı auth çerezini de sıfırla — secure flag doğru kullanılıyor
+        $isHttps = self::isHttps();
         if (!headers_sent()) {
             setcookie(self::AUTH_COOKIE_NAME, '', [
                 'expires'  => time() - 42000,
                 'path'     => '/',
                 'domain'   => '',
-                'secure'   => false,
+                'secure'   => $isHttps,
                 'httponly' => true,
                 'samesite' => 'Lax'
             ]);
@@ -673,18 +688,18 @@ class AuthService
     {
         self::startSession();
         if (!headers_sent()) {
-            // false: Diğer cihazlardaki veya açık sekmelerdeki mevcut oturum dosyasını silmez
-            session_regenerate_id(false);
+            // true: eski oturum ID'sini anında geçersiz kıl (oturum sabitleme saldırısını önler)
+            session_regenerate_id(true);
         }
         // Başarılı girişte kaba kuvvet sayacını sıfırla
         unset($_SESSION['login_failed_attempts'], $_SESSION['login_last_failed_time']);
 
         $userRecord = [
-            'id' => (int)$user['id'],
-            'name' => $user['name'],
+            'id'       => (int)$user['id'],
+            'name'     => $user['name'],
             'username' => $user['username'] ?? $user['name'],
-            'role' => $user['role'] ?? ((int)$user['id'] === 1 ? 'creator' : 'user'),
-            'email' => $user['email'] ?? '',
+            'role'     => $user['role'] ?? 'user',
+            'email'    => $user['email'] ?? '',
         ];
 
         $_SESSION['user'] = $userRecord;

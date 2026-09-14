@@ -11,9 +11,15 @@ php_flag display_errors Off
     Deny from all
 </FilesMatch>
 
-# ── Hassas Dizinlere Erişimi Engelle ─────────────────────────────────────────
+# ── Hassas Dizinlere ve Dosyalara Erişimi Engelle ───────────────────────────
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # .git ve nokta ile başlayan tüm gizli dosya/dizinlere erişimi engelle
+    RewriteRule (^|/)\. - [F,L]
+
+    # Script, dokümantasyon, veritabanı ve log dosyalarını engelle
+    RewriteRule \.(bat|md|sql|log|sh|ini)$ - [F,L]
 
     # config/ dizinini dışarıya kapat
     RewriteRule ^config/ - [F,L]
@@ -27,18 +33,17 @@ php_flag display_errors Off
     # logs/ dizinini dışarıya kapat
     RewriteRule ^logs/ - [F,L]
 
-    # example_usage.php'ye erişimi engelle
-    RewriteRule ^example_usage\.php$ - [F,L]
+    # Kurulum ve örnek kullanım dosyalarına webden erişimi engelle
+    RewriteRule ^(setup|setup_supabase|example_usage)\.php$ - [F,L]
 </IfModule>
 
 # ── Dizin Listelemeyi Kapat ───────────────────────────────────────────────────
 Options -Indexes
 
-# ── Clickjacking Koruması ─────────────────────────────────────────────────────
-Header always set X-Frame-Options "SAMEORIGIN"
-
-# ── MIME Sniffing Koruması ────────────────────────────────────────────────────
-Header always set X-Content-Type-Options "nosniff"
-
-# ── XSS Koruması (eski tarayıcılar için) ──────────────────────────────────────
-Header always set X-XSS-Protection "1; mode=block"
+# ── Güvenlik Başlıkları (Security Headers) ────────────────────────────────────
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

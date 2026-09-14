@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $service) {
         $supplements = $service->getSupplementsWithSchedule($userId);
 
     } catch (\Throwable $e) {
-        $flashMsg  = '❌ Hata: ' . $e->getMessage();
+        $flashMsg  = '❌ Hata: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
         $flashType = 'danger';
     }
 }
