@@ -22,6 +22,7 @@ use DateTime;
 class WorkoutService
 {
     private PDO $db;
+    private static bool $schemaMigrated = false;
 
     // Spor takibi sadece takip amaçlıdır (beslenmeye ekstra kalori/protein eklenmez)
     public const EXTRA_CALORIES = 0;
@@ -30,6 +31,28 @@ class WorkoutService
     public function __construct(PDO $db)
     {
         $this->db = $db;
+        $this->ensureSchemaCompatibility();
+    }
+
+    /**
+     * PostgreSQL (Supabase) üzerindeki eski uk_workouts_user_date kısıtlamasını
+     * (günde sadece 1 antrenmana izin veren eski kısıtlama) otomatik olarak kaldırır.
+     */
+    private function ensureSchemaCompatibility(): void
+    {
+        if (self::$schemaMigrated) {
+            return;
+        }
+
+        try {
+            $driver = (string)$this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'pgsql') {
+                $this->db->exec("ALTER TABLE workouts DROP CONSTRAINT IF EXISTS uk_workouts_user_date;");
+            }
+            self::$schemaMigrated = true;
+        } catch (\Throwable) {
+            // DDL yetkisi veya bağlantı durumunda sessizce devam et
+        }
     }
 
     /**
@@ -158,10 +181,11 @@ class WorkoutService
             ]);
             $targetId = $workoutId;
         } else {
-            // Aynı gün aynı tür antrenman zaten varsa mükerrer oluşturmamak için zorluğu güncelle
+            // Aynı gün aynı tür ve HENÜZ TAMAMLANMAMIŞ antrenman varsa zorluğu güncelle,
+            // aksi halde (farklı tür veya yeni seans) yeni antrenman ekle
             $check = $this->db->prepare("
                 SELECT id FROM workouts
-                WHERE user_id = :user_id AND tarih = :tarih AND antrenman_tipi = :antrenman_tipi
+                WHERE user_id = :user_id AND tarih = :tarih AND antrenman_tipi = :antrenman_tipi AND tamamlandi_mi = 0
                 LIMIT 1
             ");
             $check->execute([
@@ -184,17 +208,37 @@ class WorkoutService
                 ]);
                 $targetId = (int)$existingId;
             } else {
-                $ins = $this->db->prepare("
-                    INSERT INTO workouts (user_id, tarih, antrenman_tipi, zorluk_seviyesi, tamamlandi_mi)
-                    VALUES (:user_id, :tarih, :antrenman_tipi, :zorluk_seviyesi, 0)
-                ");
-                $ins->execute([
-                    ':user_id'         => $userId,
-                    ':tarih'           => $date,
-                    ':antrenman_tipi'  => $type,
-                    ':zorluk_seviyesi' => $difficulty,
-                ]);
-                $targetId = (int)$this->db->lastInsertId();
+                try {
+                    $ins = $this->db->prepare("
+                        INSERT INTO workouts (user_id, tarih, antrenman_tipi, zorluk_seviyesi, tamamlandi_mi)
+                        VALUES (:user_id, :tarih, :antrenman_tipi, :zorluk_seviyesi, 0)
+                    ");
+                    $ins->execute([
+                        ':user_id'         => $userId,
+                        ':tarih'           => $date,
+                        ':antrenman_tipi'  => $type,
+                        ':zorluk_seviyesi' => $difficulty,
+                    ]);
+                    $targetId = (int)$this->db->lastInsertId();
+                } catch (\PDOException $pe) {
+                    // PostgreSQL üzerinde uk_workouts_user_date kısıtı henüz silinmediyse kaldırıp tekrar dene
+                    if (str_contains($pe->getMessage(), 'uk_workouts_user_date') || $pe->getCode() === '23505') {
+                        $this->db->exec("ALTER TABLE workouts DROP CONSTRAINT IF EXISTS uk_workouts_user_date;");
+                        $ins = $this->db->prepare("
+                            INSERT INTO workouts (user_id, tarih, antrenman_tipi, zorluk_seviyesi, tamamlandi_mi)
+                            VALUES (:user_id, :tarih, :antrenman_tipi, :zorluk_seviyesi, 0)
+                        ");
+                        $ins->execute([
+                            ':user_id'         => $userId,
+                            ':tarih'           => $date,
+                            ':antrenman_tipi'  => $type,
+                            ':zorluk_seviyesi' => $difficulty,
+                        ]);
+                        $targetId = (int)$this->db->lastInsertId();
+                    } else {
+                        throw $pe;
+                    }
+                }
             }
         }
 

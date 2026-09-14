@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS workouts (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_workouts_user_date ON workouts(user_id, tarih);
+ALTER TABLE workouts DROP CONSTRAINT IF EXISTS uk_workouts_user_date;
 
 -- 3D. DİNAMİK MAKRO HEDEFLERİ (macro_targets)
 CREATE TABLE IF NOT EXISTS macro_targets (
