@@ -148,8 +148,8 @@ PROMPT;
             ],
         ];
 
-        // ── API İsteği Gönder (Model Fallback Destekli) ─────────────
-        $candidateModels = array_unique([$this->model, 'gemini-2.5-flash', 'gemini-1.5-flash']);
+        // ── API İsteği Gönder (Aktif ve Hızlı Modeller) ─────────────
+        $candidateModels = array_unique([$this->model, 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-2.5-flash-lite']);
         $lastException   = null;
 
         foreach ($candidateModels as $currentModel) {
@@ -228,8 +228,8 @@ PROMPT;
             ],
         ];
 
-        // Görsel analizi için multimodal flash modelleri kullan
-        $candidateModels = array_unique([$this->model, 'gemini-2.5-flash', 'gemini-1.5-flash']);
+        // Görsel analizi için hızlı ve aktif multimodal modelleri dene
+        $candidateModels = array_unique(['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash', $this->model, 'gemini-2.5-flash-lite']);
         $lastException   = null;
 
         foreach ($candidateModels as $currentModel) {
@@ -293,7 +293,7 @@ PROMPT;
             ],
         ];
 
-        $candidateModels = array_unique([$this->model, 'gemini-2.5-flash', 'gemini-1.5-flash']);
+        $candidateModels = array_unique([$this->model, 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash']);
         $lastException   = null;
 
         foreach ($candidateModels as $currentModel) {
