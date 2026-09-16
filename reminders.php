@@ -126,6 +126,16 @@ $typeLabels = [
             font-size: .85rem;
             line-height: 1;
         }
+        .time-badge .phone-alarm-btn {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 2px;
+            color: var(--green);
+            font-size: .82rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .time-badge .phone-alarm-btn:hover { color: #0f7a34; }
 
         /* Polling göstergesi (Kullanıcı talebiyle tamamen gizlendi) */
         #polling-indicator {
@@ -190,6 +200,18 @@ $typeLabels = [
     </header>
 
     <div class="content">
+
+    <!-- Telefon Alarmı Bilgi Kutusu -->
+    <div class="alert d-flex align-items-start gap-2 mb-3" style="background: rgba(22,163,74,0.08); border: 1px solid rgba(22,163,74,0.25); border-radius: 12px;">
+        <i class="bi bi-alarm-fill fs-5" style="color: var(--green); margin-top: 2px;"></i>
+        <div style="font-size: 13px; color: #1e293b;">
+            <strong>Yeni: Gerçek Telefon Alarmı</strong> — Aşağıdaki her saat etiketinin yanındaki
+            <i class="bi bi-alarm-fill" style="color: var(--green);"></i> ikonuna dokunursan, telefonunun
+            kendi Saat/Alarm uygulamasına o saat için alarm kurulur. Bu alarm, OptiLifeSync kapalı olsa,
+            telefon ekranı kilitli olsa bile çalar. Açılan Saat uygulamasında "Tekrarla" seçeneğini işaretlersen
+            her gün otomatik çalmaya devam eder — tek seferlik bir kurulum yeterli.
+        </div>
+    </div>
 
     <!-- Flash mesajı -->
     <?php if ($flashMsg): ?>
@@ -820,9 +842,24 @@ function renderTimeBadges(suppId) {
             <span class="time-badge">
                 <i class="bi bi-clock-fill"></i>
                 ${escapeHtml(t)}
+                <span class="phone-alarm-btn" title="Telefonun Saat/Alarm uygulamasına gerçek bir alarm kur (uygulama kapalıyken de çalar)" onclick="setPhoneAlarm(${suppId}, '${t}')"><i class="bi bi-alarm-fill"></i></span>
                 <span class="remove-time" onclick="removeTime(${suppId}, '${t}')">×</span>
             </span>`
           ).join('');
+}
+
+/**
+ * Bir saat rozetindeki 📱 ikonuna tıklanınca, o takviyenin adıyla
+ * telefonun YERLEŞİK Saat/Alarm uygulamasına gerçek bir alarm kurar.
+ * Bu, tarayıcı/uygulama kapalı olsa bile çalışır — çünkü artık
+ * OptiLifeSync'e değil, telefonun kendi işletim sistemine bağlıdır.
+ */
+function setPhoneAlarm(suppId, time) {
+    const supp = (window.__SUPPLEMENTS_CACHE__ || []).find(s => String(s.id) === String(suppId));
+    const label = supp ? supp.name : 'İlaç/Takviye';
+    if (window.optiAlarmEngine) {
+        window.optiAlarmEngine.setNativeClockAlarm(time, label);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────
