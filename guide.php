@@ -29,9 +29,7 @@ $activePage = 'guide';
     <link rel="stylesheet" href="assets/css/sidebar.css">
 
     <style>
-        :root {
-            --surface-hover: #fdfbf7;
-        }
+        /* Renk token'ları artık merkezi assets/css/theme.css içinde (sidebar.css @import eder) */
 
         .guide-hero {
             background: linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(99, 102, 241, 0.05) 50%, rgba(22, 163, 74, 0.05) 100%);

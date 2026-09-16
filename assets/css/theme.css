@@ -1,0 +1,49 @@
+/* ═══════════════════════════════════════════════════════════
+   OptiLifeSync - Merkezi Tasarım Token'ları (Theme)
+   ───────────────────────────────────────────────────────────
+   Tüm renk/yüzey/kenarlık değişkenleri TEK YERDEN buradan yönetilir.
+   Yeni bir sayfa eklerken veya renk değiştirirken sadece bu dosyayı
+   düzenlemek yeterlidir — her sayfada ayrı ayrı :root tanımlamaya
+   gerek yoktur.
+
+   Kullanım: assets/css/sidebar.css bu dosyayı @import eder, bu
+   yüzden sidebar.css'i zaten linkleyen tüm sayfalar (dashboard,
+   nutrition, workout, reminders, reports, guide, creator, index,
+   setup) bu token'lara otomatik erişir. sidebar.css linklemeyen
+   tek sayfa olan login.php ise bu dosyayı doğrudan linkler.
+═══════════════════════════════════════════════════════════ */
+:root {
+    /* Temel yüzeyler */
+    --bg:            #f6f3eb;
+    --surface:       #ffffff;
+    --surface-2:     #ede8de;
+    --surface-hover: #fdfbf7;
+    --border:        #e2ddd3;
+
+    /* Vurgu / anlam renkleri (kanonik) */
+    --accent:        #0284c7;
+    --accent-dim:    rgba(2, 132, 199, 0.12);
+    --green:         #16a34a;
+    --red:           #dc2626;
+    --yellow:        #d97706;
+    --purple:        #9333ea;
+
+    /* Metin */
+    --text:          #1e293b;
+    --muted:         #64748b;
+
+    /* Layout */
+    --sidebar-w:     240px;
+
+    /* ── Eski sayfa-bazlı takma adlar (geriye dönük uyumluluk) ──
+       workout.php gibi sayfalar bu isimlerle çağırıyordu; kod
+       tekrarını önlemek için kanonik token'lara işaret ediyorlar. */
+    --card-bg:       var(--surface);
+    --card-hover:    var(--surface-hover);
+    --card-border:   var(--border);
+    --accent-green:  var(--green);
+    --accent-yellow: var(--yellow);
+    --accent-red:    var(--red);
+    --accent-blue:   var(--accent);
+    --accent-purple: var(--purple);
+}

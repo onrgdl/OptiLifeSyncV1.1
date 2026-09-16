@@ -85,20 +85,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <link rel="stylesheet" href="assets/css/theme.css">
 
     <style>
-        :root {
-            --bg: #f6f3eb;
-            --surface: #ffffff;
-            --surface-2: #ede8de;
-            --border: #e2ddd3;
-            --accent: #0284c7;
-            --green: #16a34a;
-            --yellow: #d97706;
-            --red: #dc2626;
-            --text: #1e293b;
-            --muted: #64748b;
-        }
+        /* Renk token'ları artık merkezi assets/css/theme.css içinde */
 
         body {
             background: radial-gradient(circle at 50% 20%, #ffffff 0%, var(--bg) 80%);

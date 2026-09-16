@@ -108,20 +108,7 @@ $activePage = 'creator';
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 
     <style>
-        :root {
-            --bg: #f6f3eb;
-            --surface: #ffffff;
-            --surface-2: #ede8de;
-            --border: #e2ddd3;
-            --accent: #0284c7;
-            --green: #16a34a;
-            --yellow: #d97706;
-            --red: #dc2626;
-            --purple: #9333ea;
-            --text: #1e293b;
-            --muted: #64748b;
-            --sidebar-w: 240px;
-        }
+        /* Renk token'ları artık merkezi assets/css/theme.css içinde (sidebar.css @import eder) */
 
         body {
             background: var(--bg);

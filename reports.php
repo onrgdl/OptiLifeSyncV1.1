@@ -292,9 +292,7 @@ $chartFat         = array_map(fn($d) => $d['consumed']['fat_g'], $days);
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
     <style>
-        :root {
-            --surface-hover: #fdfbf7;
-        }
+        /* Renk token'ları artık merkezi assets/css/theme.css içinde (sidebar.css @import eder) */
 
         .report-card {
             background: var(--surface);

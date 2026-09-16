@@ -10,13 +10,16 @@ use App\Services\DashboardService;
 
 $initialDashboardData = null;
 $weeklyBreakdown = null;
+$currentStreak = 0;
 if ($pdo && isset($userId) && $userId > 0) {
     try {
         $initialDashboardData = DashboardService::getDashboardData($pdo, (int)$userId);
         $weeklyBreakdown      = DashboardService::getWeeklyBreakdown($pdo, (int)$userId);
+        $currentStreak        = DashboardService::getStreak($pdo, (int)$userId);
     } catch (\Throwable $e) {
         $initialDashboardData = null;
         $weeklyBreakdown      = null;
+        $currentStreak        = 0;
     }
 }
 ?>
@@ -36,22 +39,7 @@ if ($pdo && isset($userId) && $userId > 0) {
 /* ═══════════════════════════════════════════════════════════
    GLOBAL RESET & TOKENS
 ═══════════════════════════════════════════════════════════ */
-:root {
-    --bg:          #f6f3eb;
-    --surface:     #ffffff;
-    --surface-2:   #ede8de;
-    --border:      #e2ddd3;
-    --accent:      #0284c7;
-    --accent-dim:  rgba(2, 132, 199, 0.12);
-    --green:       #16a34a;
-    --red:         #dc2626;
-    --yellow:      #d97706;
-    --purple:      #9333ea;
-    --text:        #1e293b;
-    --muted:       #64748b;
-    --sidebar-w:   240px;
-}
-*, *::before, *::after { box-sizing: border-box; }
+/* Renk token'ları artık merkezi assets/css/theme.css içinde (sidebar.css @import eder) */
 
 /* Haftanın Günlük Dökümü - Bugün Satırı & Açılan Öğün Detayları */
 .table-row-today,
@@ -336,6 +324,23 @@ button { cursor: pointer; border: none; background: none; }
     display: none !important;
 }
 
+/* Streak (seri) rozeti */
+.streak-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    margin-left: 10px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 12px; font-weight: 700;
+    background: rgba(220, 38, 38, 0.1);
+    color: var(--red);
+    border: 1px solid rgba(220, 38, 38, 0.25);
+    vertical-align: middle;
+}
+.streak-badge i { font-size: 13px; }
+@media (max-width: 576px) {
+    .streak-badge { display: block; margin: 4px 0 0; width: fit-content; }
+}
+
 /* Skeleton loader */
 .skeleton {
     background: linear-gradient(90deg, var(--surface-2) 25%, #ffffff 50%, var(--surface-2) 75%);
@@ -360,6 +365,11 @@ button { cursor: pointer; border: none; background: none; }
                 <div class="topbar-title">Günlük Dashboard</div>
                 <div class="topbar-sub" id="dateLabel">Yükleniyor…</div>
             </div>
+            <?php if ($currentStreak > 0): ?>
+            <div class="streak-badge" title="Üst üste kaç gündür beslenme kaydı girdiğin">
+                <i class="bi bi-fire"></i> <?= (int)$currentStreak ?> gün seri
+            </div>
+            <?php endif; ?>
         </div>
         <div class="topbar-right">
             <!-- Hızlı Öğün Ekle -->
@@ -592,6 +602,74 @@ button { cursor: pointer; border: none; background: none; }
                 </div>
             </div>
         </div>
+
+        <!-- ── HAFTALIK TREND GRAFİĞİ ──────────────────────────── -->
+        <?php if (!empty($weeklyBreakdown)):
+            $chartDays        = $weeklyBreakdown['days'];
+            $chartLabelsFull  = array_map(fn($d) => $d['day_name'] . ' (' . $d['short_date'] . ')', $chartDays);
+            $chartConsumedCal = array_map(fn($d) => $d['consumed']['calories'], $chartDays);
+            $chartTargetCal   = array_map(fn($d) => $d['target']['calories'], $chartDays);
+        ?>
+        <div class="row g-3 mt-1">
+            <div class="col-12">
+                <div class="card p-3 p-sm-4" style="background: var(--surface); border: 1px solid var(--border); border-radius: 16px;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="mb-0 fw-bold" style="color: #0f172a;">
+                                <i class="bi bi-graph-up me-2 text-primary"></i>Haftalık Kalori Trendi
+                            </h6>
+                            <span class="small" style="color: #64748b;">Bu haftaki tüketim ve hedef karşılaştırması</span>
+                        </div>
+                    </div>
+                    <div style="position: relative; height: 240px;">
+                        <canvas id="weeklyTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            (function() {
+                const ctx = document.getElementById('weeklyTrendChart');
+                if (!ctx || typeof Chart === 'undefined') return;
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: <?= json_encode($chartLabelsFull, JSON_UNESCAPED_UNICODE) ?>,
+                        datasets: [
+                            {
+                                label: 'Tüketilen Kalori',
+                                data: <?= json_encode($chartConsumedCal) ?>,
+                                borderColor: '#0284c7',
+                                backgroundColor: 'rgba(2, 132, 199, 0.12)',
+                                fill: true,
+                                tension: 0.35,
+                                pointRadius: 4,
+                                pointBackgroundColor: '#0284c7'
+                            },
+                            {
+                                label: 'Hedef Kalori',
+                                data: <?= json_encode($chartTargetCal) ?>,
+                                borderColor: '#dc2626',
+                                borderDash: [6, 4],
+                                fill: false,
+                                tension: 0,
+                                pointRadius: 0
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { font: { size: 11 } } },
+                            x: { ticks: { font: { size: 11 } } }
+                        }
+                    }
+                });
+            })();
+        </script>
+        <?php endif; ?>
 
         <!-- ── HAFTANIN GÜNLÜK DÖKÜMÜ ─────────────────────────── -->
         <?php if (!empty($weeklyBreakdown)): 
@@ -1055,6 +1133,7 @@ button { cursor: pointer; border: none; background: none; }
 ═══════════════════════════════════════════════════════════ -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 <script>
 // ─── INITIAL HYDRATION & STATE ─────────────────────────────────────────

@@ -41,16 +41,7 @@ $activePage = 'workout';
     <script src="assets/js/alarm-engine.js"></script>
 
     <style>
-        :root {
-            --card-bg: #ffffff;
-            --card-hover: #fdfbf7;
-            --card-border: #e2ddd3;
-            --accent-green: #16a34a;
-            --accent-yellow: #d97706;
-            --accent-red: #dc2626;
-            --accent-blue: #0284c7;
-            --accent-purple: #9333ea;
-        }
+        /* Renk token'ları artık merkezi assets/css/theme.css içinde (sidebar.css @import eder) */
 
         .stat-card {
             background: var(--surface);

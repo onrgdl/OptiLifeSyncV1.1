@@ -195,6 +195,39 @@ class DashboardService
     }
 
     /**
+     * Kullanıcının üst üste kaç gündür beslenme kaydı girdiğini hesaplar.
+     * "Bugün" henüz kayıt girilmemişse zincir kırılmış sayılmaz (gün henüz bitmedi);
+     * hesaplama en son kayıt girilen günden geriye doğru devam eder.
+     */
+    public static function getStreak(PDO $pdo, int $userId, ?string $today = null): int
+    {
+        $today = $today ?: date('Y-m-d');
+
+        $stmt = $pdo->prepare("
+            SELECT log_date FROM daily_logs
+            WHERE user_id = ? AND total_calories > 0
+            ORDER BY log_date DESC
+            LIMIT 400
+        ");
+        $stmt->execute([$userId]);
+        $loggedSet = array_flip($stmt->fetchAll(PDO::FETCH_COLUMN));
+
+        $streak = 0;
+        $cursor = new DateTime($today);
+
+        if (!isset($loggedSet[$today])) {
+            $cursor->modify('-1 day');
+        }
+
+        while (isset($loggedSet[$cursor->format('Y-m-d')])) {
+            $streak++;
+            $cursor->modify('-1 day');
+        }
+
+        return $streak;
+    }
+
+    /**
      * Haftalık 7 günlük (Pazartesi - Pazar) detay dökümünü ve özetini döner.
      */
     public static function getWeeklyBreakdown(PDO $pdo, int $userId, ?string $refDateStr = null): array
