@@ -7,13 +7,12 @@
  * 3. Bildirim (Push Notification) olaylarını yönetir
  */
 
-const CACHE_NAME = 'optilifesync-cache-v2';
+const CACHE_NAME = 'optilifesync-cache-v3';
 
 // Önbelleğe alınacak statik kabuk dosyaları
 const STATIC_ASSETS = [
     './',
     'manifest.json',
-    'assets/css/sidebar.css',
     'assets/icons/icon-192.png',
     'assets/icons/icon-512.png',
     'assets/icons/apple-touch-icon.png',

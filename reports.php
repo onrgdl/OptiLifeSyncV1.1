@@ -1,699 +1,373 @@
 <?php
-
 declare(strict_types=1);
 
 /**
- * OptiLifeSync - Haftalık Sağlık & Performans Raporu
+ * OptiLifeSync - Haftalık Rapor (v2)
  *
- * Kullanıcının seçilen haftadaki:
- *  - Kalori ve dinamik makro hedeflerine uyumunu
- *  - Gün gün tüketim ve açık/fazla analizini
- *  - Antrenman başarı oranını (planlanan vs yapılan)
- *  - İlaç/takviye düzenliliğini
- *  - Gemini AI haftalık koçluk değerlendirmesini sunar.
+ *  • Hafta hafta gezinme
+ *  • Kalori / protein uyumu, su, antrenman, ilaç uyumu, egzersiz hacmi
+ *  • Kilo trendi (son 90 gün)
+ *  • Gün gün döküm (öğün detaylarıyla)
+ *  • Yapay zeka koç değerlendirmesi (Gemini)
  */
 
 require_once __DIR__ . '/config/app.php';
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/includes/auth.php';
-require_once __DIR__ . '/app/Services/MetabolismCalculator.php';
-require_once __DIR__ . '/app/Services/GeminiService.php';
+require_once __DIR__ . '/app/Services/DashboardService.php';
+require_once __DIR__ . '/app/Services/MedicationTracker.php';
+require_once __DIR__ . '/app/Services/ExerciseLogService.php';
 
-use App\Services\MetabolismCalculator;
+use App\Services\DashboardService;
+use App\Services\MedicationTracker;
+use App\Services\ExerciseLogService;
 
-$today  = date('Y-m-d');
-
-// ── Hafta Hesabı ──────────────────────────────────────────────────────
-$refDateStr = $_GET['date'] ?? $today;
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $refDateStr)) {
-    $refDateStr = $today;
+$today = date('Y-m-d');
+$ref = (string)($_GET['date'] ?? $today);
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $ref)) {
+    $ref = $today;
 }
 
-try {
-    $refDate = new DateTime($refDateStr);
-} catch (\Throwable) {
-    $refDate = new DateTime($today);
-}
-
-// Pazartesi (1) - Pazar (7)
-$dayOfWeek = (int)$refDate->format('N');
-$monday    = (clone $refDate)->modify('-' . ($dayOfWeek - 1) . ' days');
-$sunday    = (clone $monday)->modify('+6 days');
-
-$weekStart   = $monday->format('Y-m-d');
-$weekEnd     = $sunday->format('Y-m-d');
-$weekNumber  = (int)$monday->format('W');
-$yearNumber  = $monday->format('Y');
-
-// Navigasyon tarihleri
-$prevWeekDate = (clone $monday)->modify('-7 days')->format('Y-m-d');
-$nextWeekDate = (clone $monday)->modify('+7 days')->format('Y-m-d');
-$isCurrentWeek = ($today >= $weekStart && $today <= $weekEnd);
-
-// ── Kullanıcı Profili ────────────────────────────────────────────────
-$userProfile = [
-    'weight_kg' => 70.0, 'height_cm' => 170.0, 'birth_date' => '1996-01-01',
-    'gender' => 'male', 'activity_level' => 'moderately_active', 'goal' => 'maintain',
-];
+$week = null; $adh = null; $weights = []; $vol = null; $waterByDate = [];
 if ($pdo) {
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
-    $stmt->execute([$userId]);
-    if ($row = $stmt->fetch()) {
-        $userProfile = $row;
-    }
-}
-$age = (int)(new DateTime($userProfile['birth_date']))->diff(new DateTime())->y;
-
-$calc = new MetabolismCalculator(
-    (float)$userProfile['weight_kg'],
-    (float)$userProfile['height_cm'],
-    $age,
-    $userProfile['gender'],
-    $userProfile['activity_level'],
-    $userProfile['goal']
-);
-$restMacros     = $calc->getDailyMacros(false);
-$trainingMacros = $calc->getDailyMacros(true);
-$bmr            = $calc->getBMR();
-$tdee           = $calc->getTDEE();
-
-// ── Haftalık Verileri Çek ─────────────────────────────────────────────
-$dailyLogs       = [];
-$workouts        = [];
-$foodLogsByDate  = [];
-$suppLogsByDate  = [];
-
-if ($pdo) {
-    // 1. daily_logs
-    $stmt = $pdo->prepare("SELECT * FROM daily_logs WHERE user_id = ? AND log_date BETWEEN ? AND ?");
-    $stmt->execute([$userId, $weekStart, $weekEnd]);
-    while ($r = $stmt->fetch()) {
-        $dailyLogs[$r['log_date']] = $r;
-    }
-
-    // 2. workouts
-    $stmt = $pdo->prepare("SELECT * FROM workouts WHERE user_id = ? AND tarih BETWEEN ? AND ?");
-    $stmt->execute([$userId, $weekStart, $weekEnd]);
-    while ($r = $stmt->fetch()) {
-        $workouts[$r['tarih']] = $r;
-    }
-
-    // 3. food_logs
-    $stmt = $pdo->prepare("
-        SELECT fl.*, dl.log_date
-        FROM food_logs fl
-        JOIN daily_logs dl ON fl.daily_log_id = dl.id
-        WHERE dl.user_id = ? AND dl.log_date BETWEEN ? AND ?
-        ORDER BY fl.logged_at ASC
-    ");
-    $stmt->execute([$userId, $weekStart, $weekEnd]);
-    while ($r = $stmt->fetch()) {
-        $foodLogsByDate[$r['log_date']][] = $r;
-    }
-
-    // 4. supplement_logs
-    $stmt = $pdo->prepare("
-        SELECT sl.is_taken, dl.log_date
-        FROM supplement_logs sl
-        JOIN daily_logs dl ON sl.daily_log_id = dl.id
-        WHERE dl.user_id = ? AND dl.log_date BETWEEN ? AND ?
-    ");
-    $stmt->execute([$userId, $weekStart, $weekEnd]);
-    while ($r = $stmt->fetch()) {
-        if (!isset($suppLogsByDate[$r['log_date']])) {
-            $suppLogsByDate[$r['log_date']] = ['total' => 0, 'taken' => 0];
+    try {
+        $week = DashboardService::getWeeklyBreakdown($pdo, (int)$userId, $ref);
+        $adh = (new MedicationTracker($pdo))->getAdherence((int)$userId, 7, min($week['week_end'], $today));
+        $weights = DashboardService::getWeightHistory($pdo, (int)$userId, 90);
+        $exSvc = new ExerciseLogService($pdo);
+        foreach ($exSvc->getWeeklyVolume((int)$userId, 26) as $wv) {
+            if ($wv['week_start'] === $week['week_start']) { $vol = $wv; }
         }
-        $suppLogsByDate[$r['log_date']]['total']++;
-        if (!empty($r['is_taken'])) {
-            $suppLogsByDate[$r['log_date']]['taken']++;
-        }
+        $st = $pdo->prepare("SELECT log_date, water_ml FROM daily_logs WHERE user_id = ? AND log_date BETWEEN ? AND ?");
+        $st->execute([$userId, $week['week_start'], $week['week_end']]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) { $waterByDate[substr((string)$r['log_date'], 0, 10)] = (int)$r['water_ml']; }
+    } catch (\Throwable $e) {
+        error_log('Rapor hatası: ' . $e->getMessage());
     }
 }
 
-// ── 7 Günlük Tablo ve Toplamları İnşa Et ──────────────────────────────
-$dayNamesTr = [
-    1 => 'Pazartesi', 2 => 'Salı', 3 => 'Çarşamba',
-    4 => 'Perşembe', 5 => 'Cuma', 6 => 'Cumartesi', 7 => 'Pazar'
+$weekStart = $week['week_start'] ?? $today;
+$weekEnd = $week['week_end'] ?? $today;
+$prevWeek = date('Y-m-d', strtotime($weekStart . ' -7 days'));
+$nextWeek = date('Y-m-d', strtotime($weekStart . ' +7 days'));
+$isCurrent = $today >= $weekStart && $today <= $weekEnd;
+$trMonths = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+$fmtD = fn($d) => (int)date('j', strtotime($d)) . ' ' . $trMonths[(int)date('n', strtotime($d))];
+$shortDay = ['Pazartesi' => 'Pzt', 'Salı' => 'Sal', 'Çarşamba' => 'Çar', 'Perşembe' => 'Per', 'Cuma' => 'Cum', 'Cumartesi' => 'Cmt', 'Pazar' => 'Paz'];
+
+// Haftalık özet
+$days = $week['days'] ?? [];
+$logged = array_values(array_filter($days, fn($d) => $d['consumed']['calories'] > 0));
+$nLogged = count($logged);
+$avg = fn($k) => $nLogged ? array_sum(array_map(fn($d) => (float)$d['consumed'][$k], $logged)) / $nLogged : 0;
+$avgCal = $avg('calories'); $avgProt = $avg('protein_g'); $avgCarb = $avg('carbs_g'); $avgFat = $avg('fat_g');
+$target = $days[0]['target'] ?? ['calories' => 0, 'protein_g' => 0, 'carbs_g' => 0, 'fat_g' => 0];
+$onTarget = count(array_filter($logged, fn($d) => $d['target']['calories'] > 0 && abs($d['consumed']['calories'] - $d['target']['calories']) <= $d['target']['calories'] * 0.1));
+$workoutsDone = count(array_filter($days, fn($d) => $d['workout_done']));
+$workoutsPlanned = count(array_filter($days, fn($d) => !empty($d['workout']) || $d['workout_done']));
+$waterVals = array_filter($waterByDate);
+$avgWater = $waterVals ? array_sum($waterVals) / count($waterVals) : 0;
+$weekBalance = array_sum(array_map(fn($d) => (float)$d['consumed']['calories'] - (float)$d['target']['calories'], $logged));
+
+$fmt = fn($v) => number_format((float)$v, 0, ',', '.');
+$chart = [
+    'labels'  => array_map(fn($d) => $shortDay[$d['day_name']] ?? $d['day_name'], $days),
+    'cal'     => array_map(fn($d) => round((float)$d['consumed']['calories']), $days),
+    'target'  => array_map(fn($d) => round((float)$d['target']['calories']), $days),
+    'prot'    => array_map(fn($d) => round((float)$d['consumed']['protein_g']), $days),
+    'protT'   => array_map(fn($d) => round((float)$d['target']['protein_g']), $days),
+    'water'   => array_map(fn($d) => $waterByDate[$d['date']] ?? 0, $days),
+    'adh'     => array_map(fn($s) => $s['pct'], $adh['series'] ?? []),
+    'adhLbl'  => array_map(fn($s) => $s['label'], $adh['series'] ?? []),
+    'wLbl'    => array_map(fn($w) => date('d.m', strtotime($w['date'])), $weights),
+    'w'       => array_map(fn($w) => $w['weight_kg'], $weights),
 ];
-
-$days              = [];
-$totalCalConsumed  = 0.0;
-$totalCalTarget    = 0.0;
-$totalProtein      = 0.0;
-$totalCarbs        = 0.0;
-$totalFat          = 0.0;
-$plannedWorkouts   = 0;
-$completedWorkouts = 0;
-$daysWithFood      = 0;
-$weightsRecorded   = [];
-$totalSuppPlanned  = 0;
-$totalSuppTaken    = 0;
-
-for ($i = 0; $i < 7; $i++) {
-    $cur     = (clone $monday)->modify("+{$i} days");
-    $dateStr = $cur->format('Y-m-d');
-    $isoDay  = (int)$cur->format('N');
-
-    $w   = $workouts[$dateStr] ?? null;
-    $dl  = $dailyLogs[$dateStr] ?? null;
-    $fls = $foodLogsByDate[$dateStr] ?? [];
-    $sl  = $suppLogsByDate[$dateStr] ?? ['total' => 0, 'taken' => 0];
-
-    // Antrenman durumu
-    $hasWorkoutPlan   = ($w !== null);
-    $workoutCompleted = ($w !== null && !empty($w['tamamlandi_mi'])) || (!empty($dl['workout_done']));
-    if ($hasWorkoutPlan) {
-        $plannedWorkouts++;
-        if ($workoutCompleted) $completedWorkouts++;
-    } elseif ($workoutCompleted) {
-        $completedWorkouts++;
-    }
-
-    // Hedef: Antrenman günleri +400 kcal, +30g protein
-    $dayTarget = ($hasWorkoutPlan || $workoutCompleted) ? $trainingMacros : $restMacros;
-    $totalCalTarget += $dayTarget['calories'];
-
-    // Tüketilen değerler
-    $calConsumed  = (float)($dl['total_calories']  ?? 0);
-    $protConsumed = (float)($dl['total_protein_g'] ?? 0);
-    $carbConsumed = (float)($dl['total_carbs_g']   ?? 0);
-    $fatConsumed  = (float)($dl['total_fat_g']     ?? 0);
-
-    // Eğer daily_logs 0 ama food_logs varsa doğrudan topla
-    if ($calConsumed == 0 && count($fls) > 0) {
-        foreach ($fls as $fl) {
-            $calConsumed  += (float)$fl['calories'];
-            $protConsumed += (float)$fl['protein_g'];
-            $carbConsumed += (float)$fl['carbs_g'];
-            $fatConsumed  += (float)$fl['fat_g'];
-        }
-    }
-
-    if ($calConsumed > 0 || count($fls) > 0) {
-        $daysWithFood++;
-    }
-
-    $totalCalConsumed += $calConsumed;
-    $totalProtein     += $protConsumed;
-    $totalCarbs       += $carbConsumed;
-    $totalFat         += $fatConsumed;
-
-    // Takviye sayaçları
-    $totalSuppPlanned += $sl['total'];
-    $totalSuppTaken   += $sl['taken'];
-
-    // Kilo kaydı
-    if (!empty($dl['weight_kg'])) {
-        $weightsRecorded[$dateStr] = (float)$dl['weight_kg'];
-    }
-
-    $diffCal      = $calConsumed - $dayTarget['calories'];
-    $adherencePct = $dayTarget['calories'] > 0 ? round(($calConsumed / $dayTarget['calories']) * 100, 1) : 0;
-
-    $days[] = [
-        'date'           => $dateStr,
-        'day_name'       => $dayNamesTr[$isoDay],
-        'short_date'     => $cur->format('d/m'),
-        'is_today'       => ($dateStr === $today),
-        'is_past'        => ($dateStr < $today),
-        'workout'        => $w,
-        'workout_done'   => $workoutCompleted,
-        'target'         => $dayTarget,
-        'consumed'       => [
-            'calories'  => $calConsumed,
-            'protein_g' => $protConsumed,
-            'carbs_g'   => $carbConsumed,
-            'fat_g'     => $fatConsumed,
-        ],
-        'diff_calories'  => $diffCal,
-        'adherence_pct'  => $adherencePct,
-        'weight_kg'      => $dl['weight_kg'] ?? null,
-        'food_logs'      => $fls,
-        'supp_logs'      => $sl,
-    ];
-}
-
-// ── Haftalık Ortalamalar & Oranlar ────────────────────────────────────
-$divisorDays      = max(1, $daysWithFood);
-$avgCalConsumed   = round($totalCalConsumed / $divisorDays);
-$avgProtein       = round($totalProtein / $divisorDays, 1);
-$avgCarbs         = round($totalCarbs / $divisorDays, 1);
-$avgFat           = round($totalFat / $divisorDays, 1);
-$avgCalTarget     = round($totalCalTarget / 7);
-
-$netCalDifference = round($totalCalConsumed - $totalCalTarget);
-
-// Makro kalori dağılımı (%)
-$protKcal = $avgProtein * 4;
-$carbKcal = $avgCarbs * 4;
-$fatKcal  = $avgFat * 9;
-$totalMacroKcal = $protKcal + $carbKcal + $fatKcal;
-
-$pctProt = $totalMacroKcal > 0 ? round(($protKcal / $totalMacroKcal) * 100) : 0;
-$pctCarb = $totalMacroKcal > 0 ? round(($carbKcal / $totalMacroKcal) * 100) : 0;
-$pctFat  = $totalMacroKcal > 0 ? round(($fatKcal  / $totalMacroKcal) * 100) : 0;
-
-// Spor başarı oranı
-$workoutRate = $plannedWorkouts > 0 ? round(($completedWorkouts / $plannedWorkouts) * 100) : ($completedWorkouts > 0 ? 100 : 0);
-
-// İlaç/takviye başarı oranı
-$suppRate = $totalSuppPlanned > 0 ? round(($totalSuppTaken / $totalSuppPlanned) * 100) : 100;
-
-// Kilo değişimi
-$weightChange = null;
-if (count($weightsRecorded) >= 2) {
-    $firstW = reset($weightsRecorded);
-    $lastW  = end($weightsRecorded);
-    $weightChange = round($lastW - $firstW, 2);
-}
-
-// Chart.js verilerini JSON olarak hazırla
-$chartLabels = array_column($days, 'day_name');
-$chartDates  = array_column($days, 'short_date');
-$chartLabelsFull = array_map(fn($d) => $d['day_name'] . ' (' . $d['short_date'] . ')', $days);
-
-$chartConsumedCal = array_map(fn($d) => $d['consumed']['calories'], $days);
-$chartTargetCal   = array_map(fn($d) => $d['target']['calories'], $days);
-$chartProtein     = array_map(fn($d) => $d['consumed']['protein_g'], $days);
-$chartCarbs       = array_map(fn($d) => $d['consumed']['carbs_g'], $days);
-$chartFat         = array_map(fn($d) => $d['consumed']['fat_g'], $days);
+$mealLabels = ['breakfast' => 'Kahvaltı', 'lunch' => 'Öğle', 'dinner' => 'Akşam', 'snack' => 'Ara', 'pre_workout' => 'Ant. öncesi', 'post_workout' => 'Ant. sonrası'];
+$v = '20260929';
 ?>
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OptiLifeSync - Haftalık Rapor</title>
+    <title>Raporlar · OptiLifeSync</title>
     <?php require_once __DIR__ . '/includes/pwa-meta.php'; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-    <link rel="stylesheet" href="assets/css/sidebar.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-
+    <link rel="stylesheet" href="assets/css/sidebar.css?v=<?= $v ?>">
     <style>
-        /* Renk token'ları artık merkezi assets/css/theme.css içinde (sidebar.css @import eder) */
-
-        .report-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 1.25rem;
-            position: relative;
-            overflow: hidden;
-            transition: transform .2s ease, border-color .2s ease;
-        }
-        .report-card:hover {
-            border-color: rgba(2, 132, 199, 0.3);
-        }
-
-        .kpi-title {
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            color: var(--muted);
-            margin-bottom: .4rem;
-        }
-
-        .kpi-big {
-            font-size: 28px;
-            font-weight: 800;
-            line-height: 1.1;
-            margin-bottom: .25rem;
-        }
-
-        .kpi-subtext {
-            font-size: 12px;
-            color: var(--muted);
-        }
-
-        .chart-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 1.25rem;
-            height: 100%;
-        }
-
-        /* Hafta Seçici Bar */
-        .week-bar {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: .75rem 1.25rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: .75rem;
-        }
-
-        /* AI Analiz Kutusu */
-        .ai-banner {
-            background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(56, 189, 248, 0.08));
-            border: 1px solid rgba(99, 102, 241, 0.35);
-            border-radius: 16px;
-            padding: 1.5rem;
-            position: relative;
-        }
-
-        .badge-diff-plus {
-            background: rgba(248, 113, 113, 0.2);
-            color: #f87171;
-            border: 1px solid rgba(248, 113, 113, 0.3);
-        }
-        .badge-diff-minus {
-            background: rgba(56, 189, 248, 0.2);
-            color: #38bdf8;
-            border: 1px solid rgba(56, 189, 248, 0.3);
-        }
-        .badge-diff-ok {
-            background: rgba(34, 197, 94, 0.2);
-            color: #4ade80;
-            border: 1px solid rgba(34, 197, 94, 0.3);
-        }
-
-        .day-row:hover {
-            background: rgba(255, 255, 255, 0.02);
-        }
-
-        @media print {
-            .sidebar, .topbar, .week-bar button, .week-bar a, .btn-no-print, .mobile-bottom-nav {
-                display: none !important;
-            }
-            body, .main, .content {
-                background: #fff !important;
-                color: #000 !important;
-                padding: 0 !important;
-                margin: 0 !important;
-            }
-            .report-card, .chart-card, .ai-banner, .week-bar {
-                background: #fff !important;
-                color: #000 !important;
-                border: 1px solid #ccc !important;
-                box-shadow: none !important;
-            }
-            .text-light { color: #000 !important; }
-            .text-secondary, .text-muted { color: #555 !important; }
-        }
+        .card-pad { padding: 20px; }
+        @media (max-width: 576px) { .card-pad { padding: 16px; } }
+        .week-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .week-head h1 { font-size: 24px; margin: 0; letter-spacing: -.03em; }
+        .week-head .sub { color: var(--muted); font-size: 13px; }
+        .kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
+        @media (max-width: 1200px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (max-width: 576px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+        .kpi { padding: 16px; }
+        .kpi .l { font-size: 12px; color: var(--muted); font-weight: 650; display: flex; align-items: center; gap: 6px; }
+        .kpi .v { font-size: 24px; font-weight: 800; letter-spacing: -.03em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+        .kpi .v small { font-size: 12px; color: var(--muted); font-weight: 500; }
+        .kpi .d { font-size: 12px; color: var(--muted); margin-top: 2px; }
+        @media (max-width: 576px) { .kpi { padding: 12px; } .kpi .v { font-size: 19px; } }
+        .rp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+        @media (max-width: 1000px) { .rp-grid { grid-template-columns: minmax(0, 1fr); } }
+        .chart-box { position: relative; height: 240px; }
+        .day-row { display: grid; grid-template-columns: 92px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .day-row:last-child { border-bottom: 0; }
+        .day-row.today { background: var(--accent-dim); margin: 0 -12px; padding: 12px; border-radius: 12px; border-bottom: 0; }
+        .day-row .dn { font-weight: 700; }
+        .day-row .dd { font-size: 12px; color: var(--muted); }
+        .day-row .bars { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+        .day-row .bars .bar { height: 6px; }
+        .day-row .meta { font-size: 12px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+        .day-row .meta b { color: var(--text); font-variant-numeric: tabular-nums; }
+        .meal-chip { display: inline-flex; gap: 6px; align-items: center; padding: 6px 10px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); font-size: 12.5px; margin: 4px 4px 0 0; }
+        .ai-box { line-height: 1.7; color: var(--text-2); }
+        .ai-box h3, .ai-box h4 { font-size: 15px; margin: 16px 0 6px; color: var(--text); }
+        .ai-box ul { padding-left: 20px; margin: 0 0 8px; }
+        @media (max-width: 576px) { .day-row { grid-template-columns: 70px 1fr; } .day-row > :last-child { grid-column: 1 / -1; } }
     </style>
 </head>
 <body>
 <?php $activePage = 'reports'; require_once __DIR__ . '/includes/sidebar.php'; ?>
 
 <div class="main">
-    <!-- Topbar -->
     <header class="topbar">
         <div class="topbar-left">
             <div>
-                <div class="topbar-title">Haftalık Sağlık & Performans Raporu</div>
-                <div class="topbar-sub"><?= date('d M', strtotime($weekStart)) ?> – <?= date('d M Y', strtotime($weekEnd)) ?> · <?= $weekNumber ?>. Hafta</div>
+                <div class="topbar-title">Raporlar</div>
+                <div class="topbar-sub">Haftalık özet ve gelişim</div>
             </div>
         </div>
         <div class="topbar-right">
-            <button class="btn-topbar btn-ghost btn-no-print" onclick="window.print()" title="Yazdır veya PDF Kaydet">
-                <i class="bi bi-printer"></i>
-                <span class="d-none d-sm-inline">Yazdır / PDF</span>
-            </button>
-            <a href="dashboard.php" class="btn-topbar btn-accent"><i class="bi bi-grid-1x2-fill"></i> <span class="d-none d-sm-inline">Dashboard</span></a>
+            <button class="btn-topbar btn-accent" id="aiBtn"><i class="bi bi-stars"></i><span>Koç değerlendirmesi</span></button>
         </div>
     </header>
 
-    <!-- CONTENT -->
     <div class="content">
+        <div class="week-head">
+            <div>
+                <h1><?= $isCurrent ? 'Bu hafta' : $fmtD($weekStart) . ' haftası' ?></h1>
+                <div class="sub"><?= $fmtD($weekStart) ?> – <?= $fmtD($weekEnd) ?> <?= date('Y', strtotime($weekEnd)) ?> · <?= $nLogged ?>/7 gün kayıt</div>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                <a class="icon-btn" href="reports.php?date=<?= $prevWeek ?>" aria-label="Önceki hafta"><i class="bi bi-chevron-left"></i></a>
+                <?php if (!$isCurrent): ?><a class="btn btn-light btn-sm" href="reports.php">Bu hafta</a><?php endif; ?>
+                <a class="icon-btn <?= $isCurrent ? 'disabled' : '' ?>" style="<?= $isCurrent ? 'opacity:.35;pointer-events:none' : '' ?>" href="reports.php?date=<?= $nextWeek ?>" aria-label="Sonraki hafta"><i class="bi bi-chevron-right"></i></a>
+            </div>
+        </div>
 
-        <!-- ── Hafta Seçici Bar ──────────────────────────────────────── -->
-        <div class="week-bar mb-4">
-            <div class="d-flex align-items-center gap-2">
-                <a href="reports.php?date=<?= $prevWeekDate ?>" class="btn btn-sm btn-outline-secondary px-3 py-1">
-                    <i class="bi bi-chevron-left me-1"></i> Önceki Hafta
-                </a>
-                <?php if (!$isCurrentWeek): ?>
-                    <a href="reports.php?date=<?= $currentWeekDate ?>" class="btn btn-sm btn-outline-info px-3 py-1">
-                        Bu Hafta
-                    </a>
+        <!-- KPI -->
+        <div class="kpis">
+            <div class="card kpi">
+                <div class="l"><i class="bi bi-fire" style="color:var(--c-kcal)"></i>Ort. kalori</div>
+                <div class="v"><?= $fmt($avgCal) ?> <small>kcal</small></div>
+                <div class="d">Hedef <?= $fmt($target['calories']) ?> · <?= $onTarget ?> gün ±%10</div>
+            </div>
+            <div class="card kpi">
+                <div class="l"><i class="bi bi-egg" style="color:var(--c-protein)"></i>Ort. protein</div>
+                <div class="v"><?= $fmt($avgProt) ?> <small>g</small></div>
+                <div class="d">Hedef <?= $fmt($target['protein_g']) ?> g</div>
+            </div>
+            <div class="card kpi">
+                <div class="l"><i class="bi bi-lightning-charge" style="color:var(--purple)"></i>Antrenman</div>
+                <div class="v"><?= $workoutsDone ?><small> / <?= max($workoutsPlanned, $workoutsDone) ?></small></div>
+                <div class="d"><?= $vol && $vol['volume'] ? $fmt($vol['volume']) . ' kg hacim' : 'Tamamlanan gün' ?></div>
+            </div>
+            <div class="card kpi">
+                <div class="l"><i class="bi bi-capsule" style="color:var(--accent)"></i>İlaç uyumu</div>
+                <div class="v"><?= ($adh['pct'] ?? null) === null ? '—' : '%' . $adh['pct'] ?></div>
+                <div class="d"><?= (int)($adh['taken'] ?? 0) ?>/<?= (int)($adh['planned'] ?? 0) ?> doz</div>
+            </div>
+            <div class="card kpi">
+                <div class="l"><i class="bi bi-droplet" style="color:var(--c-water)"></i>Ort. su</div>
+                <div class="v"><?= $avgWater ? number_format($avgWater / 1000, 1, ',', '') : '—' ?> <small>L</small></div>
+                <div class="d">Haftalık denge <?= $weekBalance > 0 ? '+' : '' ?><?= $fmt($weekBalance) ?> kcal</div>
+            </div>
+        </div>
+
+        <!-- AI -->
+        <section class="card card-pad mb-4" id="aiCard" hidden>
+            <div class="card-head"><h2 class="card-title-sm"><i class="bi bi-stars"></i>Koç değerlendirmesi</h2><span class="small" style="color:var(--muted)" id="aiTime"></span></div>
+            <div class="ai-box" id="aiBox"></div>
+        </section>
+
+        <div class="rp-grid">
+            <section class="card card-pad">
+                <div class="card-head"><h2 class="card-title-sm"><i class="bi bi-fire" style="color:var(--c-kcal)"></i>Kalori</h2></div>
+                <div class="chart-box"><canvas id="calChart"></canvas></div>
+            </section>
+            <section class="card card-pad">
+                <div class="card-head"><h2 class="card-title-sm"><i class="bi bi-egg" style="color:var(--c-protein)"></i>Protein</h2></div>
+                <div class="chart-box"><canvas id="protChart"></canvas></div>
+            </section>
+            <section class="card card-pad">
+                <div class="card-head"><h2 class="card-title-sm"><i class="bi bi-capsule"></i>İlaç & takviye uyumu</h2><span class="chip">Son 7 gün</span></div>
+                <div class="chart-box"><canvas id="adhChart"></canvas></div>
+                <?php if (!empty($adh['by_supplement'])): ?>
+                    <div class="mt-3">
+                        <?php foreach ($adh['by_supplement'] as $s): if ($s['pct'] === null) continue; ?>
+                            <div class="d-flex justify-content-between small mb-1"><span class="text-truncate me-2"><?= htmlspecialchars($s['name']) ?></span><b>%<?= $s['pct'] ?></b></div>
+                            <div class="bar mb-2" style="height:6px"><span style="width:<?= $s['pct'] ?>%"></span></div>
+                        <?php endforeach; ?>
+                    </div>
                 <?php endif; ?>
-                <a href="reports.php?date=<?= $nextWeekDate ?>" class="btn btn-sm btn-outline-secondary px-3 py-1">
-                    Sonraki Hafta <i class="bi bi-chevron-right ms-1"></i>
-                </a>
-            </div>
-
-            <div class="d-flex align-items-center gap-3">
-                <span class="text-secondary small d-none d-md-inline">
-                    <i class="bi bi-calendar3 me-1 text-info"></i>
-                    <strong><?= date('d.m.Y', strtotime($weekStart)) ?></strong> – <strong><?= date('d.m.Y', strtotime($weekEnd)) ?></strong>
-                </span>
-                <form method="GET" action="reports.php" class="d-flex align-items-center gap-1">
-                    <input type="date" name="date" class="form-control form-control-sm" value="<?= htmlspecialchars($refDateStr) ?>" onchange="this.form.submit()" style="max-width:145px; background:var(--bg); border-color:var(--border); color:#f8fafc;">
-                </form>
-            </div>
+            </section>
+            <section class="card card-pad">
+                <div class="card-head"><h2 class="card-title-sm"><i class="bi bi-speedometer2"></i>Kilo</h2><span class="chip">Son 90 gün</span></div>
+                <?php if (count($weights) >= 2): ?>
+                    <div class="chart-box"><canvas id="weightChart"></canvas></div>
+                <?php else: ?>
+                    <div class="empty-state"><i class="bi bi-graph-up"></i>Kilo trendi için en az iki gün kilonuzu kaydedin.<br><a href="dashboard.php" class="small fw-semibold" style="color:var(--accent)">Özet sayfasından kaydet →</a></div>
+                <?php endif; ?>
+            </section>
+            <section class="card card-pad">
+                <div class="card-head"><h2 class="card-title-sm"><i class="bi bi-droplet" style="color:var(--c-water)"></i>Su</h2></div>
+                <div class="chart-box"><canvas id="waterChart"></canvas></div>
+            </section>
+            <section class="card card-pad">
+                <div class="card-head"><h2 class="card-title-sm"><i class="bi bi-pie-chart"></i>Ortalama makro dağılımı</h2></div>
+                <?php $kp = $avgProt * 4; $kc = $avgCarb * 4; $kf = $avgFat * 9; $ks = max(1, $kp + $kc + $kf); ?>
+                <div class="chart-box" style="height:200px"><canvas id="macroChart"></canvas></div>
+                <div class="d-flex justify-content-around mt-3 small">
+                    <div class="text-center"><div style="color:var(--muted)">Protein</div><b><?= $fmt($avgProt) ?> g · %<?= round($kp / $ks * 100) ?></b></div>
+                    <div class="text-center"><div style="color:var(--muted)">Karb</div><b><?= $fmt($avgCarb) ?> g · %<?= round($kc / $ks * 100) ?></b></div>
+                    <div class="text-center"><div style="color:var(--muted)">Yağ</div><b><?= $fmt($avgFat) ?> g · %<?= round($kf / $ks * 100) ?></b></div>
+                </div>
+            </section>
         </div>
 
-        <!-- ── 5'Lİ HAFTALIK KPI GRID ─────────────────────────────────── -->
-        <div class="row g-3 mb-4">
-            <!-- 1. Kalori Dengesi -->
-            <div class="col-sm-6 col-xl">
-                <div class="report-card h-100">
-                    <div class="kpi-title"><i class="bi bi-fire me-1 text-danger"></i> Haftalık Kalori</div>
-                    <div class="kpi-big text-danger"><?= number_format($totalCalConsumed, 0, ',', '.') ?> <span class="fs-6 text-muted fw-normal">kcal</span></div>
-                    <div class="kpi-subtext">
-                        Günlük Ort: <strong><?= number_format($avgCalConsumed, 0, ',', '.') ?></strong> / <?= number_format($avgCalTarget, 0, ',', '.') ?> kcal
+        <!-- Gün gün -->
+        <section class="card card-pad mt-4">
+            <div class="card-head"><h2 class="card-title-sm"><i class="bi bi-list-ul"></i>Gün gün</h2></div>
+            <?php foreach ($days as $i => $d):
+                $c = (float)$d['consumed']['calories']; $t = (float)$d['target']['calories'];
+                $pc = $t > 0 ? min(100, $c / $t * 100) : 0;
+                $pp = $d['target']['protein_g'] > 0 ? min(100, $d['consumed']['protein_g'] / $d['target']['protein_g'] * 100) : 0;
+                $diff = $c - $t;
+            ?>
+                <div class="day-row <?= $d['is_today'] ? 'today' : '' ?>">
+                    <div><div class="dn"><?= $d['day_name'] ?></div><div class="dd"><?= $fmtD($d['date']) ?></div></div>
+                    <div class="bars">
+                        <div class="bar"><span style="width:<?= $pc ?>%;background:<?= $c > $t * 1.1 ? 'var(--red)' : 'var(--c-kcal)' ?>"></span></div>
+                        <div class="bar"><span style="width:<?= $pp ?>%;background:var(--c-protein)"></span></div>
+                        <div class="meta">
+                            <span><b><?= $fmt($c) ?></b> / <?= $fmt($t) ?> kcal</span>
+                            <span>P <b><?= $fmt($d['consumed']['protein_g']) ?></b> g</span>
+                            <?php if (!empty($waterByDate[$d['date']])): ?><span>💧 <b><?= number_format($waterByDate[$d['date']] / 1000, 1, ',', '') ?></b> L</span><?php endif; ?>
+                            <?php if ($d['workout_done']): ?><span style="color:var(--purple)"><i class="bi bi-lightning-charge-fill"></i> <?= htmlspecialchars($d['workout']['antrenman_tipi'] ?? 'Antrenman') ?></span><?php endif; ?>
+                        </div>
                     </div>
-                    <div class="mt-2">
-                        <?php if ($netCalDifference > 0): ?>
-                            <span class="badge badge-diff-plus small">+<?= number_format($netCalDifference, 0, ',', '.') ?> kcal fazla</span>
-                        <?php elseif ($netCalDifference < 0): ?>
-                            <span class="badge badge-diff-minus small"><?= number_format($netCalDifference, 0, ',', '.') ?> kcal açık</span>
+                    <div class="text-end">
+                        <?php if ($c <= 0): ?>
+                            <span class="small" style="color:var(--muted-2)">Kayıt yok</span>
                         <?php else: ?>
-                            <span class="badge badge-diff-ok small">Hedefte</span>
+                            <span class="chip <?= abs($diff) <= $t * 0.1 ? 'accent' : ($diff > 0 ? 'yellow' : 'blue') ?>"><?= $diff > 0 ? '+' : '' ?><?= $fmt($diff) ?></span>
+                            <?php if (!empty($d['food_logs'])): ?>
+                                <button class="btn btn-link btn-sm p-0 ms-2" data-bs-toggle="collapse" data-bs-target="#meals-<?= $i ?>"><?= count($d['food_logs']) ?> öğün <i class="bi bi-chevron-down"></i></button>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>
-            </div>
-
-            <!-- 2. Protein Alımı -->
-            <div class="col-sm-6 col-xl">
-                <div class="report-card h-100">
-                    <div class="kpi-title"><i class="bi bi-egg-fried me-1 text-primary"></i> Günlük Protein</div>
-                    <div class="kpi-big text-primary"><?= $avgProtein ?> <span class="fs-6 text-muted fw-normal">g / gün</span></div>
-                    <div class="kpi-subtext">
-                        Toplam: <strong><?= number_format($totalProtein, 1, ',', '.') ?> g</strong>
-                    </div>
-                    <div class="mt-2">
-                        <span class="badge bg-primary-subtle text-primary border border-primary small">
-                            Hedef: <?= $restMacros['protein_g'] ?>g (Dinlenme) / <?= $trainingMacros['protein_g'] ?>g (Spor)
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 3. Makro Dağılımı -->
-            <div class="col-sm-6 col-xl">
-                <div class="report-card h-100">
-                    <div class="kpi-title"><i class="bi bi-pie-chart me-1 text-warning"></i> Makro Dağılımı</div>
-                    <div class="kpi-big text-warning"><?= $pctProt ?>% <span class="fs-6 text-muted fw-normal">Prot</span></div>
-                    <div class="kpi-subtext">
-                        Karb: <strong><?= $pctCarb ?>%</strong> · Yağ: <strong><?= $pctFat ?>%</strong>
-                    </div>
-                    <div class="progress mt-2" style="height: 6px; background: rgba(255,255,255,0.06);">
-                        <div class="progress-bar bg-primary" style="width: <?= $pctProt ?>%" title="Protein"></div>
-                        <div class="progress-bar bg-warning" style="width: <?= $pctCarb ?>%" title="Karbonhidrat"></div>
-                        <div class="progress-bar" style="background:#c084fc; width: <?= $pctFat ?>%" title="Yağ"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 4. Antrenman Karnesi -->
-            <div class="col-sm-6 col-xl">
-                <div class="report-card h-100">
-                    <div class="kpi-title"><i class="bi bi-activity me-1 text-success"></i> Spor Karnesi</div>
-                    <div class="kpi-big text-success"><?= $completedWorkouts ?> <span class="fs-6 text-muted fw-normal">/ <?= max($plannedWorkouts, $completedWorkouts) ?> antrenman</span></div>
-                    <div class="kpi-subtext">
-                        Başarı Oranı: <strong>%<?= $workoutRate ?></strong>
-                    </div>
-                    <div class="mt-2">
-                        <?php if ($workoutRate >= 80): ?>
-                            <span class="badge bg-success-subtle text-success border border-success small">Harika Uyum 🔥</span>
-                        <?php elseif ($workoutRate >= 50): ?>
-                            <span class="badge bg-warning-subtle text-warning border border-warning small">Orta Düzey</span>
-                        <?php else: ?>
-                            <span class="badge bg-secondary-subtle text-muted border border-secondary small">Geliştirilebilir</span>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 5. Kilo & İlaç Uyum -->
-            <div class="col-sm-6 col-xl">
-                <div class="report-card h-100">
-                    <div class="kpi-title"><i class="bi bi-speedometer2 me-1 text-info"></i> Kilo & İlaç</div>
-                    <div class="kpi-big text-info">
-                        <?php if ($weightChange !== null): ?>
-                            <?= ($weightChange > 0 ? "+$weightChange" : $weightChange) ?> <span class="fs-6 text-muted fw-normal">kg</span>
-                        <?php else: ?>
-                            <?= (float)$userProfile['weight_kg'] ?> <span class="fs-6 text-muted fw-normal">kg</span>
-                        <?php endif; ?>
-                    </div>
-                    <div class="kpi-subtext">
-                        İlaç / Takviye: <strong>%<?= $suppRate ?></strong> uyum
-                    </div>
-                    <div class="mt-2">
-                        <span class="badge bg-info-subtle text-info border border-info small">
-                            <?= ucfirst($userProfile['goal']) === 'Gain' ? 'Kilo Alma' : (ucfirst($userProfile['goal']) === 'Lose' ? 'Kilo Verme' : 'Kilo Koruma') ?> Hedefi
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── GRAFİKLER BÖLÜMÜ ──────────────────────────────────────── -->
-        <div class="row g-4 mb-4">
-            <!-- Grafik 1: Günlük Kalori Alımı vs Dinamik Hedef -->
-            <div class="col-lg-8">
-                <div class="chart-card">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                            <h6 class="mb-0 text-light fw-bold"><i class="bi bi-bar-chart-fill me-2 text-info"></i>Günlük Kalori Tüketimi & Hedef</h6>
-                            <span class="text-secondary small">Alınan kalori sütunları ve antrenman bonuslu dinamik hedef çizgisi</span>
-                        </div>
-                        <span class="badge bg-dark border border-secondary text-secondary small">Haftalık 7 Gün</span>
-                    </div>
-                    <div style="height: 320px; position: relative;">
-                        <canvas id="calorieChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Grafik 2: Makro Dağılımı ve Trendi -->
-            <div class="col-lg-4">
-                <div class="chart-card d-flex flex-column">
-                    <div class="mb-3">
-                        <h6 class="mb-0 text-light fw-bold"><i class="bi bi-pie-chart-fill me-2 text-warning"></i>Makro Enerji Payı</h6>
-                        <span class="text-secondary small">Günlük ortalama kalori kaynakları</span>
-                    </div>
-                    <div class="flex-grow-1 d-flex align-items-center justify-content-center" style="min-height: 220px; position: relative;">
-                        <canvas id="macroDoughnutChart"></canvas>
-                    </div>
-                    <div class="row g-2 text-center pt-3 border-top border-secondary border-opacity-25 mt-2">
-                        <div class="col-4">
-                            <div class="small text-muted">Protein</div>
-                            <div class="fw-bold text-primary"><?= $avgProtein ?>g</div>
-                        </div>
-                        <div class="col-4">
-                            <div class="small text-muted">Karb</div>
-                            <div class="fw-bold text-warning"><?= $avgCarbs ?>g</div>
-                        </div>
-                        <div class="col-4">
-                            <div class="small text-muted">Yağ</div>
-                            <div class="fw-bold" style="color:#c084fc"><?= $avgFat ?>g</div>
+                <?php if (!empty($d['food_logs'])): ?>
+                    <div class="collapse" id="meals-<?= $i ?>">
+                        <div class="pb-3">
+                            <?php foreach ($d['food_logs'] as $f): ?>
+                                <span class="meal-chip"><b><?= $mealLabels[$f['meal_type']] ?? '' ?></b> <?= htmlspecialchars($f['food_label']) ?> · <?= $fmt($f['calories']) ?> kcal</span>
+                            <?php endforeach; ?>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-
-    </div><!-- /content -->
-</div><!-- /main -->
+                <?php endif; ?>
+            <?php endforeach; ?>
+        </section>
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
-// ─── 1. KALORİ GRAFİĞİ (Bar + Line Combo) ────────────────────────────
-const ctxCal = document.getElementById('calorieChart').getContext('2d');
-new Chart(ctxCal, {
-    type: 'bar',
-    data: {
-        labels: <?= json_encode($chartLabelsFull) ?>,
-        datasets: [
-            {
-                label: 'Alınan Kalori (kcal)',
-                data: <?= json_encode($chartConsumedCal) ?>,
-                backgroundColor: 'rgba(248, 113, 113, 0.75)',
-                borderColor: '#f87171',
-                borderWidth: 1,
-                borderRadius: 6,
-                order: 2
-            },
-            {
-                label: 'Hedef Kalori (kcal)',
-                data: <?= json_encode($chartTargetCal) ?>,
-                type: 'line',
-                borderColor: '#38bdf8',
-                backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                borderWidth: 2,
-                borderDash: [5, 5],
-                pointBackgroundColor: '#38bdf8',
-                pointRadius: 4,
-                fill: false,
-                tension: 0.2,
-                order: 1
-            }
-        ]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                labels: { color: '#64748b', font: { size: 12 } }
-            },
-            tooltip: {
-                backgroundColor: '#ffffff',
-                titleColor: '#0f172a',
-                bodyColor: '#334155',
-                borderColor: '#e2ddd3',
-                borderWidth: 1,
-                callbacks: {
-                    afterBody: function(items) {
-                        const idx = items[0].dataIndex;
-                        const diff = <?= json_encode(array_column($days, 'diff_calories')) ?>[idx];
-                        if (diff > 0) return `Fark: +${diff} kcal fazla`;
-                        if (diff < 0) return `Fark: ${diff} kcal açık`;
-                        return 'Fark: Tam hedefte';
-                    }
-                }
-            }
-        },
-        scales: {
-            x: {
-                ticks: { color: '#64748b' },
-                grid: { color: 'rgba(0, 0, 0, 0.06)' }
-            },
-            y: {
-                ticks: { color: '#64748b' },
-                grid: { color: 'rgba(0, 0, 0, 0.06)' },
-                suggestedMin: 1500
-            }
-        }
-    }
-});
+const D = <?= json_encode($chart, JSON_UNESCAPED_UNICODE) ?>;
+const MACRO = <?= json_encode([round($kp), round($kc), round($kf)]) ?>;
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const n0 = v => Math.round(v || 0).toLocaleString('tr-TR');
+let charts = [];
 
-// ─── 2. MAKRO DAĞILIMI (Doughnut Chart) ──────────────────────────────
-const ctxMacro = document.getElementById('macroDoughnutChart').getContext('2d');
-new Chart(ctxMacro, {
-    type: 'doughnut',
-    data: {
-        labels: ['Protein (%<?= $pctProt ?>)', 'Karbonhidrat (%<?= $pctCarb ?>)', 'Yağ (%<?= $pctFat ?>)'],
-        datasets: [{
-            data: [<?= $pctProt ?: 30 ?>, <?= $pctCarb ?: 45 ?>, <?= $pctFat ?: 25 ?>],
-            backgroundColor: ['#2563eb', '#d97706', '#9333ea'],
-            borderColor: '#ffffff',
-            borderWidth: 3,
-            hoverOffset: 6
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'bottom',
-                labels: { color: '#64748b', font: { size: 11 }, padding: 14 }
-            }
-        },
-        cutout: '70%'
+function axis(t, extra = {}) {
+    return { x: { grid: { display: false }, ticks: { color: t.muted }, border: { display: false } },
+             y: Object.assign({ beginAtZero: true, grid: { color: t.grid }, ticks: { color: t.muted, maxTicksLimit: 5 }, border: { display: false } }, extra) };
+}
+function drawAll() {
+    if (typeof Chart === 'undefined') return;
+    charts.forEach(c => c.destroy()); charts = [];
+    const t = { grid: cssVar('--border'), muted: cssVar('--muted'), kcal: cssVar('--c-kcal'), prot: cssVar('--c-protein'), carb: cssVar('--c-carb'), fat: cssVar('--c-fat'), water: cssVar('--c-water'), accent: cssVar('--accent-bright'), red: cssVar('--red') };
+    const legend = { labels: { color: t.muted, usePointStyle: true, boxWidth: 8 } };
+    const mk = (id, cfg) => { const el = document.getElementById(id); if (el) charts.push(new Chart(el, cfg)); };
+    const target = (data, label) => ({ type: 'line', label, data, borderColor: t.muted, borderDash: [5, 4], pointRadius: 0, borderWidth: 1.5 });
+
+    mk('calChart', { type: 'bar', data: { labels: D.labels, datasets: [
+        { label: 'Alınan', data: D.cal, backgroundColor: D.cal.map((v, i) => v > D.target[i] * 1.1 ? t.red : t.kcal), borderRadius: 8, maxBarThickness: 30 },
+        target(D.target, 'Hedef') ] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend }, scales: axis(t) } });
+
+    mk('protChart', { type: 'bar', data: { labels: D.labels, datasets: [
+        { label: 'Protein (g)', data: D.prot, backgroundColor: t.prot, borderRadius: 8, maxBarThickness: 30 },
+        target(D.protT, 'Hedef') ] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend }, scales: axis(t) } });
+
+    mk('adhChart', { type: 'bar', data: { labels: D.adhLbl, datasets: [
+        { label: 'Uyum %', data: D.adh.map(v => v ?? 0), backgroundColor: D.adh.map(v => v === null ? t.grid : (v >= 80 ? t.accent : (v >= 50 ? t.carb : t.red))), borderRadius: 8, maxBarThickness: 30 } ] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => D.adh[c.dataIndex] === null ? 'Planlı doz yok' : `%${c.raw}` } } }, scales: axis(t, { max: 100 }) } });
+
+    mk('weightChart', { type: 'line', data: { labels: D.wLbl, datasets: [
+        { label: 'Kilo (kg)', data: D.w, borderColor: t.accent, backgroundColor: t.accent + '22', fill: true, tension: .3, pointRadius: 2 } ] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: axis(t, { beginAtZero: false }) } });
+
+    mk('waterChart', { type: 'bar', data: { labels: D.labels, datasets: [
+        { label: 'Su (ml)', data: D.water, backgroundColor: t.water, borderRadius: 8, maxBarThickness: 30 } ] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: axis(t) } });
+
+    mk('macroChart', { type: 'doughnut', data: { labels: ['Protein', 'Karbonhidrat', 'Yağ'], datasets: [
+        { data: MACRO, backgroundColor: [t.prot, t.carb, t.fat], borderWidth: 0 } ] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'right', labels: { color: t.muted, usePointStyle: true } }, tooltip: { callbacks: { label: c => `${c.label}: ${n0(c.raw)} kcal` } } } } });
+}
+drawAll();
+document.addEventListener('opti:theme', drawAll);
+
+/* ── Basit ve güvenli Markdown → HTML ── */
+function md(src) {
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\*(.+?)\*/g, '<i>$1</i>');
+    let html = '', inList = false;
+    for (const raw of String(src).split('\n')) {
+        const line = raw.trim();
+        const li = line.match(/^([-*•]|\d+\.)\s+(.*)$/);
+        if (li) { if (!inList) { html += '<ul>'; inList = true; } html += `<li>${inline(li[2])}</li>`; continue; }
+        if (inList) { html += '</ul>'; inList = false; }
+        const h = line.match(/^#{1,4}\s+(.*)$/);
+        if (h) html += `<h4>${inline(h[1])}</h4>`;
+        else if (line) html += `<p class="mb-2">${inline(line)}</p>`;
+    }
+    return html + (inList ? '</ul>' : '');
+}
+
+document.getElementById('aiBtn').addEventListener('click', async () => {
+    const card = document.getElementById('aiCard'), box = document.getElementById('aiBox');
+    card.hidden = false;
+    box.innerHTML = '<div class="d-flex align-items-center gap-2" style="color:var(--muted)"><span class="spinner-border spinner-border-sm"></span>Haftanız değerlendiriliyor…</div>';
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    try {
+        const fd = new FormData();
+        fd.append('action', 'ai_analysis');
+        fd.append('week_start', <?= json_encode($weekStart) ?>);
+        fd.append('week_end', <?= json_encode($weekEnd) ?>);
+        const res = await fetch(`${window.API_BASE}/reports.php`, { method: 'POST', body: fd, credentials: 'include' }).then(r => r.json());
+        if (!res.ok) throw new Error(res.error || 'Değerlendirme alınamadı');
+        box.innerHTML = md(res.advice);
+        document.getElementById('aiTime').textContent = res.generated_at || '';
+    } catch (e) {
+        box.innerHTML = `<div class="alert alert-warning mb-0">${e.message.replace(/</g, '&lt;')}</div>`;
     }
 });
 </script>

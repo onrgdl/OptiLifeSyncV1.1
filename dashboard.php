@@ -17,2181 +17,541 @@ if ($pdo && isset($userId) && $userId > 0) {
         $weeklyBreakdown      = DashboardService::getWeeklyBreakdown($pdo, (int)$userId);
         $currentStreak        = DashboardService::getStreak($pdo, (int)$userId);
     } catch (\Throwable $e) {
-        $initialDashboardData = null;
-        $weeklyBreakdown      = null;
-        $currentStreak        = 0;
+        error_log('Dashboard SSR hatası: ' . $e->getMessage());
     }
 }
+
+$hour = (int) date('H');
+$greeting = $hour < 5 ? 'İyi geceler' : ($hour < 12 ? 'Günaydın' : ($hour < 18 ? 'İyi günler' : 'İyi akşamlar'));
+$firstName = trim(explode(' ', (string)($currentUser['name'] ?? $currentUser['username'] ?? ''))[0] ?? '');
+$defaultMeal = $hour < 11 ? 'breakfast' : ($hour < 16 ? 'lunch' : ($hour < 21 ? 'dinner' : 'snack'));
+$trDays = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+$trMonths = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+$todayLabel = $trDays[(int)date('w')] . ', ' . (int)date('j') . ' ' . $trMonths[(int)date('n')];
+$v = '20260929';
+$shortDay = ['Pazartesi' => 'Pzt', 'Salı' => 'Sal', 'Çarşamba' => 'Çar', 'Perşembe' => 'Per', 'Cuma' => 'Cum', 'Cumartesi' => 'Cmt', 'Pazar' => 'Paz'];
 ?>
 <!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>OptiLifeSync — Dashboard</title>
+<title>Özet · OptiLifeSync</title>
 <?php require_once __DIR__ . '/includes/pwa-meta.php'; ?>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<link rel="stylesheet" href="assets/css/sidebar.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-<script src="assets/js/alarm-engine.js"></script>
-
+<link rel="stylesheet" href="assets/css/sidebar.css?v=<?= $v ?>">
 <style>
-/* ═══════════════════════════════════════════════════════════
-   GLOBAL RESET & TOKENS
-═══════════════════════════════════════════════════════════ */
-/* Renk token'ları artık merkezi assets/css/theme.css içinde (sidebar.css @import eder) */
+    .dash { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 20px; }
+    .span-12 { grid-column: span 12; } .span-8 { grid-column: span 8; } .span-7 { grid-column: span 7; }
+    .span-6 { grid-column: span 6; } .span-5 { grid-column: span 5; } .span-4 { grid-column: span 4; }
+    @media (max-width: 1200px) { .span-8, .span-7, .span-5, .span-4 { grid-column: span 12; } .span-6 { grid-column: span 6; } }
+    @media (max-width: 768px) { .dash { gap: 14px; } .span-6 { grid-column: span 12; } }
+    .card-pad { padding: 20px; }
+    @media (max-width: 576px) { .card-pad { padding: 16px; } }
 
-/* Haftanın Günlük Dökümü - Bugün Satırı & Açılan Öğün Detayları */
-.table-row-today,
-.table-row-today > td,
-.table-row-today > th {
-    background-color: #e6f4fe !important;
-    --bs-table-bg: #e6f4fe !important;
-    --bs-table-accent-bg: #e6f4fe !important;
-    color: #0f172a !important;
-}
-.table-row-today:hover > td,
-.table-row-today:hover > th {
-    background-color: #dbeafe !important;
-    --bs-table-bg: #dbeafe !important;
-}
-.table-row-meals-detail,
-.table-row-meals-detail > td {
-    background-color: #f6f3eb !important;
-    --bs-table-bg: #f6f3eb !important;
-    --bs-table-accent-bg: #f6f3eb !important;
-    --bs-table-hover-bg: #f6f3eb !important;
-    color: #000000 !important;
-}
-body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    font-size: 14px;
-    max-width: 100vw;
-    overflow-x: hidden;
-}
-a { text-decoration: none; color: inherit; }
-button { cursor: pointer; border: none; background: none; }
+    /* Karşılama */
+    .hello { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+    .hello h1 { font-size: 28px; margin: 0; letter-spacing: -.03em; }
+    .hello .date { color: var(--muted); font-weight: 500; margin-top: 2px; }
+    .hello-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    @media (max-width: 576px) { .hello h1 { font-size: 23px; } .hello { margin-bottom: 14px; } .mini-stat .v { font-size: 15px; } .mini-stat .l { font-size: 11px; } .big-ring { --size: 176px; } }
+    .daytype { cursor: pointer; user-select: none; }
+    .daytype.training { background: var(--purple-dim); color: var(--purple); border-color: transparent; }
 
-/* TOPBAR */
-.topbar {
-    position: sticky; top: 0; z-index: 50;
-    background: rgba(246, 243, 235, 0.95);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
-    padding: 0 24px;
-    height: 60px;
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 12px;
-}
-.topbar-left { display: flex; align-items: center; gap: 12px; }
-.topbar-title { font-size: 16px; font-weight: 600; color: var(--text); }
-.topbar-sub   { font-size: 12px; color: var(--muted); }
-.topbar-right { display: flex; align-items: center; gap: 8px; }
+    /* Enerji kartı */
+    .energy { display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center; }
+    @media (max-width: 576px) { .energy { grid-template-columns: 1fr; gap: 20px; justify-items: center; } }
+    .big-ring { --size: 196px; --w: 16px; }
+    .big-ring .center { text-align: center; line-height: 1.1; }
+    .big-ring .center .num { font-size: 38px; font-weight: 800; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+    .big-ring .center .lbl { font-size: 12.5px; color: var(--muted); font-weight: 600; margin-top: 4px; }
+    .big-ring.over { --c: var(--red) !important; }
+    .macro-list { display: flex; flex-direction: column; gap: 16px; width: 100%; }
+    .macro .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+    .macro .name { font-weight: 650; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+    .macro .name::before { content: ''; width: 10px; height: 10px; border-radius: 3px; background: var(--mc); }
+    .macro .val { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .macro .val b { color: var(--text); font-size: 15px; }
+    .macro .bar > span { background: var(--mc); }
+    .energy-foot { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 22px; }
+    .mini-stat { background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; }
+    .mini-stat .l { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+    .mini-stat .v { font-size: 17px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 
-.btn-topbar {
-    display: flex; align-items: center; gap: 6px;
-    padding: 7px 14px;
-    border-radius: 10px;
-    font-size: 13px; font-weight: 500;
-    transition: all .15s;
-}
-.btn-accent {
-    background: var(--accent); color: #ffffff;
-}
-.btn-accent:hover { background: #0369a1; color: #ffffff; }
-.btn-ghost  {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    color: var(--text);
-}
-.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+    /* Dozlar */
+    .dose-mini { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .dose-mini:last-child { border-bottom: 0; }
+    .dose-mini .t { font-weight: 800; width: 48px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .dose-mini .n { flex: 1; min-width: 0; }
+    .dose-mini .n div:first-child { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dose-mini .n div:last-child { font-size: 12px; color: var(--muted); }
+    .dose-mini.taken .n div:first-child { text-decoration: line-through; color: var(--muted); }
+    .btn-take { background: var(--brand-grad); color: #fff; border: 0; border-radius: 10px; padding: 6px 12px; font-weight: 700; font-size: 12.5px; white-space: nowrap; }
+    .ok-mark { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--green-dim); color: var(--green); }
 
-/* CONTENT AREA */
-.content { padding: 24px; flex: 1; }
+    /* Su */
+    .water-wrap { display: flex; gap: 18px; align-items: center; }
+    .bottle { width: 64px; height: 118px; border-radius: 18px 18px 22px 22px; border: 3px solid color-mix(in srgb, var(--c-water) 45%, transparent); position: relative; overflow: hidden; flex-shrink: 0; background: var(--surface-2); }
+    .bottle::before { content: ''; position: absolute; top: -9px; left: 50%; transform: translateX(-50%); width: 26px; height: 10px; border-radius: 4px; background: color-mix(in srgb, var(--c-water) 45%, transparent); }
+    .bottle .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(180deg, #67e8f9, var(--c-water)); transition: height .7s cubic-bezier(.2,.8,.2,1); }
+    .bottle .fill::before { content: ''; position: absolute; top: -6px; left: -10%; width: 120%; height: 12px; background: radial-gradient(ellipse at center, rgba(255,255,255,.55), transparent 70%); }
+    .water-num { font-size: 30px; font-weight: 800; letter-spacing: -.03em; color: var(--c-water); font-variant-numeric: tabular-nums; }
+    .water-btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 16px; }
+    .water-btns button { border: 1px solid var(--border); background: var(--surface-2); color: var(--text); border-radius: 12px; padding: 9px 4px; font-weight: 700; font-size: 13px; line-height: 1.15; }
+    .water-btns button small { display: block; font-weight: 500; font-size: 10.5px; color: var(--muted); }
+    .water-btns button:hover { border-color: var(--c-water); }
+    .water-btns button:active { transform: scale(.96); }
 
-/* SECTION HEADER */
-.section-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 16px;
-}
-.section-title {
-    font-size: 15px; font-weight: 600; color: var(--text);
-    display: flex; align-items: center; gap: 8px;
-}
+    /* Kilo */
+    .weight-num { font-size: 30px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+    .spark { width: 100%; height: 46px; display: block; margin-top: 10px; }
 
-/* ═══════════════════════════════════════════════════════════
-   CARDS & TILES
-═══════════════════════════════════════════════════════════ */
-.card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    overflow: hidden;
-}
-.card-body { padding: 20px; }
+    /* Öğünler */
+    .meal-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+    .meal-row:last-child { border-bottom: 0; }
+    .meal-ic { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-size: 17px; flex-shrink: 0; background: var(--surface-2); }
+    .meal-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .meal-meta { font-size: 12px; color: var(--muted); }
+    .meal-kcal { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-/* KPI tiles — üstteki 4 büyük kart */
-.kpi-tile {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 18px 20px;
-    position: relative;
-    overflow: hidden;
-    transition: border-color .2s, transform .15s;
-}
-.kpi-tile:hover { border-color: rgba(2, 132, 199, 0.3); transform: translateY(-1px); }
-.kpi-tile .glow {
-    position: absolute; top: -40px; right: -40px;
-    width: 120px; height: 120px;
-    border-radius: 50%;
-    opacity: .08;
-    filter: blur(30px);
-}
-.kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 6px; }
-.kpi-value { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; color: var(--text); }
-.kpi-sub   { font-size: 12px; color: var(--muted); }
+    /* Hafta şeridi */
+    .week-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+    .wday { text-align: center; padding: 10px 4px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--border); }
+    .wday.today { border-color: var(--accent-bright); background: var(--accent-dim); }
+    .wday .d { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+    .wday .ring { --size: 42px; --w: 5px; margin: 8px auto 6px; }
+    .wday .k { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .wday .wk { font-size: 11px; color: var(--purple); height: 14px; }
+    @media (max-width: 576px) { .week-strip { gap: 4px; } .wday { padding: 8px 2px; border-radius: 12px; } .wday .ring { --size: 34px; --w: 4px; } .wday .k { font-size: 10.5px; } }
+    .chart-box { position: relative; height: 240px; }
 
-/* Progress Bar */
-.gyp-progress {
-    height: 8px; background: rgba(0, 0, 0, 0.06);
-    border-radius: 99px; overflow: hidden; margin: 10px 0 6px;
-}
-.gyp-progress-fill {
-    height: 100%; border-radius: 99px;
-    transition: width .6s cubic-bezier(.34,1.56,.64,1);
-}
-
-/* Donut / Ring */
-.ring-wrap { position: relative; width: 72px; height: 72px; flex-shrink:0; }
-.ring-wrap svg { transform: rotate(-90deg); }
-.ring-center {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 700; line-height: 1.1;
-}
-.ring-center small { font-size: 9px; color: var(--muted); font-weight: 400; }
-
-/* Workout badge */
-.workout-badge {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 14px;
-    border-radius: 99px;
-    font-size: 12px; font-weight: 600;
-    transition: all .2s;
-}
-.workout-badge.on  { background: rgba(22,163,74,.15); border: 1px solid rgba(22,163,74,.35); color: var(--green); }
-.workout-badge.off { background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); }
-
-/* Alarm item */
-.alarm-item {
-    display: flex; align-items: center; gap: 14px;
-    padding: 12px 16px;
-    border-radius: 12px;
-    background: #ffffff;
-    border: 1px solid var(--border);
-    margin-bottom: 8px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-    transition: border-color .15s;
-}
-.alarm-item:hover { border-color: rgba(2, 132, 199, 0.3); }
-.alarm-time {
-    font-size: 14px; font-weight: 700;
-    color: var(--accent); min-width: 40px;
-}
-.alarm-icon {
-    width: 36px; height: 36px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 16px; flex-shrink: 0;
-}
-.alarm-icon.med   { background: rgba(220,38,38,.12); color: var(--red);    }
-.alarm-icon.supp  { background: rgba(22,163,74,.12);   color: var(--green);  }
-.alarm-icon.vit   { background: rgba(217,119,6,.12);  color: var(--yellow); }
-.alarm-label  { font-size: 13px; font-weight: 500; color: var(--text); }
-.alarm-dose   { font-size: 11px; color: var(--muted); }
-.alarm-badge  {
-    margin-left: auto;
-    background: var(--accent-dim);
-    border: 1px solid rgba(2, 132, 199, 0.25);
-    color: var(--accent);
-    border-radius: 99px; padding: 3px 10px;
-    font-size: 11px; font-weight: 600; white-space: nowrap;
-}
-
-/* Meal row */
-.meal-row {
-    display: flex; align-items: center;
-    padding: 10px 14px; gap: 12px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    background: #ffffff;
-    margin-bottom: 6px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-}
-.meal-dot {
-    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-}
-.meal-name { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
-.meal-type { font-size: 11px; color: var(--muted); }
-.meal-cal  { font-size: 13px; font-weight: 600; color: var(--red); margin-left: auto; white-space: nowrap; }
-
-/* Empty state */
-.empty-state {
-    text-align: center; padding: 32px 20px; color: var(--muted);
-}
-.empty-state i { font-size: 32px; display: block; margin-bottom: 8px; }
-
-/* ═══════════════════════════════════════════════════════════
-   QUICK ADD MODAL (Bootstrap base + custom)
-═══════════════════════════════════════════════════════════ */
-.modal-content {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    color: var(--text);
-}
-.modal-header { border-bottom: 1px solid var(--border); padding: 18px 22px; }
-.modal-body   { padding: 20px 22px; }
-.modal-footer { border-top: 1px solid var(--border); padding: 14px 22px; }
-
-.search-input {
-    background: #ffffff;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    color: var(--text);
-    padding: 12px 16px;
-    width: 100%;
-    font-size: 14px;
-    outline: none;
-    transition: border-color .2s;
-}
-.search-input:focus { border-color: var(--accent); }
-.search-input::placeholder { color: var(--muted); }
-
-.result-tabs .tab-btn {
-    background: none; border: none;
-    padding: 6px 14px; border-radius: 8px;
-    color: var(--muted); font-size: 13px; font-weight: 500;
-    transition: all .15s;
-}
-.result-tabs .tab-btn.active { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
-
-.result-item {
-    display: flex; align-items: center;
-    padding: 12px 14px; gap: 12px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    background: #ffffff;
-    margin-bottom: 6px;
-    cursor: pointer;
-    transition: border-color .15s, transform .1s;
-}
-.result-item:hover { border-color: var(--accent); transform: translateX(2px); }
-.result-item.selected { border-color: var(--accent); background: var(--accent-dim); }
-
-.result-icon {
-    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center; font-size: 18px;
-}
-.result-icon.food { background: rgba(217,119,6,.12); }
-.result-icon.supp { background: rgba(22,163,74,.12); }
-
-.result-name  { font-size: 13px; font-weight: 500; color: var(--text); }
-.result-meta  { font-size: 11px; color: var(--muted); }
-.result-kcal  { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--red); }
-
-/* Quantity row in modal */
-.qty-row { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
-.qty-input {
-    background: #ffffff; border: 1px solid var(--border);
-    border-radius: 10px; color: var(--text);
-    padding: 9px 12px; width: 90px; outline: none;
-    transition: border-color .2s;
-}
-.qty-input:focus { border-color: var(--accent); }
-.meal-select {
-    background: #ffffff; border: 1px solid var(--border);
-    border-radius: 10px; color: var(--text);
-    padding: 9px 12px; flex:1; outline: none;
-}
-.meal-select:focus { border-color: var(--accent); }
-
-/* Polling dot (Kullanıcı talebiyle tamamen gizlendi) */
-#poll-dot {
-    display: none !important;
-}
-
-/* Streak (seri) rozeti */
-.streak-badge {
-    display: inline-flex; align-items: center; gap: 5px;
-    margin-left: 10px;
-    padding: 4px 11px;
-    border-radius: 999px;
-    font-size: 12px; font-weight: 700;
-    background: rgba(220, 38, 38, 0.1);
-    color: var(--red);
-    border: 1px solid rgba(220, 38, 38, 0.25);
-    vertical-align: middle;
-}
-.streak-badge i { font-size: 13px; }
-@media (max-width: 576px) {
-    .streak-badge { display: block; margin: 4px 0 0; width: fit-content; }
-}
-
-/* Skeleton loader */
-.skeleton {
-    background: linear-gradient(90deg, var(--surface-2) 25%, #ffffff 50%, var(--surface-2) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.4s infinite;
-    border-radius: 8px;
-}
-@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .skeleton { background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%; animation: sk 1.2s infinite; border-radius: 12px; }
+    @keyframes sk { to { background-position: -200% 0; } }
 </style>
 </head>
 <body>
-
 <?php $activePage = 'dashboard'; require_once __DIR__ . '/includes/sidebar.php'; ?>
 
-<!-- ═══════════════════════ MAIN ════════════════════════════ -->
 <div class="main">
-
-    <!-- TOPBAR -->
     <header class="topbar">
         <div class="topbar-left">
             <div>
-                <div class="topbar-title">Günlük Dashboard</div>
-                <div class="topbar-sub" id="dateLabel">Yükleniyor…</div>
+                <div class="topbar-title">Özet</div>
+                <div class="topbar-sub" id="dateLabel"><?= $todayLabel ?></div>
             </div>
-            <?php if ($currentStreak > 0): ?>
-            <div class="streak-badge" title="Üst üste kaç gündür beslenme kaydı girdiğin">
-                <i class="bi bi-fire"></i> <?= (int)$currentStreak ?> gün seri
-            </div>
-            <?php endif; ?>
         </div>
         <div class="topbar-right">
-            <!-- Hızlı Öğün Ekle -->
             <button class="btn-topbar btn-accent" data-bs-toggle="modal" data-bs-target="#quickAddModal">
-                <i class="bi bi-plus-lg"></i>
-                <span>Hızlı Öğün Ekle</span>
+                <i class="bi bi-plus-lg"></i><span>Öğün ekle</span>
             </button>
         </div>
     </header>
 
-    <!-- CONTENT -->
     <div class="content">
-
-        <!-- ── KPI KARTLARI (4'lü üst satır) ─────────────── -->
-        <div class="row g-3 mb-4">
-            <!-- Kalori -->
-            <div class="col-6 col-xl-3">
-                <div class="kpi-tile">
-                    <div class="glow" style="background:var(--red)"></div>
-                    <div class="kpi-label"><i class="bi bi-fire me-1"></i>Kalori</div>
-                    <div class="kpi-value" id="kpiCalVal" style="color:var(--red)">—</div>
-                    <div class="kpi-sub">/ <span id="kpiCalTarget">—</span> kcal hedef</div>
-                    <div class="gyp-progress">
-                        <div class="gyp-progress-fill" id="kpiCalBar" style="width:0%;background:var(--red)"></div>
-                    </div>
-                    <div style="font-size:11px;color:var(--muted)"><span id="kpiCalRem">—</span> kcal kaldı</div>
-                </div>
-            </div>
-            <!-- Protein -->
-            <div class="col-6 col-xl-3">
-                <div class="kpi-tile">
-                    <div class="glow" style="background:#60a5fa"></div>
-                    <div class="kpi-label"><i class="bi bi-egg-fried me-1"></i>Protein</div>
-                    <div class="kpi-value" id="kpiProtVal" style="color:#60a5fa">—</div>
-                    <div class="kpi-sub">/ <span id="kpiProtTarget">—</span> g hedef</div>
-                    <div class="gyp-progress">
-                        <div class="gyp-progress-fill" id="kpiProtBar" style="width:0%;background:#60a5fa"></div>
-                    </div>
-                    <div style="font-size:11px;color:var(--muted)"><span id="kpiProtRem">—</span> g kaldı</div>
-                </div>
-            </div>
-            <!-- Karb -->
-            <div class="col-6 col-xl-3">
-                <div class="kpi-tile">
-                    <div class="glow" style="background:var(--yellow)"></div>
-                    <div class="kpi-label"><i class="bi bi-lightning me-1"></i>Karbonhidrat</div>
-                    <div class="kpi-value" id="kpiCarbVal" style="color:var(--yellow)">—</div>
-                    <div class="kpi-sub">/ <span id="kpiCarbTarget">—</span> g hedef</div>
-                    <div class="gyp-progress">
-                        <div class="gyp-progress-fill" id="kpiCarbBar" style="width:0%;background:var(--yellow)"></div>
-                    </div>
-                    <div style="font-size:11px;color:var(--muted)"><span id="kpiCarbRem">—</span> g kaldı</div>
-                </div>
-            </div>
-            <!-- Yağ -->
-            <div class="col-6 col-xl-3">
-                <div class="kpi-tile">
-                    <div class="glow" style="background:var(--purple)"></div>
-                    <div class="kpi-label"><i class="bi bi-droplet-half me-1"></i>Yağ</div>
-                    <div class="kpi-value" id="kpiFatVal" style="color:var(--purple)">—</div>
-                    <div class="kpi-sub">/ <span id="kpiFatTarget">—</span> g hedef</div>
-                    <div class="gyp-progress">
-                        <div class="gyp-progress-fill" id="kpiFatBar" style="width:0%;background:var(--purple)"></div>
-                    </div>
-                    <div style="font-size:11px;color:var(--muted)"><span id="kpiFatRem">—</span> g kaldı</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── ALT 2'Lİ ALAN ──────────────────────────────── -->
-        <div class="row g-3 mb-3">
-
-            <!-- SOL: Günün Özeti (Donut Rings) -->
-            <div class="col-lg-5">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <div class="section-header">
-                            <div class="section-title"><i class="bi bi-pie-chart-fill" style="color:var(--accent)"></i> Günün Makro Özeti</div>
-                            <div id="workoutBadge" class="workout-badge off" onclick="toggleWorkout()" style="cursor:pointer" title="Antrenman / Dinlenme durumunu değiştirmek için tıklayın">
-                                <i class="bi bi-moon-stars"></i> Dinlenme
-                            </div>
-                        </div>
-
-                        <!-- 4 Ring -->
-                        <div class="d-flex flex-wrap gap-3 justify-content-around" id="ringContainer">
-                            <!-- Dinamik olarak doldurulur -->
-                        </div>
-
-                        <!-- BMR / TDEE satırı -->
-                        <div class="d-flex justify-content-around mt-4 pt-3" style="border-top:1px solid var(--border)">
-                            <div class="text-center">
-                                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">BMR</div>
-                                <div style="font-size:18px;font-weight:700;color:#dc2626;" id="bmrVal">—</div>
-                                <div style="font-size:10px;color:var(--muted)">kcal/gün</div>
-                            </div>
-                            <div style="width:1px;background:var(--border)"></div>
-                            <div class="text-center">
-                                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">TDEE</div>
-                                <div style="font-size:18px;font-weight:700;color:var(--accent)" id="tdeeVal">—</div>
-                                <div style="font-size:10px;color:var(--muted)">kcal/gün</div>
-                            </div>
-                            <div style="width:1px;background:var(--border)"></div>
-                            <div class="text-center">
-                                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Kalan</div>
-                                <div style="font-size:18px;font-weight:700;color:var(--green)" id="remCalVal">—</div>
-                                <div style="font-size:10px;color:var(--muted)">kcal</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- SAĞ: Yaklaşan Alarmlar -->
-            <div class="col-lg-7">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <div class="section-header">
-                            <div class="section-title"><i class="bi bi-alarm-fill" style="color:var(--yellow)"></i> Yaklaşan Alarmlar</div>
-                            <div class="d-flex align-items-center gap-2">
-                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 d-flex align-items-center gap-1" onclick="openAlarmAudioModal()" title="Alarm &amp; Ses Ayarları" style="font-size:11.5px; border-radius:8px; border-color:var(--border);">
-                                    <i class="bi bi-volume-up-fill text-primary"></i>
-                                    <span>Ses Ayarları</span>
-                                </button>
-                                <a href="reminders.php" style="font-size:12px;color:var(--accent)">Tümünü Yönet →</a>
-                            </div>
-                        </div>
-                        <div id="alarmList">
-                            <div class="skeleton" style="height:56px;margin-bottom:8px"></div>
-                            <div class="skeleton" style="height:56px;margin-bottom:8px"></div>
-                            <div class="skeleton" style="height:56px"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── AKILLI HİDRASYON & SU TAKİBİ ────────────────── -->
-        <div class="row g-3 mb-3">
-            <div class="col-12">
-                <div class="card" style="background: linear-gradient(135deg, rgba(14,165,233,0.07), rgba(2,132,199,0.02)); border: 1px solid rgba(56,189,248,0.25);">
-                    <div class="card-body p-3 p-sm-4">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                            <div class="section-title mb-0" style="color:var(--text); font-size:15px; font-weight:600;">
-                                <i class="bi bi-droplet-fill text-info fs-5 me-1"></i>
-                                <span>Akıllı Hidrasyon & Su Takibi</span>
-                            </div>
-                            <div class="d-flex align-items-center gap-2">
-                                <span id="waterTargetBadge" class="badge" style="background:rgba(56,189,248,0.15); color:var(--accent); border:1px solid rgba(56,189,248,0.3); font-weight:600; padding:6px 12px; font-size:12px;">
-                                    🎯 Günlük Hedef: <span id="waterTargetVal">2800</span> ml
-                                </span>
-                                <button class="btn btn-sm btn-ghost" onclick="resetWater()" title="Sıfırla" style="padding:4px 8px; border-radius:8px;">
-                                    <i class="bi bi-arrow-counterclockwise"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="row align-items-center g-3">
-                            <!-- Sol: İlerleme & İstatistikler -->
-                            <div class="col-lg-5">
-                                <div class="d-flex align-items-center gap-3">
-                                    <div class="position-relative" style="width:76px; height:76px; flex-shrink:0;">
-                                        <div id="waterPercentRing" style="width:76px; height:76px; border-radius:50%; background:conic-gradient(var(--accent) 0%, var(--surface-2) 0%); display:flex; align-items:center; justify-content:center; box-shadow:0 0 15px rgba(2,132,199,0.15); transition: background 0.5s ease;">
-                                            <div style="width:62px; height:62px; border-radius:50%; background:var(--surface); display:flex; flex-direction:column; align-items:center; justify-content:center;">
-                                                <span id="waterPercentText" style="font-weight:700; font-size:15px; color:var(--accent);">0%</span>
-                                                <small style="font-size:9px; color:var(--muted);">HEDEF</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div class="d-flex align-items-baseline gap-2">
-                                            <span id="waterConsumedVal" style="font-size:26px; font-weight:700; color:var(--accent);">0</span>
-                                            <span style="color:var(--muted); font-size:14px;">/ <span id="waterTargetSub">2800</span> ml</span>
-                                        </div>
-                                        <div id="waterStatusMsg" style="font-size:12px; color:var(--muted); margin-top:2px;">
-                                            Kalan: <strong id="waterRemainingVal" style="color:var(--text);">2800 ml</strong> (yaklaşık <span id="waterGlassesVal">11</span> bardak)
-                                        </div>
-                                        <div id="waterBonusBadge" class="mt-1 d-none" style="font-size:11px; color:var(--green); font-weight:500;">
-                                            <i class="bi bi-lightning-charge-fill me-1"></i>Antrenman desteği: +500 ml eklendi
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="gyp-progress mt-3 mb-0" style="height:10px; background:var(--surface-2);">
-                                    <div id="waterProgressBar" class="gyp-progress-fill" style="width:0%; background:linear-gradient(90deg, #38bdf8, #0284c7);"></div>
-                                </div>
-                            </div>
-
-                            <!-- Sağ: Tek Tıkla Bardak/Şişe Ekleme Butonları -->
-                            <div class="col-lg-7">
-                                <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
-                                    <button class="btn btn-ghost text-light" onclick="quickAddWater(200)" style="padding:8px 12px; border-radius:10px; font-size:13px; font-weight:600;">
-                                        🥛 +200 ml <small class="text-muted d-block fw-normal" style="font-size:10px">1 Bardak</small>
-                                    </button>
-                                    <button class="btn btn-ghost text-light" onclick="quickAddWater(330)" style="padding:8px 12px; border-radius:10px; font-size:13px; font-weight:600;">
-                                        🥤 +330 ml <small class="text-muted d-block fw-normal" style="font-size:10px">Küçük Şişe</small>
-                                    </button>
-                                    <button class="btn btn-ghost text-light" onclick="quickAddWater(500)" style="padding:8px 14px; border-radius:10px; font-size:13px; font-weight:600; border-color:rgba(56,189,248,0.4); background:rgba(56,189,248,0.1);">
-                                        🍶 +500 ml <small class="text-info d-block fw-normal" style="font-size:10px">Orta Şişe</small>
-                                    </button>
-                                    <button class="btn btn-ghost text-light" onclick="quickAddWater(1000)" style="padding:8px 12px; border-radius:10px; font-size:13px; font-weight:600;">
-                                        🫖 +1000 ml <small class="text-muted d-block fw-normal" style="font-size:10px">Sürahi</small>
-                                    </button>
-                                    <button class="btn btn-ghost text-warning" onclick="quickAddWater(-200)" style="padding:8px 10px; border-radius:10px; font-size:13px;" title="Son bardağı geri al">
-                                        <i class="bi bi-arrow-counterclockwise"></i> -200 ml
-                                    </button>
-                                    <button class="btn btn-ghost text-accent" onclick="promptCustomWater()" style="padding:8px 10px; border-radius:10px; font-size:13px;" title="Özel Miktar Gir">
-                                        <i class="bi bi-pencil-square"></i> Özel
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── SON ÖĞÜNLER ────────────────────────────────── -->
-        <div class="row g-3">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body">
-                        <div class="section-header">
-                            <div class="section-title"><i class="bi bi-clock-history" style="color:var(--green)"></i> Bugün Eklenenler</div>
-                            <a href="nutrition.php" style="font-size:12px;color:var(--accent)">Beslenme Modülüne Git →</a>
-                        </div>
-                        <div id="mealList" class="row g-2">
-                            <div class="col-12 skeleton" style="height:44px;border-radius:10px"></div>
-                            <div class="col-12 skeleton" style="height:44px;border-radius:10px"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── HAFTALIK TREND GRAFİĞİ ──────────────────────────── -->
-        <?php if (!empty($weeklyBreakdown)):
-            $chartDays        = $weeklyBreakdown['days'];
-            $chartLabelsFull  = array_map(fn($d) => $d['day_name'] . ' (' . $d['short_date'] . ')', $chartDays);
-            $chartConsumedCal = array_map(fn($d) => $d['consumed']['calories'], $chartDays);
-            $chartTargetCal   = array_map(fn($d) => $d['target']['calories'], $chartDays);
-        ?>
-        <div class="row g-3 mt-1">
-            <div class="col-12">
-                <div class="card p-3 p-sm-4" style="background: var(--surface); border: 1px solid var(--border); border-radius: 16px;">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                            <h6 class="mb-0 fw-bold" style="color: #0f172a;">
-                                <i class="bi bi-graph-up me-2 text-primary"></i>Haftalık Kalori Trendi
-                            </h6>
-                            <span class="small" style="color: #64748b;">Bu haftaki tüketim ve hedef karşılaştırması</span>
-                        </div>
-                    </div>
-                    <div style="position: relative; height: 240px;">
-                        <canvas id="weeklyTrendChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <script>
-            (function() {
-                const ctx = document.getElementById('weeklyTrendChart');
-                if (!ctx || typeof Chart === 'undefined') return;
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: <?= json_encode($chartLabelsFull, JSON_UNESCAPED_UNICODE) ?>,
-                        datasets: [
-                            {
-                                label: 'Tüketilen Kalori',
-                                data: <?= json_encode($chartConsumedCal) ?>,
-                                borderColor: '#0284c7',
-                                backgroundColor: 'rgba(2, 132, 199, 0.12)',
-                                fill: true,
-                                tension: 0.35,
-                                pointRadius: 4,
-                                pointBackgroundColor: '#0284c7'
-                            },
-                            {
-                                label: 'Hedef Kalori',
-                                data: <?= json_encode($chartTargetCal) ?>,
-                                borderColor: '#dc2626',
-                                borderDash: [6, 4],
-                                fill: false,
-                                tension: 0,
-                                pointRadius: 0
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
-                        scales: {
-                            y: { beginAtZero: true, ticks: { font: { size: 11 } } },
-                            x: { ticks: { font: { size: 11 } } }
-                        }
-                    }
-                });
-            })();
-        </script>
-        <?php endif; ?>
-
-        <!-- ── HAFTANIN GÜNLÜK DÖKÜMÜ ─────────────────────────── -->
-        <?php if (!empty($weeklyBreakdown)): 
-            $days = $weeklyBreakdown['days'];
-            $daysWithFood = $weeklyBreakdown['days_with_food'];
-        ?>
-        <div class="row g-3 mt-1">
-            <div class="col-12">
-                <div class="card p-3 p-sm-4" style="background: var(--surface); border: 1px solid var(--border); border-radius: 16px;">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                            <h6 class="mb-0 fw-bold" style="color: #0f172a;">
-                                <i class="bi bi-calendar-week me-2 text-primary"></i>Haftanın Günlük Dökümü
-                            </h6>
-                            <span class="small" style="color: #64748b;">Bu hafta kaydedilen besinler, kalori hedefleri ve spor aktiviteleri</span>
-                        </div>
-                        <span class="badge" style="background: var(--surface-2); color: #475569; border: 1px solid var(--border); font-weight: 600; font-size: 11.5px;"><?= $daysWithFood ?> gün veri kaydedildi</span>
-                    </div>
-
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover align-middle mb-0" style="border-collapse: separate; border-spacing: 0;">
-                            <thead>
-                                <tr style="font-size: 12.5px; border-bottom: 2px solid var(--border); background: var(--surface-2); color: #475569; font-weight: 600;">
-                                    <th style="padding: 10px 12px; border-top-left-radius: 8px;">Tarih</th>
-                                    <th style="padding: 10px 12px;">Spor Durumu</th>
-                                    <th style="padding: 10px 12px;">Alınan / Hedef</th>
-                                    <th style="padding: 10px 12px;">Fark</th>
-                                    <th style="padding: 10px 12px; color: #2563eb; font-weight: 700;">Protein</th>
-                                    <th style="padding: 10px 12px; color: #d97706; font-weight: 700;">Karb</th>
-                                    <th style="padding: 10px 12px; color: #9333ea; font-weight: 700;">Yağ</th>
-                                    <th style="padding: 10px 12px; border-top-right-radius: 8px;">Öğünler</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            <?php foreach ($days as $idx => $d): 
-                                $diff = $d['diff_calories'];
-                                $rowClass = $d['is_today'] ? 'table-row-today' : '';
-                            ?>
-                                <tr class="<?= $rowClass ?>" style="border-bottom: 1px solid var(--border); transition: background-color .15s;">
-                                    <td style="padding: 11px 12px;">
-                                        <strong style="color: #0f172a; font-weight: 700;"><?= $d['day_name'] ?></strong>
-                                        <div class="small" style="color: #64748b; font-size: 11.5px;">
-                                            <?= $d['short_date'] ?>
-                                            <?php if ($d['is_today']): ?>
-                                                <span class="badge ms-1" style="background:#0284c7; color:#ffffff; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 6px;">BUGÜN</span>
-                                            <?php endif; ?>
-                                        </div>
-                                    </td>
-
-                                    <!-- Spor Durumu -->
-                                    <td style="padding: 11px 12px;">
-                                        <?php if ($d['workout_done']): ?>
-                                            <span class="badge" style="background: rgba(22, 163, 74, 0.12); color: #15803d; border: 1px solid rgba(22, 163, 74, 0.3); font-weight: 600;">
-                                                <i class="bi bi-check-circle-fill me-1"></i> <?= htmlspecialchars($d['workout']['antrenman_tipi'] ?? 'Tamamlandı') ?>
-                                            </span>
-                                        <?php elseif ($d['workout']): ?>
-                                            <span class="badge" style="background: rgba(217, 119, 6, 0.12); color: #b45309; border: 1px solid rgba(217, 119, 6, 0.3); font-weight: 600;">
-                                                <i class="bi bi-clock me-1"></i> Planlandı
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="badge" style="background: var(--surface-2); color: #64748b; border: 1px solid var(--border); font-weight: 500;">
-                                                <i class="bi bi-moon me-1"></i> Dinlenme
-                                            </span>
-                                        <?php endif; ?>
-                                    </td>
-
-                                    <!-- Alınan / Hedef Kalori -->
-                                    <td style="padding: 11px 12px;">
-                                        <div>
-                                            <strong style="color: #0f172a; font-weight: 700; font-size: 13.5px;"><?= number_format($d['consumed']['calories'], 0) ?></strong>
-                                            <span style="color: #64748b; font-size: 12px;"> / <?= number_format($d['target']['calories'], 0) ?> kcal</span>
-                                        </div>
-                                        <div class="progress mt-1" style="height: 5px; max-width: 130px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px;">
-                                            <div class="progress-bar bg-danger" style="width: <?= min(100, $d['adherence_pct']) ?>%; border-radius: 999px;"></div>
-                                        </div>
-                                    </td>
-
-                                    <!-- Fark -->
-                                    <td style="padding: 11px 12px;">
-                                        <?php if ($d['consumed']['calories'] == 0): ?>
-                                            <span style="color: #94a3b8; font-size: 13px;">—</span>
-                                        <?php elseif ($diff > 0): ?>
-                                            <span class="badge" style="background: rgba(234, 179, 8, 0.15); color: #b45309; border: 1px solid rgba(234, 179, 8, 0.4); font-weight: 600;">+<?= number_format($diff, 0) ?> kcal</span>
-                                        <?php elseif ($diff < 0): ?>
-                                            <span class="badge" style="background: rgba(2, 132, 199, 0.12); color: #0284c7; border: 1px solid rgba(2, 132, 199, 0.3); font-weight: 600;"><?= number_format($diff, 0) ?> kcal</span>
-                                        <?php else: ?>
-                                            <span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #15803d; border: 1px solid rgba(34, 197, 94, 0.4); font-weight: 600;">Hedefte</span>
-                                        <?php endif; ?>
-                                    </td>
-
-                                    <!-- Makrolar -->
-                                    <td style="padding: 11px 12px;"><span class="fw-bold" style="color: #2563eb;"><?= round($d['consumed']['protein_g'], 1) ?>g</span></td>
-                                    <td style="padding: 11px 12px;"><span class="fw-bold" style="color: #d97706;"><?= round($d['consumed']['carbs_g'], 1) ?>g</span></td>
-                                    <td style="padding: 11px 12px;"><span class="fw-bold" style="color: #9333ea;"><?= round($d['consumed']['fat_g'], 1) ?>g</span></td>
-
-                                    <!-- Öğünler Mini Liste / Popover -->
-                                    <td style="padding: 11px 12px;">
-                                        <?php if (!empty($d['food_logs'])): ?>
-                                            <button class="btn btn-sm py-1 px-2.5 d-inline-flex align-items-center gap-1" 
-                                                    type="button" 
-                                                    data-bs-toggle="collapse" 
-                                                    data-bs-target="#dash-meals-<?= $idx ?>" 
-                                                    aria-expanded="false"
-                                                    style="background: #ffffff; border: 1px solid #cbd5e1; color: #0f172a; font-weight: 600; font-size: 12px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                                                <span><?= count($d['food_logs']) ?> öğün</span>
-                                                <i class="bi bi-chevron-down" style="font-size: 10px; color: #64748b;"></i>
-                                            </button>
-                                        <?php else: ?>
-                                            <span style="color: #94a3b8; font-size: 12px;">Kayıt yok</span>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-
-                                <?php if (!empty($d['food_logs'])): ?>
-                                <tr class="collapse table-row-meals-detail" id="dash-meals-<?= $idx ?>">
-                                    <td colspan="8" style="background-color: #f6f3eb !important; border-top: 1px dashed var(--border); border-bottom: 2px solid var(--border); padding: 14px 16px;">
-                                        <div class="d-flex align-items-center justify-content-between mb-2.5">
-                                            <div class="fw-bold small" style="color: #000000 !important; font-size: 13px;">
-                                                <i class="bi bi-card-checklist me-1" style="color: #0284c7;"></i>
-                                                <?= $d['day_name'] ?> Günü Tüketilen Öğünler (<?= count($d['food_logs']) ?> kayıt):
-                                            </div>
-                                            <span class="small fw-semibold" style="color: #000000 !important; font-size: 12px;">
-                                                Toplam: <?= number_format($d['consumed']['calories'], 0) ?> kcal
-                                            </span>
-                                        </div>
-                                        <div class="d-flex flex-wrap gap-2">
-                                            <?php foreach ($d['food_logs'] as $f): 
-                                                $mealLabel = match($f['meal_type'] ?? '') {
-                                                    'breakfast'    => 'Kahvaltı',
-                                                    'lunch'        => 'Öğle',
-                                                    'dinner'       => 'Akşam',
-                                                    'snack'        => 'Ara Öğün',
-                                                    'pre_workout'  => 'Antrenman Öncesi',
-                                                    'post_workout' => 'Antrenman Sonrası',
-                                                    default        => 'Öğün'
-                                                };
-                                                $mealIcon = match($f['meal_type'] ?? '') {
-                                                    'breakfast'    => '🌅',
-                                                    'lunch'        => '☀️',
-                                                    'dinner'       => '🌙',
-                                                    'snack'        => '🍎',
-                                                    'pre_workout'  => '⚡',
-                                                    'post_workout' => '💪',
-                                                    default        => '🍽️'
-                                                };
-                                            ?>
-                                                <div class="p-2.5 px-3 rounded-3 shadow-sm d-inline-flex flex-column gap-1" 
-                                                     style="background-color: #fce7f3 !important; border: 1px solid #fbcfe8 !important; color: #000000 !important; min-width: 210px;">
-                                                    <div class="d-flex align-items-center justify-content-between gap-2">
-                                                        <span class="badge" style="background: rgba(219, 39, 119, 0.15); color: #9d174d; font-size: 10.5px; font-weight: 700; border: 1px solid rgba(219, 39, 119, 0.25);">
-                                                            <?= $mealIcon ?> <?= $mealLabel ?>
-                                                        </span>
-                                                        <span class="fw-bold" style="color: #e11d48; font-size: 12px;">
-                                                            🔥 <?= number_format((float)$f['calories'], 0) ?> kcal
-                                                        </span>
-                                                    </div>
-                                                    <div class="fw-bold text-truncate" style="color: #000000 !important; font-size: 13px; max-width: 280px;" title="<?= htmlspecialchars($f['food_label']) ?>">
-                                                        <?= htmlspecialchars($f['food_label']) ?>
-                                                    </div>
-                                                    <div class="d-flex align-items-center gap-2 pt-1 mt-auto" style="font-size: 11px; border-top: 1px solid rgba(251, 207, 232, 0.8);">
-                                                        <span style="color: #1d4ed8; font-weight: 700;">P: <?= round((float)$f['protein_g'], 1) ?>g</span>
-                                                        <span style="color: #cbd5e1;">•</span>
-                                                        <span style="color: #b45309; font-weight: 700;">K: <?= round((float)$f['carbs_g'], 1) ?>g</span>
-                                                        <span style="color: #cbd5e1;">•</span>
-                                                        <span style="color: #7e22ce; font-weight: 700;">Y: <?= round((float)$f['fat_g'], 1) ?>g</span>
-                                                    </div>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endif; ?>
-
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
-
-    </div><!-- /content -->
-</div><!-- /main -->
-
-<!-- Polling göstergesi (gizlendi) -->
-<div id="poll-dot" style="display:none !important">
-    <span id="pollLabel"></span>
-</div>
-
-<!-- ═══════════════════ HIZLI EKLE MODAL (Gemini AI) ══════════════════ -->
-<div class="modal fade" id="quickAddModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content">
-        <div class="modal-header">
+        <div class="hello fade-in">
             <div>
-                <h5 class="modal-title fw-bold">🤖 Öğün Analizi</h5>
+                <h1><?= $greeting ?><?= $firstName !== '' ? ', ' . htmlspecialchars($firstName) : '' ?> 👋</h1>
+                <div class="date"><?= $todayLabel ?></div>
             </div>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="hello-actions">
+                <?php if ($currentStreak > 0): ?>
+                    <span class="chip yellow" title="Üst üste beslenme kaydı girilen gün sayısı"><i class="bi bi-fire"></i><?= (int)$currentStreak ?> gün seri</span>
+                <?php endif; ?>
+                <span class="chip daytype" id="workoutBadge" onclick="toggleWorkout()" title="Bugünü antrenman / dinlenme günü olarak işaretle">
+                    <i class="bi bi-moon-stars"></i> Dinlenme günü
+                </span>
+            </div>
         </div>
-        <div class="modal-body">
 
-            <!-- Sekme: Besin Analizi / Takviye -->
-            <div class="result-tabs d-flex gap-2 mb-4">
-                <button class="tab-btn active" id="tabBtnFood" onclick="switchModalTab('food', this)">
-                    🍗 Besin Analizi
-                </button>
-                <button class="tab-btn" id="tabBtnSupp" onclick="switchModalTab('supp', this)">
-                    💊 İlaçlar & Takviyeler
-                </button>
-            </div>
-
-            <!-- ── BÖLÜM 1: Gemini Serbest Metin ─────────────────── -->
-            <div id="panelFood">
-                <!-- Fotoğrafla Analiz Butonu -->
-                <button type="button" class="btn btn-outline-light w-100 mb-3 py-2 d-flex align-items-center justify-content-center gap-2 rounded-3" onclick="openPhotoModalFromQuickAdd()">
-                    <i class="bi bi-camera-fill text-info"></i>
-                    <span class="fw-semibold">Öğünü fotoğrafla analiz et</span>
-                </button>
-
-                <!-- Metin Alanı -->
-                <div style="margin-bottom:12px">
-                    <label style="font-size:12px;color:var(--muted);margin-bottom:6px;display:block">
-                        <i class="bi bi-pencil-square me-1"></i>Öğünü serbest olarak yazın
-                    </label>
-                    <textarea id="geminiInput" class="search-input" rows="3"
-                        style="resize:vertical;min-height:80px;line-height:1.5"
-                        placeholder="Örn: 150 gr ızgara tavuklu salata ve 1 kutu kola&#10;Örn: Kahvaltıda 2 yumurta, tam buğday ekmek, 1 bardak süt&#10;Örn: Akşam yemeği: mercimek çorbası ve 1 dilim ekmek"></textarea>
-                    <div style="font-size:11px;color:var(--muted);margin-top:4px">
-                        <i class="bi bi-info-circle me-1"></i>Porsiyon, ağırlık ve içerik bilgisi verdiğinizde sonuç daha doğru olur.
+        <div class="dash">
+            <!-- ═══ ENERJİ ═══ -->
+            <section class="card card-pad span-7 fade-in">
+                <div class="card-head">
+                    <h2 class="card-title-sm"><i class="bi bi-fire"></i>Bugünkü enerji</h2>
+                    <a href="nutrition.php" class="small fw-semibold" style="color:var(--accent)">Beslenme →</a>
+                </div>
+                <div class="energy">
+                    <div class="ring big-ring" id="calRing" style="--c:var(--c-kcal)">
+                        <div class="center">
+                            <div class="num" id="kpiCalRem">—</div>
+                            <div class="lbl" id="kpiCalRemLbl">kcal kaldı</div>
+                        </div>
+                    </div>
+                    <div class="macro-list">
+                        <div class="macro" style="--mc:var(--c-kcal)">
+                            <div class="top"><span class="name">Kalori</span><span class="val"><b id="kpiCalVal">—</b> / <span id="kpiCalTarget">—</span> kcal</span></div>
+                            <div class="bar"><span id="kpiCalBar" style="width:0"></span></div>
+                        </div>
+                        <div class="macro" style="--mc:var(--c-protein)">
+                            <div class="top"><span class="name">Protein</span><span class="val"><b id="kpiProtVal">—</b> / <span id="kpiProtTarget">—</span> g</span></div>
+                            <div class="bar"><span id="kpiProtBar" style="width:0"></span></div>
+                        </div>
+                        <div class="macro" style="--mc:var(--c-carb)">
+                            <div class="top"><span class="name">Karbonhidrat</span><span class="val"><b id="kpiCarbVal">—</b> / <span id="kpiCarbTarget">—</span> g</span></div>
+                            <div class="bar"><span id="kpiCarbBar" style="width:0"></span></div>
+                        </div>
+                        <div class="macro" style="--mc:var(--c-fat)">
+                            <div class="top"><span class="name">Yağ</span><span class="val"><b id="kpiFatVal">—</b> / <span id="kpiFatTarget">—</span> g</span></div>
+                            <div class="bar"><span id="kpiFatBar" style="width:0"></span></div>
+                        </div>
                     </div>
                 </div>
-
-                <!-- Öğün Tipi -->
-                <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:14px">
-                    <div style="flex:1">
-                        <label style="font-size:12px;color:var(--muted);margin-bottom:6px;display:block">Öğün Tipi</label>
-                        <select id="geminiMealType" class="meal-select">
-                            <option value="" disabled selected>-- Öğün Seçiniz --</option>
-                            <option value="breakfast">Kahvaltı</option>
-                            <option value="lunch">Öğle</option>
-                            <option value="dinner">Akşam</option>
-                            <option value="snack">Ara</option>
-                            <option value="pre_workout">Antrenman Öncesi</option>
-                            <option value="post_workout">Sonrası</option>
-                        </select>
-                    </div>
-                    <button onclick="previewGemini()" id="previewBtn"
-                        style="background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.3);
-                               color:var(--accent);padding:9px 18px;border-radius:10px;font-size:13px;
-                               font-weight:600;white-space:nowrap;transition:all .2s"
-                        onmouseover="this.style.background='rgba(56,189,248,.2)'"
-                        onmouseout="this.style.background='rgba(56,189,248,.12)'">
-                        <i class="bi bi-stars me-1"></i> Analiz Et
-                    </button>
+                <div class="energy-foot">
+                    <div class="mini-stat"><div class="l">Bazal (BMR)</div><div class="v" id="bmrVal">—</div></div>
+                    <div class="mini-stat"><div class="l">Günlük harcama</div><div class="v" id="tdeeVal">—</div></div>
+                    <div class="mini-stat"><div class="l">Protein kalan</div><div class="v" id="kpiProtRem">—</div></div>
                 </div>
+            </section>
 
-                <!-- Yükleniyor -->
-                <div id="geminiLoading" class="d-none" style="text-align:center;padding:24px 0">
-                    <div style="display:inline-flex;align-items:center;gap:10px;
-                                background:var(--surface-2);border:1px solid var(--border);
-                                padding:12px 20px;border-radius:12px">
-                        <div class="spinner-border spinner-border-sm text-info" role="status"></div>
-                        <span style="font-size:13px;color:var(--muted)">Analiz ediliyor…</span>
+            <!-- ═══ DOZLAR ═══ -->
+            <section class="card card-pad span-5 fade-in">
+                <div class="card-head">
+                    <h2 class="card-title-sm"><i class="bi bi-capsule-pill"></i>İlaç & takviye</h2>
+                    <span class="chip accent" id="doseChip">—</span>
+                </div>
+                <div id="doseMiniList"><div class="skeleton" style="height:120px"></div></div>
+                <a href="reminders.php" class="btn btn-light btn-sm w-100 mt-3">Tümünü yönet <i class="bi bi-arrow-right ms-1"></i></a>
+            </section>
+
+            <!-- ═══ SU ═══ -->
+            <section class="card card-pad span-6 fade-in">
+                <div class="card-head">
+                    <h2 class="card-title-sm"><i class="bi bi-droplet" style="color:var(--c-water)"></i>Su</h2>
+                    <div class="d-flex gap-1">
+                        <button class="icon-btn" onclick="quickAddWater(-250)" title="Son bardağı geri al"><i class="bi bi-arrow-counterclockwise"></i></button>
+                        <button class="icon-btn" onclick="promptCustomWater()" title="Özel miktar"><i class="bi bi-pencil"></i></button>
                     </div>
                 </div>
-
-                <!-- Önizleme Sonucu -->
-                <div id="geminiPreview" class="d-none" style="
-                    background: linear-gradient(135deg,rgba(56,189,248,.08),rgba(99,102,241,.05));
-                    border: 1px solid rgba(56,189,248,.25);
-                    border-radius: 14px; padding: 18px">
-                    <span id="geminiModelBadge" class="d-none"></span>
-                    <div style="font-weight:600;margin-bottom:12px;color:var(--text)" id="geminiPreviewLabel"></div>
-
-                    <!-- Makro Kartları -->
-                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="geminiMacroGrid">
-                        <!-- JS ile doldurulur -->
-                    </div>
-                    <div style="font-size:11px;color:var(--muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-                        <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
-                        Bu değerler yapay zeka tahminidir. Gerçek değerler farklılık gösterebilir.
+                <div class="water-wrap">
+                    <div class="bottle"><div class="fill" id="waterFill"></div></div>
+                    <div style="min-width:0">
+                        <div><span class="water-num" id="waterConsumedVal">0</span> <span style="color:var(--muted)">/ <span id="waterTargetVal">—</span> ml</span></div>
+                        <div class="small mt-1" style="color:var(--text-2)" id="waterStatusMsg">Kalan <b id="waterRemainingVal">—</b></div>
+                        <div class="small mt-1" style="color:var(--green)" id="waterBonusBadge" hidden><i class="bi bi-lightning-charge-fill me-1"></i>Antrenman günü: +500 ml</div>
                     </div>
                 </div>
-
-                <!-- Hata -->
-                <div id="geminiError" class="d-none" style="
-                    background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);
-                    border-radius:12px;padding:14px;color:#fca5a5;font-size:13px">
-                    <i class="bi bi-exclamation-circle me-1"></i>
-                    <span id="geminiErrorMsg"></span>
+                <div class="water-btns">
+                    <button onclick="quickAddWater(200)">+200<small>bardak</small></button>
+                    <button onclick="quickAddWater(330)">+330<small>kutu</small></button>
+                    <button onclick="quickAddWater(500)">+500<small>şişe</small></button>
+                    <button onclick="quickAddWater(1000)">+1 L<small>sürahi</small></button>
                 </div>
-            </div>
+            </section>
 
-            <!-- ── BÖLÜM 2: Lokal Takviye Arama ──────────────────── -->
-            <div id="panelSupp" class="d-none">
-                <div style="position:relative;margin-bottom:10px">
-                    <i class="bi bi-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted)"></i>
-                    <input type="text" id="suppSearchInput" class="search-input" style="padding-left:38px"
-                           placeholder="Takviye adı yazın (örn: D3, Whey, Magnezyum)"
-                           oninput="searchLocalSupps(this.value)">
+            <!-- ═══ KİLO ═══ -->
+            <section class="card card-pad span-6 fade-in">
+                <div class="card-head">
+                    <h2 class="card-title-sm"><i class="bi bi-speedometer2"></i>Kilo</h2>
+                    <span class="chip" id="weightChangeChip">—</span>
                 </div>
-                <div id="suppResultsModal" style="max-height:280px;overflow-y:auto"></div>
-            </div>
+                <div class="d-flex align-items-end justify-content-between gap-3">
+                    <div>
+                        <div><span class="weight-num" id="weightNow">—</span> <span style="color:var(--muted)">kg</span></div>
+                        <div class="small" style="color:var(--muted)" id="weightMeta">—</div>
+                    </div>
+                    <form class="d-flex gap-2" onsubmit="saveWeight(event)">
+                        <input type="number" step="0.1" min="25" max="350" inputmode="decimal" class="form-control" id="weightInput" placeholder="kg" style="width:96px">
+                        <button class="btn btn-primary" type="submit" title="Kaydet"><i class="bi bi-check-lg"></i></button>
+                    </form>
+                </div>
+                <svg class="spark" id="weightSpark" viewBox="0 0 300 46" preserveAspectRatio="none"></svg>
+            </section>
 
-        </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-            <button type="button" class="btn btn-info fw-semibold" id="addBtn"
-                    onclick="submitQuickAdd()" disabled>
-                <i class="bi bi-plus-lg me-1"></i> Günlüğüme Kaydet
-            </button>
+            <!-- ═══ ÖĞÜNLER ═══ -->
+            <section class="card card-pad span-6 fade-in">
+                <div class="card-head">
+                    <h2 class="card-title-sm"><i class="bi bi-egg-fried"></i>Bugün yediklerim</h2>
+                    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddModal"><i class="bi bi-plus-lg"></i> Ekle</button>
+                </div>
+                <div id="mealList"><div class="skeleton" style="height:44px;margin-bottom:8px"></div><div class="skeleton" style="height:44px"></div></div>
+            </section>
+
+            <!-- ═══ HAFTA ═══ -->
+            <section class="card card-pad span-6 fade-in">
+                <div class="card-head">
+                    <h2 class="card-title-sm"><i class="bi bi-calendar-week"></i>Bu hafta</h2>
+                    <a href="reports.php" class="small fw-semibold" style="color:var(--accent)">Rapor →</a>
+                </div>
+                <?php if (!empty($weeklyBreakdown)): ?>
+                    <div class="week-strip">
+                        <?php foreach ($weeklyBreakdown['days'] as $d):
+                            $t = (float)$d['target']['calories'];
+                            $c = (float)$d['consumed']['calories'];
+                            $p = $t > 0 ? min(100, round($c / $t * 100)) : 0;
+                            $over = $t > 0 && $c > $t * 1.1;
+                        ?>
+                            <div class="wday <?= $d['is_today'] ? 'today' : '' ?>" title="<?= $d['day_name'] ?>: <?= number_format($c, 0, ',', '.') ?> / <?= number_format($t, 0, ',', '.') ?> kcal">
+                                <div class="d"><?= $shortDay[$d['day_name']] ?? mb_substr($d['day_name'], 0, 3) ?></div>
+                                <div class="ring" style="--p:<?= $p ?>;--c:<?= $over ? 'var(--red)' : 'var(--c-kcal)' ?>"></div>
+                                <div class="k"><?= $c > 0 ? number_format($c / 1000, 1, ',', '') . 'k' : '—' ?></div>
+                                <div class="wk"><?= $d['workout_done'] ? '<i class="bi bi-lightning-charge-fill"></i>' : '' ?></div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="chart-box mt-3"><canvas id="weeklyTrendChart"></canvas></div>
+                <?php endif; ?>
+            </section>
         </div>
     </div>
-  </div>
 </div>
 
-<!-- ═══════════════════ FOTOĞRAFLA ANALİZ MODAL (Gemini Vision) ══════════════════ -->
-<div class="modal fade" id="photoAnalysisModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content">
-        <div class="modal-header">
-            <div>
-                <h5 class="modal-title fw-bold" style="background:linear-gradient(135deg,#f472b6,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent">
-                    <i class="bi bi-camera-fill me-1" style="-webkit-text-fill-color:#f472b6"></i> Fotoğrafla Öğün Analizi
-                </h5>
-                <div style="font-size:12px;color:var(--muted)">
-                    Tabağınızın veya yiyeceğinizin fotoğrafını yükleyin, besin değerlerinizi öğrenin.
-                </div>
-            </div>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
-
-        <div class="modal-body">
-            <!-- Gizli File Inputlar (Kamera & Galeri) -->
-            <input type="file" id="cameraFileInput" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoSelected(this)">
-            <input type="file" id="galleryFileInput" accept="image/*" style="display:none" onchange="handlePhotoSelected(this)">
-
-            <!-- Aşama 1: Fotoğraf Seçim Alanı -->
-            <div id="photoDropArea" class="p-4 text-center mb-3" style="background:var(--surface-2);border:2px dashed rgba(236,72,153,.35);border-radius:14px;transition:border-color .2s">
-                <div style="font-size:38px;margin-bottom:8px">📸</div>
-                <div class="fw-semibold mb-1" style="font-size:15px;color:var(--text)">Yemek Fotoğrafını Yükleyin veya Çekin</div>
-                <div class="small text-muted mb-3">JPG, PNG veya WEBP (Maksimum 10MB)</div>
-                <div class="d-flex flex-wrap justify-content-center gap-2">
-                    <button type="button" class="btn btn-sm px-3 py-2 fw-semibold" onclick="document.getElementById('cameraFileInput').click()" style="background:rgba(236,72,153,.15);border:1px solid rgba(236,72,153,.4);color:#000000 !important;">
-                        <i class="bi bi-camera-fill me-1" style="color:#db2777"></i> Kamera ile Çek
-                    </button>
-                    <button type="button" class="btn btn-sm px-3 py-2 fw-semibold" onclick="document.getElementById('galleryFileInput').click()" style="background:var(--surface-2);border:1px solid var(--border);color:#000000 !important;">
-                        <i class="bi bi-image me-1 text-primary"></i> Galeriden Seç
-                    </button>
-                </div>
-            </div>
-
-            <!-- Aşama 2: Önizleme & Parametreler (Görsel seçilince görünür) -->
-            <div id="photoPreviewContainer" class="d-none">
-                <div class="row g-3">
-                    <div class="col-md-5 text-center">
-                        <div style="position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--border);max-height:240px;background:#000;">
-                            <img id="photoPreviewImg" src="" alt="Önizleme" style="width:100%;max-height:240px;object-fit:cover;display:block;">
-                            <button type="button" class="btn btn-sm btn-dark position-absolute bottom-0 end-0 m-2 opacity-75" onclick="clearSelectedPhoto()" style="font-size:11px">
-                                <i class="bi bi-arrow-repeat me-1"></i> Değiştir
-                            </button>
-                        </div>
-                    </div>
-                    <div class="col-md-7">
-                        <div class="mb-2">
-                            <label class="form-label text-secondary small mb-1">Öğün Zamanı</label>
-                            <select id="photoMealType" class="meal-select">
-                                <option value="" disabled selected>-- Öğün Seçiniz --</option>
-                                <option value="breakfast">Kahvaltı</option>
-                                <option value="lunch">Öğle</option>
-                                <option value="dinner">Akşam</option>
-                                <option value="snack">Ara</option>
-                                <option value="pre_workout">Antrenman Öncesi</option>
-                                <option value="post_workout">Sonrası</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label text-secondary small mb-1">Ek Not veya Açıklama (İsteğe Bağlı)</label>
-                            <input type="text" id="photoUserNotes" class="search-input" placeholder="Örn: Yarısını yedim, sosu zeytinyağlı, 1 dilim ekmekle">
-                            <div style="font-size:11px;color:var(--muted);margin-top:4px">
-                                Porsiyon veya içerik belirtirseniz analiz çok daha hassas olur.
-                            </div>
-                        </div>
-                        <button type="button" id="startPhotoAnalysisBtn" class="btn btn-accent w-100 py-2 fw-semibold" onclick="analyzeSelectedPhoto()">
-                            <i class="bi bi-stars me-1"></i> Analiz Et
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Yükleniyor Göstergesi -->
-            <div id="photoAnalyzingSpinner" class="d-none text-center py-4">
-                <div class="spinner-border text-info mb-2" role="status" style="width:2.5rem;height:2.5rem;"></div>
-                <div class="fw-semibold text-info" style="font-size:14px">Fotoğraf Analiz Ediliyor...</div>
-                <div class="small text-muted">Yiyecekler tespit ediliyor ve makrolar hesaplanıyor...</div>
-            </div>
-
-            <!-- Aşama 3: Analiz Sonucu ve Düzenleme / Onay Kartı -->
-            <div id="photoResultCard" class="d-none mt-3 p-3" style="background:#ffffff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.05)">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="badge" style="background:rgba(34,197,94,.15);color:#15803d;border:1px solid rgba(34,197,94,.3);font-size:12px">
-                        <i class="bi bi-check-circle me-1"></i> Analiz Tamamlandı
-                    </span>
-                    <small id="photoResultModel" class="text-muted d-none" style="font-size:11px"></small>
-                </div>
-
-                <div class="mb-2">
-                    <label class="form-label text-dark fw-semibold small mb-1">Tespit Edilen Yemek Adı</label>
-                    <input type="text" id="photoResultFoodLabel" class="form-control form-control-sm text-dark fw-semibold" style="background:#ffffff;border-color:var(--border);color:var(--text)">
-                </div>
-
-                <div id="photoResultDesc" class="small mb-3 p-2 rounded" style="background:#f8f6f0;border:1px solid var(--border);color:#334155"></div>
-
-                <div class="row g-2 mb-3">
-                    <div class="col-3 text-center">
-                        <div class="p-2 rounded" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25)">
-                            <small class="fw-bold" style="color:#dc2626;font-size:11px">🔥 Kalori</small>
-                            <input type="number" id="photoResultCal" class="form-control form-control-sm text-center fw-bold mt-1" style="background:#ffffff;border-color:rgba(239,68,68,.3);color:#dc2626" step="1">
-                            <small class="text-muted" style="font-size:10px">kcal</small>
-                        </div>
-                    </div>
-                    <div class="col-3 text-center">
-                        <div class="p-2 rounded" style="background:rgba(2,132,199,.08);border:1px solid rgba(2,132,199,.25)">
-                            <small class="fw-bold" style="color:#0284c7;font-size:11px">💪 Protein</small>
-                            <input type="number" id="photoResultProt" class="form-control form-control-sm text-center fw-bold mt-1" style="color:#0284c7;background:#ffffff;border-color:rgba(2,132,199,.3)" step="0.1">
-                            <small class="text-muted" style="font-size:10px">gram</small>
-                        </div>
-                    </div>
-                    <div class="col-3 text-center">
-                        <div class="p-2 rounded" style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25)">
-                            <small class="fw-bold" style="color:#d97706;font-size:11px">⚡ Karb</small>
-                            <input type="number" id="photoResultCarb" class="form-control form-control-sm text-center fw-bold mt-1" style="color:#d97706;background:#ffffff;border-color:rgba(217,119,6,.3)" step="0.1">
-                            <small class="text-muted" style="font-size:10px">gram</small>
-                        </div>
-                    </div>
-                    <div class="col-3 text-center">
-                        <div class="p-2 rounded" style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.25)">
-                            <small class="fw-bold" style="color:#7c3aed;font-size:11px">💧 Yağ</small>
-                            <input type="number" id="photoResultFat" class="form-control form-control-sm text-center fw-bold mt-1" style="color:#7c3aed;background:#ffffff;border-color:rgba(124,58,237,.3)" step="0.1">
-                            <small class="text-muted" style="font-size:10px">gram</small>
-                        </div>
-                    </div>
-                </div>
-
-                <button type="button" id="confirmSavePhotoFoodBtn" class="btn btn-success w-100 py-2 fw-semibold" onclick="confirmSavePhotoFood()">
-                    <i class="bi bi-check2-circle me-1"></i> Onayla ve Günlüğüme Ekle
-                </button>
-            </div>
-        </div>
-
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
-        </div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════
-     JAVASCRIPT
-═══════════════════════════════════════════════════════════ -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-
+<?php require __DIR__ . '/includes/quick-add.php'; ?>
 <script>
-// ─── INITIAL HYDRATION & STATE ─────────────────────────────────────────
-window.__INITIAL_DASHBOARD__ = <?= $initialDashboardData ? json_encode($initialDashboardData, JSON_UNESCAPED_UNICODE) : 'null' ?>;
-let dashData     = null;    // Son API yanıtı
-let selectedItem = null;    // Modal'da seçilen öğe ('gemini' | 'local' tipi)
-let searchTimer  = null;    // Debounce
-let activeTab    = 'foods';
-const shownAlarms = new Set();
+/* ── Yardımcılar ─────────────────────────────────────────── */
+const fmt = v => parseFloat(v || 0).toLocaleString('tr-TR', { maximumFractionDigits: 1 });
+const fmt0 = v => Math.round(parseFloat(v || 0)).toLocaleString('tr-TR');
+const setText = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const toast = (title, icon = 'success') => window.Swal && Swal.fire({ toast: true, position: 'top', icon, title, showConfirmButton: false, timer: 1800 });
 
-// ─── API HELPER & AUTH FAILURE TOLERANCE ─────────────────────────────
-let authFailureStreak = 0;
-
-async function apiPost(action, extra = {}) {
+async function apiPost(action, extra = {}, endpoint = 'dashboard.php') {
     const fd = new FormData();
     fd.append('action', action);
     for (const [k, v] of Object.entries(extra)) fd.append(k, v);
-    const r = await fetch(`${window.API_BASE}/dashboard.php`, {
-        method: 'POST',
-        body: fd,
-        credentials: 'include'
-    });
+    const r = await fetch(`${window.API_BASE}/${endpoint}`, { method: 'POST', body: fd, credentials: 'include' });
     return r.json();
 }
 
-// ─── DASHBOARD LOAD ───────────────────────────────────────────────────
-async function loadDashboard(forceFetch = false) {
-    // 1. İlk açılışta sunucudan gelen veriyi 0ms içinde anında ekrana bas
-    if (!forceFetch && window.__INITIAL_DASHBOARD__ && !dashData) {
-        dashData = window.__INITIAL_DASHBOARD__;
-        renderDashboard(dashData);
-        checkAlarms(dashData.upcoming_alarms ?? []);
-        window.__INITIAL_DASHBOARD__ = null;
-        return;
-    }
+/* ── Durum ───────────────────────────────────────────────── */
+let dashData = <?= $initialDashboardData ? json_encode($initialDashboardData, JSON_UNESCAPED_UNICODE) : 'null' ?>;
+let authFailureStreak = 0;
 
+async function loadDashboard() {
     try {
         const data = await apiPost('load');
         if (!data.ok) {
-            if (data.require_login) {
-                authFailureStreak++;
-                console.warn(`Oturum uyarısı (${authFailureStreak}/3)`);
-                // Tek bir geçici gecikmede kullanıcıyı hemen atma; 3 kez üst üste başarısız olursa yönlendir
-                if (authFailureStreak >= 3) {
-                    window.location.href = 'login.php?redirect=dashboard.php';
-                    return;
-                }
-                setTimeout(() => loadDashboard(true), 4000);
-                return;
-            }
-            throw new Error(data.error || 'Veri yüklenemedi');
+            if (data.require_login && ++authFailureStreak >= 3) { location.href = 'login.php?redirect=dashboard.php'; return; }
+            setTimeout(loadDashboard, 4000);
+            return;
         }
-        authFailureStreak = 0; // Başarılı yanıtta sayacı sıfırla
+        authFailureStreak = 0;
         dashData = data;
-        window.__CURRENT_ALARMS__ = data.upcoming_alarms ?? [];
         renderDashboard(data);
-        checkAlarms(window.__CURRENT_ALARMS__);
-        if (window.Capacitor && window.optiAlarmEngine) {
-            window.optiAlarmEngine.syncCapacitorNotifications(window.__CURRENT_ALARMS__);
-        }
     } catch (e) {
-        const pollLbl = document.getElementById('pollLabel');
-        if (pollLbl) pollLbl.textContent = '⚠️ Yeniden deneniyor…';
-        console.error('Dashboard yüklenemedi:', e);
-        // Ağ gecikmesi veya soğuk başlangıçta 4 saniye sonra otomatik yeniden dene
-        setTimeout(() => loadDashboard(true), 4000);
+        setTimeout(loadDashboard, 4000);
     }
 }
 
 function renderDashboard(d) {
-    // ── Tarih ──
-    document.getElementById('dateLabel').textContent =
-        `${d.day_name} · ${formatDate(d.date)}`;
+    if (!d) return;
+    // Enerji
+    const rem = d.remaining.calories;
+    const ring = document.getElementById('calRing');
+    ring.style.setProperty('--p', Math.min(100, d.progress_pct.calories));
+    ring.classList.toggle('over', rem < 0);
+    setText('kpiCalRem', fmt0(Math.abs(rem)));
+    setText('kpiCalRemLbl', rem >= 0 ? 'kcal kaldı' : 'kcal fazla');
+    const macro = (k, c, t, p) => {
+        setText(`kpi${k}Val`, fmt0(c)); setText(`kpi${k}Target`, fmt0(t));
+        const b = document.getElementById(`kpi${k}Bar`); if (b) b.style.width = Math.min(100, p) + '%';
+    };
+    macro('Cal', d.consumed.calories, d.target.calories, d.progress_pct.calories);
+    macro('Prot', d.consumed.protein_g, d.target.protein_g, d.progress_pct.protein_g);
+    macro('Carb', d.consumed.carbs_g, d.target.carbs_g, d.progress_pct.carbs_g);
+    macro('Fat', d.consumed.fat_g, d.target.fat_g, d.progress_pct.fat_g);
+    setText('bmrVal', fmt0(d.bmr) + ' kcal');
+    setText('tdeeVal', fmt0(d.tdee) + ' kcal');
+    setText('kpiProtRem', d.remaining.protein_g > 0 ? fmt0(d.remaining.protein_g) + ' g' : 'Tamam ✓');
 
-    // ── KPI Kartları ──
-    setKPI('Cal',  d.consumed.calories,  d.target.calories,  d.remaining.calories,  d.progress_pct.calories,  'kcal');
-    setKPI('Prot', d.consumed.protein_g, d.target.protein_g, d.remaining.protein_g, d.progress_pct.protein_g, 'g');
-    setKPI('Carb', d.consumed.carbs_g,   d.target.carbs_g,   d.remaining.carbs_g,   d.progress_pct.carbs_g,   'g');
-    setKPI('Fat',  d.consumed.fat_g,     d.target.fat_g,     d.remaining.fat_g,     d.progress_pct.fat_g,     'g');
+    // Antrenman günü
+    const wb = document.getElementById('workoutBadge');
+    wb.classList.toggle('training', !!d.is_training);
+    wb.innerHTML = d.is_training ? '<i class="bi bi-lightning-charge-fill"></i> Antrenman günü' : '<i class="bi bi-moon-stars"></i> Dinlenme günü';
 
-    // ── BMR / TDEE ──
-    document.getElementById('bmrVal').textContent  = fmt(d.bmr);
-    document.getElementById('tdeeVal').textContent = fmt(d.tdee);
-    document.getElementById('remCalVal').textContent =
-        d.remaining.calories >= 0
-            ? fmt(d.remaining.calories)
-            : `+${fmt(Math.abs(d.remaining.calories))}`;
-    document.getElementById('remCalVal').style.color =
-        d.remaining.calories >= 0 ? 'var(--green)' : 'var(--red)';
-
-    // ── Ring Charts ──
-    renderRings(d);
-
-    // ── Alarmlar ──
-    renderAlarms(d.upcoming_alarms ?? []);
-
-    // ── Son Öğünler ──
-    renderMeals(d.recent_meals ?? []);
-
-    // ── Akıllı Su Takibi ──
-    if (d.water) renderWater(d.water);
-
-    // ── Polling göstergesi ──
-    const pollLbl = document.getElementById('pollLabel');
-    if (pollLbl) pollLbl.textContent = 'Güncel · ' + now();
+    renderDoses(d.doses);
+    renderWater(d.water);
+    renderWeight(d.weight);
+    renderMeals(d.recent_meals || []);
 }
 
-function setKPI(key, consumed, target, remaining, pct, unit) {
-    setText(`kpi${key}Val`,    fmt(consumed));
-    setText(`kpi${key}Target`, fmt(target));
-    setText(`kpi${key}Rem`,    remaining >= 0 ? fmt(remaining) : `+${fmt(Math.abs(remaining))}`);
-    const bar = document.getElementById(`kpi${key}Bar`);
-    if (bar) bar.style.width = Math.min(100, pct) + '%';
-}
-
-// ── SVG Ring (donut) ─────────────────────────────────────────────────
-function renderRings(d) {
-    const rings = [
-        { label:'Kalori',   consumed: d.consumed.calories,  target: d.target.calories,  pct: d.progress_pct.calories,  unit:'kcal', color:'#ef4444' },
-        { label:'Protein',  consumed: d.consumed.protein_g, target: d.target.protein_g, pct: d.progress_pct.protein_g, unit:'g',    color:'#2563eb' },
-        { label:'Karb',     consumed: d.consumed.carbs_g,   target: d.target.carbs_g,   pct: d.progress_pct.carbs_g,   unit:'g',    color:'#d97706' },
-        { label:'Yağ',      consumed: d.consumed.fat_g,     target: d.target.fat_g,     pct: d.progress_pct.fat_g,     unit:'g',    color:'#9333ea' },
-    ];
-
-    const container = document.getElementById('ringContainer');
-    container.innerHTML = rings.map(r => {
-        const radius   = 28;
-        const circ     = 2 * Math.PI * radius;
-        const filled   = Math.min(100, r.pct) / 100 * circ;
-        const isOver   = r.pct > 100;
-        return `
-        <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-            <div class="ring-wrap">
-                <svg width="72" height="72" viewBox="0 0 72 72">
-                    <circle cx="36" cy="36" r="${radius}" fill="none" stroke="var(--border)" stroke-width="8"/>
-                    <circle cx="36" cy="36" r="${radius}" fill="none"
-                        stroke="${isOver ? '#fb923c' : r.color}"
-                        stroke-width="8"
-                        stroke-dasharray="${filled} ${circ - filled}"
-                        stroke-linecap="round"
-                        style="transition:stroke-dasharray .6s cubic-bezier(.34,1.56,.64,1)"/>
-                </svg>
-                <div class="ring-center">
-                    <span style="color:${isOver?'#fb923c':r.color};font-size:11px">${Math.round(r.pct)}%</span>
-                    <small>${r.unit}</small>
-                </div>
-            </div>
-            <div style="text-align:center">
-                <div style="font-size:12px;font-weight:600">${fmt(r.consumed)}</div>
-                <div style="font-size:10px;color:var(--muted)">${r.label} / ${fmt(r.target)}</div>
-            </div>
+/* ── Dozlar ──────────────────────────────────────────────── */
+function renderDoses(doses) {
+    const el = document.getElementById('doseMiniList');
+    const chip = document.getElementById('doseChip');
+    if (!doses || !doses.doses || !doses.doses.length) {
+        chip.textContent = '—';
+        el.innerHTML = `<div class="empty-state py-3"><i class="bi bi-capsule"></i>Bugün planlı doz yok.<br><a href="reminders.php" class="small fw-semibold" style="color:var(--accent)">İlaç / takviye ekle →</a></div>`;
+        return;
+    }
+    const s = doses.summary;
+    chip.textContent = `${s.taken}/${s.total} alındı`;
+    // Önce bekleyenler, sonra alınanlar; en fazla 5 satır
+    const order = { due: 0, missed: 1, pending: 2, skipped: 3, taken: 4 };
+    const list = [...doses.doses].sort((a, b) => (order[a.status] - order[b.status]) || a.time.localeCompare(b.time)).slice(0, 5);
+    el.innerHTML = list.map(x => {
+        const done = x.status === 'taken' || x.status === 'skipped';
+        const tag = x.status === 'missed' ? '<span class="chip red" style="padding:1px 8px;font-size:11px">Kaçırıldı</span>' : x.status === 'due' ? '<span class="chip accent" style="padding:1px 8px;font-size:11px">Şimdi</span>' : '';
+        return `<div class="dose-mini ${x.status}">
+            <div class="t">${esc(x.time)}</div>
+            <div class="n"><div>${esc(x.name)}</div><div>${esc(x.dose)} ${tag}</div></div>
+            ${done ? `<div class="ok-mark" title="${x.status === 'taken' ? 'Alındı' : 'Atlandı'}"><i class="bi ${x.status === 'taken' ? 'bi-check2' : 'bi-dash'}"></i></div>`
+                   : `<button class="btn-take" onclick="takeDose(${x.supplement_id}, '${x.time}')">Aldım</button>`}
         </div>`;
     }).join('');
 }
 
-// ── Alarmlar ──────────────────────────────────────────────────────────
-function renderAlarms(alarms) {
-    const el = document.getElementById('alarmList');
-    if (alarms.length === 0) {
-        el.innerHTML = `
-        <div class="empty-state">
-            <i class="bi bi-bell-slash"></i>
-            Önümüzdeki 3 saatte alarm yok.<br>
-            <a href="reminders.php" style="color:var(--accent);font-size:12px">Alarm ekle →</a>
-        </div>`;
-        return;
-    }
-
-    el.innerHTML = alarms.map(a => {
-        const iconClass = a.type === 'medication' ? 'med' : (a.type === 'vitamin' ? 'vit' : 'supp');
-        const icon = a.type === 'medication' ? '💊' : (a.type === 'vitamin' ? '☀️' : '💪');
-        const minLeft = a.minutes_left;
-        const minLabel = minLeft <= 0 ? 'Şimdi!' : (minLeft < 60 ? `${minLeft}dk` : `${Math.floor(minLeft/60)}s ${minLeft%60}dk`);
-
-        return `
-        <div class="alarm-item" id="alarm-row-${a.id}">
-            <div class="alarm-time">${a.remind_at}</div>
-            <div class="alarm-icon ${iconClass}">${icon}</div>
-            <div style="min-width:0;flex:1">
-                <div class="alarm-label">${esc(a.label)}</div>
-                <div class="alarm-dose">${esc(a.dose)} · ${esc(a.form)}</div>
-            </div>
-            <div class="alarm-badge">${minLabel}</div>
-            <button class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="dismissDashboardAlarm(${a.id})" title="Alarmı Sil / Kaldır" style="text-decoration:none;opacity:0.8;">
-                <i class="bi bi-trash3"></i>
-            </button>
-        </div>`;
-    }).join('');
+async function takeDose(suppId, time) {
+    const res = await apiPost('log_dose', { supplement_id: suppId, scheduled_time: time, status: 'taken' }, 'reminders.php');
+    if (res.ok) { toast('Alındı olarak işaretlendi'); loadDashboard(); }
+    else toast(res.error || 'Kaydedilemedi', 'error');
 }
+document.addEventListener('opti:dose-logged', loadDashboard);
+document.addEventListener('opti:doses-synced', loadDashboard);
 
-async function dismissDashboardAlarm(alarmId) {
-    const result = await Swal.fire({
-        title: 'Alarmı Kaldır?',
-        text: 'Bu alarmı dashboard ve hatırlatıcı listesinden silmek istiyor musunuz?',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#64748b',
-        confirmButtonText: 'Evet, Sil',
-        cancelButtonText: 'Vazgeç',
-        background: '#ffffff',
-        color: '#1e293b',
-    });
-
-    if (result.isConfirmed) {
-        const formData = new FormData();
-        formData.append('action', 'delete_alarm');
-        formData.append('alarm_id', alarmId);
-
-        const res = await fetch(`${window.API_BASE}/dashboard.php`, { method: 'POST', body: formData });
-        const data = await res.json();
-
-        if (data.ok) {
-            Swal.fire({
-                icon: 'success',
-                title: 'Alarm Silindi',
-                toast: true,
-                position: 'top-end',
-                timer: 2000,
-                showConfirmButton: false,
-                background: '#ffffff',
-                color: '#1e293b',
-            });
-            await loadDashboard();
-        }
-    }
-}
-
-// ── Son Öğünler ───────────────────────────────────────────────────────
-const MEAL_COLORS = {
-    breakfast:'#facc15', lunch:'#4ade80', dinner:'#60a5fa',
-    snack:'#f87171', pre_workout:'#fb923c', post_workout:'#a78bfa'
-};
-const MEAL_LABELS = {
-    breakfast:'Kahvaltı', lunch:'Öğle', dinner:'Akşam',
-    snack:'Ara', pre_workout:'Ant. Öncesi', post_workout:'Ant. Sonrası'
-};
-
-function renderMeals(meals) {
-    const el = document.getElementById('mealList');
-    if (meals.length === 0) {
-        el.innerHTML = `
-        <div class="col-12">
-            <div class="empty-state">
-                <i class="bi bi-journal-x"></i>
-                Bugün henüz öğün girilmedi.
-                <button data-bs-toggle="modal" data-bs-target="#quickAddModal"
-                    style="display:block;margin:10px auto 0;background:var(--accent-dim);border:1px solid rgba(56,189,248,.3);
-                           color:var(--accent);padding:7px 18px;border-radius:10px;font-size:13px;cursor:pointer">
-                    ⚡ İlk Öğünü Ekle
-                </button>
-            </div>
-        </div>`;
-        return;
-    }
-
-    el.innerHTML = meals.map(m => `
-    <div class="col-md-6" id="meal-card-${m.id}">
-        <div class="meal-row align-items-center">
-            <div class="meal-dot" style="background:${MEAL_COLORS[m.meal_type]||'var(--muted)'}"></div>
-            <div style="min-width:0;flex:1">
-                <div class="meal-name text-truncate" title="${esc(m.food_label)}">${esc(m.food_label)}</div>
-                <div class="meal-type">${MEAL_LABELS[m.meal_type]||m.meal_type} · <span style="font-size:11px;color:var(--muted)">${m.protein_g||0}p · ${m.carbs_g||0}k · ${m.fat_g||0}y</span></div>
-            </div>
-            <div class="meal-cal text-nowrap">${fmt(m.calories)} kcal</div>
-            <button class="btn btn-sm btn-link text-danger p-0 ms-2" data-meal-id="${m.id}" data-food-label="${esc(m.food_label)}" onclick="deleteDashboardMealBtn(this)" title="Bu öğünü sil" style="text-decoration:none;opacity:0.8;font-size:14px">
-                <i class="bi bi-trash3"></i>
-            </button>
-        </div>
-    </div>`).join('');
-}
-
-function deleteDashboardMealBtn(btn) {
-    const mealId = parseInt(btn.getAttribute('data-meal-id'), 10);
-    const foodName = btn.getAttribute('data-food-label') || 'Bu öğün';
-    deleteDashboardMeal(mealId, foodName);
-}
-
-async function deleteDashboardMeal(mealId, foodName) {
-    const result = await Swal.fire({
-        title: 'Öğünü Sil?',
-        text: `"${foodName}" kaydını silmek istediğinize emin misiniz? Günlük kalori ve makro hedeflerinizden düşülecektir.`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#64748b',
-        confirmButtonText: 'Evet, Sil',
-        cancelButtonText: 'Vazgeç',
-        background: '#111827',
-        color: '#f8fafc',
-    });
-
-    if (result.isConfirmed) {
-        const formData = new FormData();
-        formData.append('action', 'delete_meal');
-        formData.append('meal_id', mealId);
-
-        try {
-            const res = await fetch(`${window.API_BASE}/dashboard.php`, { method: 'POST', body: formData });
-            const data = await res.json();
-
-            if (data.ok) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Öğün Silindi',
-                    text: 'Kalori ve makro hedefleriniz güncellendi.',
-                    toast: true,
-                    position: 'top-end',
-                    timer: 2000,
-                    showConfirmButton: false,
-                    background: '#111827',
-                    color: '#f8fafc',
-                });
-                await loadDashboard();
-            } else {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Hata',
-                    text: data.error || 'Öğün silinemedi.',
-                    background: '#111827',
-                    color: '#f8fafc',
-                });
-            }
-        } catch (err) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Bağlantı Hatası',
-                text: 'Sunucuya ulaşılamadı.',
-                background: '#111827',
-                color: '#f8fafc',
-            });
-        }
-    }
-}
-
-
-// ─── ALARM PUSH (setInterval polling) ────────────────────────────────
-function checkAlarms(alarms) {
-    const nowMin = new Date().toTimeString().substring(0, 5); // "14:25"
-    for (const a of alarms) {
-        // Yalnızca tam bu dakikaya denk gelen alarm çalsın (Erken uyarı yok, alarm anı beklenir)
-        if (a.remind_at !== nowMin) continue;
-        const key = `${a.id}-${a.remind_at}-${new Date().toDateString()}`;
-        if (shownAlarms.has(key)) continue;
-        shownAlarms.add(key);
-
-        // Sesli alarmı ve kilit ekranı / sistem bildirimini birlikte ateşle
-        if (window.optiAlarmEngine) {
-            window.optiAlarmEngine.triggerAlarm({
-                title: a.type === 'medication' ? '💊 İlaç Zamanı!' : '💪 Takviye Zamanı!',
-                body: `${a.label} — ${a.dose || ''} alma vaktiniz geldi!`.trim(),
-                label: a.label,
-                dose: a.dose,
-                type: a.type,
-                id: a.id
-            });
-        }
-
-        Swal.fire({
-            icon:'warning', iconColor:'#f59e0b',
-            title: a.type==='medication' ? '💊 İlaç Zamanı!' : '💪 Takviye Zamanı!',
-            html:`<div style="text-align:center">
-                      <h5 style="color:#0f172a; font-size:1.2rem; margin-bottom:8px; font-weight:700;">${esc(a.label)}</h5>
-                      <p style="color:#64748b; margin-bottom:4px; font-size:14px;">Saat: <strong style="color:var(--accent); font-size:15px;">${a.remind_at}</strong></p>
-                      <p style="color:#64748b; margin-bottom:12px; font-size:14px;">Doz: <strong style="color:#0f172a">${esc(a.dose)}</strong></p>
-                      <div class="badge bg-danger px-3 py-2" style="font-size:12px; letter-spacing:0.5px;">
-                          🔔 Sesli Alarm Çalıyor...
-                      </div>
-                  </div>`,
-            confirmButtonText:'✅ Aldım / Durdur',
-            cancelButtonText:'⏸ Ertele 15dk',
-            showCancelButton:true,
-            confirmButtonColor:'#16a34a', cancelButtonColor:'#64748b',
-            background:'#ffffff', color:'#1e293b', allowOutsideClick:false,
-            backdrop: `rgba(15, 23, 42, 0.65)`,
-        }).then(r => {
-            // Alarm sesini kapat
-            if (window.optiAlarmEngine) {
-                window.optiAlarmEngine.stop();
-            }
-
-            if (r.dismiss === Swal.DismissReason.cancel) {
-                setTimeout(() => { shownAlarms.delete(key); }, 15*60*1000);
-            }
-        });
-    }
-}
-
-/**
- * Dashboard içi hızlı Alarm & Ses Ayarları Modalı
- */
-function openAlarmAudioModal() {
-    const currentSound = window.optiAlarmEngine ? window.optiAlarmEngine.getSound() : 'classic';
-    const currentVol   = window.optiAlarmEngine ? window.optiAlarmEngine.getVolumePercent() : 70;
-    const sentinelOn   = window.optiAlarmEngine ? window.optiAlarmEngine.isSentinelEnabled : true;
-
-    Swal.fire({
-        title: '🔔 Alarm, Ses & Ekran Ayarları',
-        html: `
-            <div style="text-align:left; font-size:14px;">
-                <!-- Arka Plan Nöbetçisi -->
-                <div class="p-3 mb-3 rounded-3" style="background:#f8fafc; border:1px solid var(--border);">
-                    <div class="form-check form-switch d-flex align-items-center justify-content-between ps-0 mb-1">
-                        <label class="form-check-label small fw-bold text-dark mb-0" for="dashSentinelToggle" style="cursor:pointer;">
-                            <i class="bi bi-shield-check text-success me-1"></i>Ekran Kapalıyken Çal
-                        </label>
-                        <input class="form-check-input ms-2" type="checkbox" role="switch" id="dashSentinelToggle" ${sentinelOn ? 'checked' : ''}>
-                    </div>
-                    <small class="text-secondary d-block" style="font-size:11px; line-height:1.35;">
-                        Telefon ekranı kilitlendiğinde veya tarayıcı arka plandayken alarm motorunun uyumasını engeller.
-                    </small>
-                </div>
-
-                <!-- Alarm Melodisi -->
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold text-secondary mb-1">Alarm Melodisi</label>
-                    <select id="swalSoundSelect" class="form-select form-select-sm">
-                        <option value="classic" ${currentSound==='classic'?'selected':''}>🔔 Klasik Dijital Bip</option>
-                        <option value="chime" ${currentSound==='chime'?'selected':''}>🎵 Melodik Çan (Ding-Dong)</option>
-                        <option value="marimba" ${currentSound==='marimba'?'selected':''}>🌿 Yumuşak Marimba</option>
-                        <option value="urgent" ${currentSound==='urgent'?'selected':''}>🚨 Acil Uyarı Sireni</option>
-                        <option value="pulse" ${currentSound==='pulse'?'selected':''}>⚡ Modern Elektronik Ritim</option>
-                    </select>
-                </div>
-
-                <!-- Ses Seviyesi -->
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <label class="form-label small fw-semibold text-secondary mb-0">Ses Düzeyi</label>
-                        <span id="swalVolLabel" class="badge bg-light text-dark border px-2 py-1 fw-bold">${currentVol}%</span>
-                    </div>
-                    <input type="range" class="form-range" id="swalVolSlider" min="0" max="100" step="5" value="${currentVol}">
-                </div>
-
-                <!-- Test Butonu -->
-                <button type="button" class="btn btn-outline-primary btn-sm w-100 fw-semibold d-flex align-items-center justify-content-center gap-2 mb-2" id="swalTestBtn">
-                    <i class="bi bi-play-fill fs-6"></i> Sesi Test Et
-                </button>
-
-                <hr class="my-2" style="border-color:var(--border);">
-
-                <button type="button" class="btn btn-outline-secondary btn-sm w-100 fw-semibold d-flex align-items-center justify-content-center gap-2" onclick="testSystemNotification()">
-                    <i class="bi bi-bell-fill text-warning"></i>
-                    <span>Bildirim & Ekran Testi</span>
-                </button>
-                <small class="text-secondary d-block text-center mt-1" style="font-size:11px;">
-                    Alarm çaldığında bildirim çubuğunda ve kilit ekranında görünür.
-                </small>
-            </div>
-        `,
-        showConfirmButton: true,
-        confirmButtonText: 'Tamam',
-        confirmButtonColor: '#0284c7',
-        background: '#ffffff',
-        color: '#1e293b',
-        didOpen: () => {
-            const selectEl    = document.getElementById('swalSoundSelect');
-            const sliderEl    = document.getElementById('swalVolSlider');
-            const labelEl     = document.getElementById('swalVolLabel');
-            const testBtn     = document.getElementById('swalTestBtn');
-            const sentinelEl  = document.getElementById('dashSentinelToggle');
-
-            if (selectEl) {
-                selectEl.addEventListener('change', (e) => {
-                    if (window.optiAlarmEngine) {
-                        window.optiAlarmEngine.setSound(e.target.value);
-                        window.optiAlarmEngine.testSound();
-                    }
-                });
-            }
-
-            if (sliderEl && labelEl) {
-                sliderEl.addEventListener('input', (e) => {
-                    labelEl.textContent = e.target.value + '%';
-                    if (window.optiAlarmEngine) {
-                        window.optiAlarmEngine.setVolume(e.target.value);
-                    }
-                });
-            }
-
-            if (testBtn) {
-                testBtn.addEventListener('click', () => {
-                    if (window.optiAlarmEngine) {
-                        window.optiAlarmEngine.testSound();
-                    }
-                });
-            }
-
-            if (sentinelEl) {
-                sentinelEl.addEventListener('change', (e) => {
-                    if (window.optiAlarmEngine) {
-                        window.optiAlarmEngine.toggleSentinel(e.target.checked);
-                    }
-                });
-            }
-        }
-    });
-}
-
-/**
- * Sistem Bildirimi ve Kilit Ekranı Görünüm Testi
- */
-async function testSystemNotification() {
-    if ('Notification' in window && Notification.permission !== 'granted') {
-        const perm = await Notification.requestPermission();
-        if (perm !== 'granted') {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Bildirim İzni Gerekli',
-                text: 'Bildirimlerin kilit ekranında ve bildirim çubuğunda görünmesi için bildirim iznini onaylamanız gerekir.',
-                confirmButtonColor: '#0284c7',
-                background: '#ffffff',
-                color: '#1e293b'
-            });
-            return;
-        }
-    }
-
-    if (window.optiAlarmEngine) {
-        window.optiAlarmEngine.showSystemNotification('🔔 Test Bildirimi', {
-            body: 'Harika! OptiLifeSync alarm bildirimleri telefon ekranınızda başarıyla çalışıyor.'
-        });
-
-        Swal.fire({
-            icon: 'success',
-            title: 'Test Bildirimi Gönderildi',
-            text: 'Telefonunuzun bildirim çubuğunu veya kilit ekranını kontrol edin.',
-            timer: 3000,
-            showConfirmButton: false,
-            background: '#ffffff',
-            color: '#1e293b'
-        });
-    }
-}
-
-// ─── MODAL: SEKMELER ─────────────────────────────────────────────────
-function switchModalTab(tab, btn) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('panelFood').classList.toggle('d-none', tab !== 'food');
-    document.getElementById('panelSupp').classList.toggle('d-none', tab !== 'supp');
-    // Sekme değişince seçimi ve butonu sıfırla
-    selectedItem = null;
-    document.getElementById('addBtn').disabled = true;
-    if (tab === 'supp') resetGeminiPanel();
-}
-
-// ─── MODAL: GEMİNİ ÖNİZLEME ─────────────────────────────────────────
-let geminiResult = null;  // Son başarılı Gemini analizi
-
-async function previewGemini() {
-    const text = document.getElementById('geminiInput').value.trim();
-    if (!text) {
-        Swal.fire({ icon:'warning', title:'Boş Alan', text:'Lütfen bir öğün metni girin.', background:'#1e293b', color:'#f8fafc', timer:2000, showConfirmButton:false });
-        return;
-    }
-
-    // UI durumları sıfırla
-    document.getElementById('geminiPreview').classList.add('d-none');
-    document.getElementById('geminiError').classList.add('d-none');
-    document.getElementById('geminiLoading').classList.remove('d-none');
-    document.getElementById('previewBtn').disabled = true;
-    document.getElementById('addBtn').disabled = true;
-    selectedItem = null;
-    geminiResult = null;
-
-    try {
-        const fd = new FormData();
-        fd.append('action',    'analyze_only');
-        fd.append('meal_text', text);
-
-        const r    = await fetch(`${window.API_BASE}/analyze_food.php`, { method:'POST', body:fd });
-        const data = await r.json();
-
-        document.getElementById('geminiLoading').classList.add('d-none');
-        document.getElementById('previewBtn').disabled = false;
-
-        if (!data.ok) throw new Error(data.error ?? 'Bilinmeyen hata');
-
-        const m = data.analyzed.macros;
-        geminiResult = data.analyzed;
-
-        // Önizleme kartı
-        document.getElementById('geminiPreviewLabel').textContent = text.length > 80 ? text.substring(0,80)+'…' : text;
-        const modelBadgeEl = document.getElementById('geminiModelBadge');
-        if (modelBadgeEl) modelBadgeEl.textContent = data.analyzed.model_used ?? 'gemini';
-        document.getElementById('geminiMacroGrid').innerHTML = [
-            { label:'Kalori',  val: m.kalori,  unit:'kcal', color:'#ef4444', icon:'🔥' },
-            { label:'Protein', val: m.protein, unit:'g',    color:'#2563eb', icon:'💪' },
-            { label:'Karb',    val: m.karb,    unit:'g',    color:'#d97706', icon:'⚡' },
-            { label:'Yağ',     val: m.yag,     unit:'g',    color:'#9333ea', icon:'💧' },
-        ].map(c => `
-            <div style="background:var(--surface);border:1px solid var(--border);
-                        border-radius:10px;padding:10px;text-align:center">
-                <div style="font-size:16px">${c.icon}</div>
-                <div style="font-size:18px;font-weight:700;color:${c.color};margin:2px 0">${c.val}</div>
-                <div style="font-size:10px;color:var(--muted)">${c.label}<br>${c.unit}</div>
-            </div>`).join('');
-
-        document.getElementById('geminiPreview').classList.remove('d-none');
-
-        // Kaydet butonunu aktifleştir
-        selectedItem = { type:'gemini', mealText: text };
-        document.getElementById('addBtn').disabled = false;
-
-    } catch(e) {
-        document.getElementById('geminiLoading').classList.add('d-none');
-        document.getElementById('previewBtn').disabled = false;
-        document.getElementById('geminiErrorMsg').textContent = e.message;
-        document.getElementById('geminiError').classList.remove('d-none');
-    }
-}
-
-function resetGeminiPanel() {
-    document.getElementById('geminiPreview').classList.add('d-none');
-    document.getElementById('geminiError').classList.add('d-none');
-    document.getElementById('geminiLoading').classList.add('d-none');
-    geminiResult = null;
-}
-
-// ─── MODAL: LOKAL TAKVİYE ARAMA ──────────────────────────────────────
-let suppSearchTimer = null;
-window._suppModalResults = [];
-
-async function searchLocalSupps(query) {
-    clearTimeout(suppSearchTimer);
-    const q = query.trim();
-    if (q.length < 2) { document.getElementById('suppResultsModal').innerHTML = ''; return; }
-    suppSearchTimer = setTimeout(async () => {
-        const fd = new FormData();
-        fd.append('action', 'quick_search');
-        fd.append('q', q);
-        const r    = await fetch(`${window.API_BASE}/dashboard.php`, { method:'POST', body:fd });
-        const data = await r.json();
-        if (!data.ok) return;
-        window._suppModalResults = data.supplements ?? [];
-        renderSuppModal(window._suppModalResults);
-    }, 350);
-}
-
-function renderSuppModal(supps) {
-    const el = document.getElementById('suppResultsModal');
-    if (supps.length === 0) {
-        el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)"><i class="bi bi-capsule" style="font-size:24px;display:block;margin-bottom:8px"></i>Takviye bulunamadı.<br><a href="reminders.php" style="color:var(--accent)">Takviye ekle →</a></div>';
-        return;
-    }
-    el.innerHTML = supps.map((s, i) => `
-    <div class="result-item" onclick="selectSuppModal(${i})" data-midx="${i}">
-        <div class="result-icon supp">💊</div>
-        <div style="min-width:0">
-            <div class="result-name">${esc(s.name)}</div>
-            <div class="result-meta">${s.dose_amount} ${s.dose_unit} · ${s.form} · ${s.type}</div>
-        </div>
-        <div class="result-kcal" style="color:var(--green)">${s.calories_per_dose ?? 0} kcal/doz</div>
-    </div>`).join('');
-}
-
-function selectSuppModal(idx) {
-    const s = (window._suppModalResults ?? [])[idx];
-    if (!s) return;
-    document.querySelectorAll('#suppResultsModal .result-item').forEach(e => e.classList.remove('selected'));
-    document.querySelector(`#suppResultsModal [data-midx="${idx}"]`)?.classList.add('selected');
-    selectedItem = { type:'local', data:s };
-    document.getElementById('addBtn').disabled = false;
-}
-
-// ─── MODAL: KAYDET ────────────────────────────────────────────────────
-async function submitQuickAdd() {
-    if (!selectedItem) return;
-    const btn = document.getElementById('addBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<div class="spinner-border spinner-border-sm me-1"></div> Kaydediliyor…';
-
-    try {
-        let data;
-
-        if (selectedItem.type === 'gemini') {
-            // Gemini: analyze + kaydet tek endpoint
-            const fd = new FormData();
-            fd.append('action',    'analyze');
-            fd.append('meal_text', selectedItem.mealText);
-            fd.append('meal_type', document.getElementById('geminiMealType').value);
-            const r = await fetch(`${window.API_BASE}/analyze_food.php`, { method:'POST', body:fd });
-            data = await r.json();
-
-        } else {
-            // Lokal takviye
-            const fd = new FormData();
-            fd.append('action',        'quick_add');
-            fd.append('source',        'local');
-            fd.append('supplement_id', selectedItem.data.id);
-            const r = await fetch(`${window.API_BASE}/dashboard.php`, { method:'POST', body:fd });
-            data = await r.json();
-        }
-
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i> Günlüğüme Kaydet';
-
-        if (data.ok) {
-            bootstrap.Modal.getInstance(document.getElementById('quickAddModal')).hide();
-            await loadDashboard();
-            Swal.fire({ icon:'success', title:'Kaydedildi!', timer:1800, showConfirmButton:false, background:'#1e293b', color:'#f8fafc' });
-        } else {
-            throw new Error(data.error ?? 'Bilinmeyen hata');
-        }
-
-    } catch(e) {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i> Günlüğüme Kaydet';
-        Swal.fire({ icon:'error', title:'Hata', text:e.message, background:'#1e293b', color:'#f8fafc' });
-    }
-}
-
-// ─── SU TAKİBİ FONKSİYONLARI ────────────────────────────────────────
+/* ── Su ──────────────────────────────────────────────────── */
 function renderWater(w) {
     if (!w) return;
-    setText('waterTargetVal',   fmt(w.target_ml));
-    setText('waterTargetSub',   fmt(w.target_ml));
-    setText('waterConsumedVal', fmt(w.consumed_ml));
-    setText('waterRemainingVal', `${fmt(w.remaining_ml)} ml`);
-    setText('waterGlassesVal',  fmt(Math.ceil(w.remaining_ml / 250)));
-    setText('waterPercentText', `${Math.round(w.pct)}%`);
-
-    const bar = document.getElementById('waterProgressBar');
-    if (bar) bar.style.width = Math.min(100, w.pct) + '%';
-
-    const ring = document.getElementById('waterPercentRing');
-    if (ring) {
-        const ringColor = w.pct >= 100 ? '#22c55e' : 'var(--accent)';
-        const deg = Math.min(100, w.pct) * 3.6;
-        ring.style.background = `conic-gradient(${ringColor} ${deg}deg, rgba(255,255,255,0.08) ${deg}deg)`;
-    }
-
-    const bonusBadge = document.getElementById('waterBonusBadge');
-    if (bonusBadge) {
-        if (w.workout_bonus > 0) {
-            bonusBadge.classList.remove('d-none');
-        } else {
-            bonusBadge.classList.add('d-none');
-        }
-    }
+    setText('waterConsumedVal', fmt0(w.consumed_ml));
+    setText('waterTargetVal', fmt0(w.target_ml));
+    document.getElementById('waterFill').style.height = Math.min(100, w.pct) + '%';
+    document.getElementById('waterStatusMsg').innerHTML = w.remaining_ml > 0
+        ? `Kalan <b>${fmt0(w.remaining_ml)} ml</b> · yaklaşık ${Math.ceil(w.remaining_ml / 250)} bardak`
+        : '<b style="color:var(--green)">Günlük hedef tamamlandı 🎉</b>';
+    document.getElementById('waterBonusBadge').hidden = !(w.workout_bonus > 0);
 }
 
 async function quickAddWater(amount) {
     try {
         const data = await apiPost('add_water', { amount });
         if (!data.ok) throw new Error(data.error);
-
-        if (dashData && dashData.water) {
-            dashData.water.consumed_ml  = data.water_ml;
-            dashData.water.target_ml    = data.target_ml;
-            dashData.water.pct          = data.pct;
-            dashData.water.remaining_ml = data.remaining_ml;
+        if (dashData?.water) {
+            Object.assign(dashData.water, { consumed_ml: data.water_ml, target_ml: data.target_ml, pct: data.pct, remaining_ml: data.remaining_ml, workout_bonus: data.workout_bonus });
             renderWater(dashData.water);
-        } else {
-            await loadDashboard();
         }
-
-        Swal.fire({
-            icon: amount >= 0 ? 'success' : 'info',
-            title: data.message,
-            toast: true,
-            position: 'top-end',
-            timer: 1600,
-            showConfirmButton: false,
-            background: '#111827',
-            color: '#f8fafc'
-        });
-    } catch(e) {
-        Swal.fire({ icon:'error', title:'Hata', text:e.message, background:'#1e293b', color:'#f8fafc' });
-    }
-}
-
-async function resetWater() {
-    const res = await Swal.fire({
-        title: 'Su Tüketimini Sıfırla?',
-        text: 'Bugün içilen su miktarını 0 ml yapmak istiyor musunuz?',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Evet, Sıfırla',
-        cancelButtonText: 'Vazgeç',
-        background: '#111827',
-        color: '#f8fafc',
-    });
-    if (res.isConfirmed) {
-        const data = await apiPost('reset_water');
-        if (data.ok) {
-            await loadDashboard();
-            Swal.fire({ icon:'success', title:'Sıfırlandı', toast:true, position:'top-end', timer:1500, showConfirmButton:false, background:'#111827', color:'#f8fafc' });
-        }
-    }
+        toast(data.message, amount >= 0 ? 'success' : 'info');
+    } catch (e) { toast(e.message || 'Hata', 'error'); }
 }
 
 async function promptCustomWater() {
     const { value: ml } = await Swal.fire({
-        title: 'Özel Su Miktarı',
-        input: 'number',
-        inputLabel: 'Eklenecek miktar (ml):',
-        inputPlaceholder: 'Örn: 400',
-        showCancelButton: true,
-        confirmButtonText: 'Ekle 💧',
-        cancelButtonText: 'İptal',
-        background: '#111827',
-        color: '#f8fafc',
-        inputValidator: (v) => {
-            if (!v || parseInt(v) <= 0) return 'Lütfen geçerli bir mililitre girin!';
-        }
+        title: 'Özel miktar', input: 'number', inputLabel: 'Eklenecek su (ml)', inputPlaceholder: 'ör. 400',
+        showCancelButton: true, confirmButtonText: 'Ekle', cancelButtonText: 'Vazgeç',
+        inputValidator: v => (!v || parseInt(v, 10) <= 0) ? 'Geçerli bir miktar girin' : undefined
     });
-    if (ml) {
-        quickAddWater(parseInt(ml));
+    if (ml) quickAddWater(parseInt(ml, 10));
+}
+
+/* ── Kilo ────────────────────────────────────────────────── */
+function renderWeight(w) {
+    if (!w) return;
+    setText('weightNow', w.current ? fmt(w.current) : '—');
+    document.getElementById('weightInput').placeholder = w.current ? String(w.current) : 'kg';
+    const meta = w.logged_today ? 'Bugün kaydedildi' : (w.last_date ? `Son kayıt: ${new Date(w.last_date + 'T00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}` : 'Henüz kayıt yok — bugün tartılın');
+    setText('weightMeta', meta);
+    const chip = document.getElementById('weightChangeChip');
+    const ch = w.change_7d ?? w.change_30d;
+    if (ch === null || ch === undefined) { chip.textContent = 'Değişim —'; chip.className = 'chip'; }
+    else {
+        const good = (w.goal === 'lose' && ch < 0) || (w.goal === 'gain' && ch > 0) || (w.goal === 'maintain' && Math.abs(ch) <= 0.5);
+        chip.className = 'chip ' + (good ? 'accent' : (ch === 0 ? '' : 'yellow'));
+        chip.innerHTML = `<i class="bi ${ch < 0 ? 'bi-arrow-down-right' : ch > 0 ? 'bi-arrow-up-right' : 'bi-dash'}"></i>${ch > 0 ? '+' : ''}${fmt(ch)} kg · ${w.change_7d !== null ? '7 gün' : '30 gün'}`;
     }
+    // Mini grafik
+    const svg = document.getElementById('weightSpark');
+    const pts = w.spark || [];
+    if (pts.length < 2) { svg.innerHTML = ''; return; }
+    const min = Math.min(...pts) - .3, max = Math.max(...pts) + .3;
+    const xy = pts.map((v, i) => [i / (pts.length - 1) * 300, 42 - (v - min) / (max - min) * 38]);
+    const line = xy.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+    svg.innerHTML = `<defs><linearGradient id="wg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${cssVar('--accent-bright')}" stop-opacity=".25"/><stop offset="1" stop-color="${cssVar('--accent-bright')}" stop-opacity="0"/></linearGradient></defs>
+        <path d="${line} L300,46 L0,46 Z" fill="url(#wg)"/><path d="${line}" fill="none" stroke="${cssVar('--accent-bright')}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
 }
 
-// ─── FOTOĞRAFLA ANALİZ (GEMINI VISION) ──────────────────────────────
-let selectedPhotoFile = null;
-let photoModalInstance = null;
-
-function openPhotoModal() {
-    const el = document.getElementById('photoAnalysisModal');
-    if (!photoModalInstance) {
-        photoModalInstance = new bootstrap.Modal(el);
-    }
-    clearSelectedPhoto();
-    photoModalInstance.show();
+async function saveWeight(e) {
+    e.preventDefault();
+    const inp = document.getElementById('weightInput');
+    const val = inp.value.trim().replace(',', '.');
+    if (!val) return;
+    const res = await apiPost('set_weight', { weight_kg: val });
+    if (!res.ok) { toast(res.error || 'Kaydedilemedi', 'error'); return; }
+    inp.value = '';
+    toast('Kilo kaydedildi');
+    loadDashboard();
 }
 
-function openPhotoModalFromQuickAdd() {
-    const quickModalEl = document.getElementById('quickAddModal');
-    const quickModal = bootstrap.Modal.getInstance(quickModalEl);
-    if (quickModal) quickModal.hide();
-    openPhotoModal();
-}
-
-// Görseli tarayıcıda canvas ile sıkıştırıp boyutlandıran yardımcı fonksiyon (hızlı yükleme ve timeout engelleme)
-async function compressImageIfNeeded(file, maxDimension = 1400, quality = 0.82) {
-    if (!file || !file.type.startsWith('image/')) return file;
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                let width = img.width;
-                let height = img.height;
-                if (width <= maxDimension && height <= maxDimension && file.size < 1024 * 1024) {
-                    resolve(file);
-                    return;
-                }
-                if (width > height) {
-                    if (width > maxDimension) {
-                        height = Math.round((height * maxDimension) / width);
-                        width = maxDimension;
-                    }
-                } else {
-                    if (height > maxDimension) {
-                        width = Math.round((width * maxDimension) / height);
-                        height = maxDimension;
-                    }
-                }
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                canvas.toBlob((blob) => {
-                    if (blob) {
-                        const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
-                            type: 'image/jpeg',
-                            lastModified: Date.now()
-                        });
-                        resolve(compressedFile);
-                    } else {
-                        resolve(file);
-                    }
-                }, 'image/jpeg', quality);
-            };
-            img.onerror = () => resolve(file);
-            img.src = e.target.result;
-        };
-        reader.onerror = () => resolve(file);
-        reader.readAsDataURL(file);
-    });
-}
-
-async function handlePhotoSelected(input) {
-    if (!input.files || !input.files[0]) return;
-    const rawFile = input.files[0];
-
-    let file = rawFile;
-    try {
-        file = await compressImageIfNeeded(rawFile);
-    } catch(err) {
-        console.warn('Görsel sıkıştırma atlandı:', err);
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-        Swal.fire({ icon:'error', title:'Dosya Çok Büyük', text:'Lütfen 10MB\'dan küçük bir fotoğraf seçin.', background:'#ffffff', color:'#1e293b' });
-        input.value = '';
+/* ── Öğünler ─────────────────────────────────────────────── */
+const MEAL = {
+    breakfast: ['🌅', 'Kahvaltı'], lunch: ['☀️', 'Öğle'], dinner: ['🌙', 'Akşam'],
+    snack: ['🍎', 'Ara öğün'], pre_workout: ['⚡', 'Antrenman öncesi'], post_workout: ['💪', 'Antrenman sonrası']
+};
+function renderMeals(meals) {
+    const el = document.getElementById('mealList');
+    if (!meals.length) {
+        el.innerHTML = `<div class="empty-state py-3"><i class="bi bi-journal-plus"></i>Bugün henüz öğün eklenmedi.<br>
+            <button class="btn btn-primary btn-sm mt-3" data-bs-toggle="modal" data-bs-target="#quickAddModal"><i class="bi bi-plus-lg me-1"></i>İlk öğünü ekle</button></div>`;
         return;
     }
-
-    selectedPhotoFile = file;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        document.getElementById('photoPreviewImg').src = e.target.result;
-        document.getElementById('photoDropArea').classList.add('d-none');
-        document.getElementById('photoPreviewContainer').classList.remove('d-none');
-        document.getElementById('photoResultCard').classList.add('d-none');
-        document.getElementById('photoAnalyzingSpinner').classList.add('d-none');
-    };
-    reader.readAsDataURL(file);
+    el.innerHTML = meals.map(m => {
+        const [ic, lb] = MEAL[m.meal_type] || ['🍽️', 'Öğün'];
+        const time = m.time || '';
+        return `<div class="meal-row">
+            <div class="meal-ic">${ic}</div>
+            <div style="flex:1;min-width:0">
+                <div class="meal-name" title="${esc(m.food_label)}">${esc(m.food_label)}</div>
+                <div class="meal-meta">${lb}${time ? ' · ' + esc(time) : ''} · P ${fmt0(m.protein_g)} · K ${fmt0(m.carbs_g)} · Y ${fmt0(m.fat_g)}</div>
+            </div>
+            <div class="meal-kcal">${fmt0(m.calories)} <small style="color:var(--muted);font-weight:500">kcal</small></div>
+            <button class="icon-btn danger" style="border:0" onclick="deleteDashboardMeal(${parseInt(m.id, 10)})" title="Sil"><i class="bi bi-trash3"></i></button>
+        </div>`;
+    }).join('');
 }
 
-function clearSelectedPhoto() {
-    selectedPhotoFile = null;
-    const cam = document.getElementById('cameraFileInput');
-    const gal = document.getElementById('galleryFileInput');
-    if (cam) cam.value = '';
-    if (gal) gal.value = '';
-    const img = document.getElementById('photoPreviewImg');
-    if (img) img.src = '';
-    document.getElementById('photoDropArea').classList.remove('d-none');
-    document.getElementById('photoPreviewContainer').classList.add('d-none');
-    document.getElementById('photoResultCard').classList.add('d-none');
-    document.getElementById('photoAnalyzingSpinner').classList.add('d-none');
-    document.getElementById('photoUserNotes').value = '';
+async function deleteDashboardMeal(mealId) {
+    const r = await Swal.fire({ icon: 'warning', title: 'Öğün silinsin mi?', text: 'Günlük kalori ve makrolardan düşülecek.', showCancelButton: true, confirmButtonText: 'Sil', cancelButtonText: 'Vazgeç' });
+    if (!r.isConfirmed) return;
+    const data = await apiPost('delete_meal', { meal_id: mealId });
+    if (data.ok) { toast('Öğün silindi'); loadDashboard(); } else toast(data.error || 'Silinemedi', 'error');
 }
 
-async function analyzeSelectedPhoto() {
-    if (!selectedPhotoFile) {
-        Swal.fire({ icon:'warning', title:'Görsel Seçilmedi', text:'Lütfen analiz edilecek bir yemek fotoğrafı seçin.', background:'#ffffff', color:'#1e293b' });
-        return;
-    }
-
-    const btn = document.getElementById('startPhotoAnalysisBtn');
-    btn.disabled = true;
-    document.getElementById('photoAnalyzingSpinner').classList.remove('d-none');
-    document.getElementById('photoResultCard').classList.add('d-none');
-
-    try {
-        const fd = new FormData();
-        fd.append('action', 'analyze_image');
-        fd.append('food_image', selectedPhotoFile);
-        fd.append('meal_type', document.getElementById('photoMealType').value);
-        fd.append('notes', document.getElementById('photoUserNotes').value.trim());
-
-        const res = await fetch(`${window.API_BASE}/analyze_food.php`, { method:'POST', body:fd });
-        const data = await res.json();
-
-        document.getElementById('photoAnalyzingSpinner').classList.add('d-none');
-        btn.disabled = false;
-
-        if (!data.ok) throw new Error(data.error ?? 'Analiz başarısız oldu.');
-
-        const analyzed = data.analyzed;
-        document.getElementById('photoResultFoodLabel').value = analyzed.food_label || 'Fotoğraflı Öğün';
-        document.getElementById('photoResultDesc').textContent = analyzed.description ? `🔍 Tespit Edilenler: ${analyzed.description}` : 'Yemek içeriği analiz edildi.';
-        document.getElementById('photoResultModel').textContent = `Model: ${analyzed.model_used || 'Gemini Vision'}`;
-        
-        document.getElementById('photoResultCal').value  = analyzed.macros.kalori || 0;
-        document.getElementById('photoResultProt').value = analyzed.macros.protein || 0;
-        document.getElementById('photoResultCarb').value = analyzed.macros.karb || 0;
-        document.getElementById('photoResultFat').value  = analyzed.macros.yag || 0;
-
-        document.getElementById('photoResultCard').classList.remove('d-none');
-
-    } catch(e) {
-        document.getElementById('photoAnalyzingSpinner').classList.add('d-none');
-        btn.disabled = false;
-        Swal.fire({ icon:'error', title:'Analiz Hatası', text: e.message, background:'#ffffff', color:'#1e293b' });
-    }
+/* ── Antrenman / dinlenme ────────────────────────────────── */
+async function toggleWorkout() {
+    const data = await apiPost('toggle_workout');
+    if (data.ok) { toast(data.workout_done ? 'Antrenman günü olarak işaretlendi' : 'Dinlenme günü'); loadDashboard(); }
 }
 
-async function confirmSavePhotoFood() {
-    const saveBtn = document.getElementById('confirmSavePhotoFoodBtn');
-    saveBtn.disabled = true;
-    saveBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-1"></div> Günlüğe Ekleniyor...';
+document.addEventListener('opti:food-added', loadDashboard);
 
-    try {
-        const fd = new FormData();
-        fd.append('action', 'save_custom');
-        fd.append('food_label', document.getElementById('photoResultFoodLabel').value.trim() || 'Fotoğraflı Öğün');
-        fd.append('meal_type', document.getElementById('photoMealType').value);
-        fd.append('calories', document.getElementById('photoResultCal').value);
-        fd.append('protein', document.getElementById('photoResultProt').value);
-        fd.append('carbs', document.getElementById('photoResultCarb').value);
-        fd.append('fat', document.getElementById('photoResultFat').value);
-
-        const res = await fetch(`${window.API_BASE}/analyze_food.php`, { method:'POST', body:fd });
-        const data = await res.json();
-
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Onayla ve Günlüğüme Ekle';
-
-        if (!data.ok) throw new Error(data.error ?? 'Kaydetme hatası');
-
-        if (photoModalInstance) photoModalInstance.hide();
-        await loadDashboard();
-
-        Swal.fire({
-            icon: 'success',
-            title: 'Öğün Günlüğe Eklendi!',
-            text: 'Fotoğraftaki besin değerleri bugünkü makrolarınıza işlendi.',
-            timer: 2000,
-            showConfirmButton: false,
-            background: '#ffffff',
-            color: '#1e293b'
-        });
-    } catch(e) {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Onayla ve Günlüğüme Ekle';
-        Swal.fire({ icon:'error', title:'Hata', text: e.message, background:'#ffffff', color:'#1e293b' });
-    }
-}
-
-
-// ─── YARDIMCILAR ─────────────────────────────────────────────────────
-const fmt = v => parseFloat(v||0).toLocaleString('tr-TR', {maximumFractionDigits:1});
-const setText = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
-const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-const now = () => new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});
-
-const formatDate = d => new Date(d+'T00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'});
-
-// ─── BAŞLATMA ────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', async () => {
-
-    // İlk yükleme
-    await loadDashboard();
-
-    // Her 30sn veri yenile
-    setInterval(() => loadDashboard(true), 30_000);
-
-    // Yüksek hassasiyetli yerel alarm kontrolü (Her 2 saniyede bir - Sıfır gecikme)
-    setInterval(() => {
-        if (window.__CURRENT_ALARMS__ && window.__CURRENT_ALARMS__.length > 0) {
-            checkAlarms(window.__CURRENT_ALARMS__);
+/* ── Haftalık grafik ─────────────────────────────────────── */
+<?php if (!empty($weeklyBreakdown)): ?>
+const WEEK = <?= json_encode(array_map(fn($d) => ['l' => $shortDay[$d['day_name']] ?? mb_substr($d['day_name'], 0, 3), 'c' => round((float)$d['consumed']['calories']), 't' => round((float)$d['target']['calories'])], $weeklyBreakdown['days']), JSON_UNESCAPED_UNICODE) ?>;
+let weekChart = null;
+function drawWeekChart() {
+    const ctx = document.getElementById('weeklyTrendChart');
+    if (!ctx || typeof Chart === 'undefined') return;
+    if (weekChart) weekChart.destroy();
+    const grid = cssVar('--border'), muted = cssVar('--muted'), kcal = cssVar('--c-kcal'), text = cssVar('--text');
+    weekChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: WEEK.map(d => d.l),
+            datasets: [
+                { type: 'bar', label: 'Alınan', data: WEEK.map(d => d.c), backgroundColor: kcal, borderRadius: 8, maxBarThickness: 28 },
+                { type: 'line', label: 'Hedef', data: WEEK.map(d => d.t), borderColor: muted, borderDash: [5, 4], pointRadius: 0, borderWidth: 1.5, tension: 0 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: muted, boxWidth: 10, boxHeight: 10, usePointStyle: true } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmt0(c.raw)} kcal` } } },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: muted }, border: { display: false } },
+                y: { beginAtZero: true, grid: { color: grid }, ticks: { color: muted, maxTicksLimit: 5 }, border: { display: false } }
+            }
         }
-    }, 2000);
-
-    // Bildirim izni
-    if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
-    }
-
-    // Modal kapanınca sıfırla
-    document.getElementById('quickAddModal').addEventListener('hidden.bs.modal', () => {
-        selectedItem  = null;
-        geminiResult  = null;
-        document.getElementById('addBtn').disabled = true;
-        document.getElementById('geminiInput').value = '';
-        document.getElementById('suppSearchInput').value = '';
-        document.getElementById('suppResultsModal').innerHTML = '';
-        resetGeminiPanel();
-        // Sekmeyi ilk sekmele döndür
-        document.getElementById('tabBtnFood').click();
     });
-});
+}
+drawWeekChart();
+document.addEventListener('opti:theme', () => { drawWeekChart(); if (dashData) renderWeight(dashData.weight); });
+<?php endif; ?>
 
+/* ── Başlat ──────────────────────────────────────────────── */
+if (dashData) renderDashboard(dashData); else loadDashboard();
+setInterval(() => { if (!document.hidden) loadDashboard(); }, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) loadDashboard(); });
 </script>
 </body>
 </html>

@@ -104,51 +104,14 @@ $activePage = 'creator';
     <?php require_once __DIR__ . '/includes/pwa-meta.php'; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="assets/css/sidebar.css">
+    <link rel="stylesheet" href="assets/css/sidebar.css?v=20260929">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 
     <style>
         /* Renk token'ları artık merkezi assets/css/theme.css içinde (sidebar.css @import eder) */
 
-        body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            font-size: 14px;
-            display: flex;
-        }
-
-        .main-wrapper {
-            margin-left: var(--sidebar-w);
-            flex: 1;
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
-
-        @media (max-width: 991.98px) {
-            .main-wrapper {
-                margin-left: 0;
-                padding-bottom: 72px;
-            }
-        }
-
-        .top-bar {
-            background: rgba(246, 243, 235, 0.95);
-            border-bottom: 1px solid var(--border);
-            padding: 16px 28px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .page-content {
-            padding: 28px;
-        }
-
         .creator-hero {
-            background: linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(56, 189, 248, 0.12));
+            background: linear-gradient(135deg, var(--yellow-dim), var(--accent-dim));
             border: 1px solid rgba(234, 179, 8, 0.3);
             border-radius: 20px;
             padding: 24px;
@@ -222,21 +185,17 @@ $activePage = 'creator';
 
 <?php require_once __DIR__ . '/includes/sidebar.php'; ?>
 
-<div class="main-wrapper">
-    <div class="top-bar">
-        <div class="d-flex align-items-center gap-3">
-            <h5 class="mb-0 fw-bold d-flex align-items-center gap-2">
-                <span>👑</span> Creator Yönetici Paneli
-            </h5>
+<div class="main">
+    <header class="topbar">
+        <div class="topbar-left">
+            <div>
+                <div class="topbar-title">Creator paneli</div>
+                <div class="topbar-sub">Kullanıcı yönetimi</div>
+            </div>
         </div>
-        <div>
-            <a href="dashboard.php" class="btn btn-sm btn-outline-info">
-                <i class="bi bi-arrow-left me-1"></i> Dashboard'a Dön
-            </a>
-        </div>
-    </div>
+    </header>
 
-    <div class="page-content">
+    <div class="content">
         <?php if ($error): ?>
             <div class="alert alert-danger py-2 px-3 mb-3 d-flex align-items-center gap-2" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;border-radius:12px">
                 <i class="bi bi-exclamation-octagon-fill fs-5"></i>
@@ -432,8 +391,7 @@ async function confirmPurgeData(e) {
             cancelButtonColor: '#64748b',
             confirmButtonText: 'Evet, Sıfırla',
             cancelButtonText: 'Vazgeç',
-            background: '#111827',
-            color: '#f8fafc',
+
             inputValidator: (value) => {
                 if (!value) return 'PIN kodunuzu girmelisiniz!';
             }

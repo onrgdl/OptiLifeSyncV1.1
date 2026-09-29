@@ -26,7 +26,7 @@ $activePage = 'guide';
     <!-- Bootstrap 5 CSS & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="assets/css/sidebar.css">
+    <link rel="stylesheet" href="assets/css/sidebar.css?v=20260929">
 
     <style>
         /* Renk token'ları artık merkezi assets/css/theme.css içinde (sidebar.css @import eder) */
@@ -157,7 +157,7 @@ $activePage = 'guide';
         }
 
         .search-bar-wrap input {
-            background: #ffffff;
+            background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 0.7rem 1.1rem 0.7rem 2.6rem;
@@ -178,7 +178,7 @@ $activePage = 'guide';
             left: 14px;
             top: 50%;
             transform: translateY(-50%);
-            color: #64748b;
+            color: var(--muted);
             font-size: 15px;
         }
 
@@ -207,7 +207,7 @@ $activePage = 'guide';
         <div class="topbar-left">
             <div>
                 <div class="topbar-title">Sistem Kullanım Kılavuzu</div>
-                <div class="topbar-sub">OptiLifeSync V1.1 · Modül Rehberi ve Bilimsel Açıklamalar</div>
+                <div class="topbar-sub">OptiLifeSync 2.0 · Modül Rehberi ve Bilimsel Açıklamalar</div>
             </div>
         </div>
         <div class="topbar-right">
@@ -226,11 +226,11 @@ $activePage = 'guide';
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <div style="max-width: 650px;">
                     <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill small fw-bold mb-3" style="background:rgba(56,189,248,0.15); color:var(--accent); border:1px solid rgba(56,189,248,0.3);">
-                        <i class="bi bi-shield-check"></i> Sürüm 1.1 · Güncel Sistem Dokümantasyonu
+                        <i class="bi bi-shield-check"></i> Sürüm 2.0 · Güncel Sistem Dokümantasyonu
                     </div>
                     <h2 class="text-light fw-bold mb-2">OptiLifeSync Nasıl Çalışır?</h2>
                     <p class="text-secondary mb-0" style="font-size: 14px; line-height: 1.65;">
-                        OptiLifeSync; Mifflin-St Jeor metabolizma formülasyonu, Google Gemini 2.5 Flash yapay zeka gıda analiz motoru, akıllı ilaç ve takviye hatırlatıcıları ile haftalık spor takip sistemini tek çatı altında birleştiren yeni nesil kişisel sağlık yönetim platformudur.
+                        OptiLifeSync; Mifflin-St Jeor metabolizma formülasyonu, Google Gemini yapay zeka gıda analiz motoru, akıllı ilaç ve takviye hatırlatıcıları ile haftalık spor takip sistemini tek çatı altında birleştiren yeni nesil kişisel sağlık yönetim platformudur.
                     </p>
                 </div>
                 <!-- Canlı Arama Kutusu -->
@@ -339,7 +339,7 @@ $activePage = 'guide';
                     <div class="feature-card">
                         <div class="feature-title"><i class="bi bi-chat-text text-info"></i> Serbest Metinle Besin Analizi</div>
                         <p class="feature-desc">
-                            Örn: <em>"2 haşlanmış yumurta, 50g lor peyniri ve 1 dilim çavdar ekmeği"</em> yazdığınızda Gemini 2.5 Flash gıdaları ayrıştırır, kalori ve makro gramajlarını hesaplar.
+                            Örn: <em>"2 haşlanmış yumurta, 50g lor peyniri ve 1 dilim çavdar ekmeği"</em> yazdığınızda Gemini yapay zekası gıdaları ayrıştırır, kalori ve makro gramajlarını hesaplar.
                         </p>
                     </div>
                 </div>
@@ -389,26 +389,38 @@ $activePage = 'guide';
             <div class="row g-3">
                 <div class="col-md-6 col-lg-4">
                     <div class="feature-card">
-                        <div class="feature-title"><i class="bi bi-alarm text-warning"></i> Çoklu Alarm & Saat Planı</div>
-                        <p class="feature-desc">
-                            Günde birden fazla kez alınması gereken ilaçlar için tek kayıtta birden fazla saat (örn: 08:30, 14:00, 21:00) ve haftanın belirli günlerini seçebilirsiniz.
-                        </p>
+                        <div class="feature-title"><i class="bi bi-phone text-success"></i> Telefonun kendi alarmı (Android)</div>
+                        <p class="feature-desc">OptiLifeSync Android uygulamasında alarmlar telefonun alarm sistemine kurulur: uygulama kapalıyken, ekran kilitliyken ve telefon yeniden başladıktan sonra bile çalar, siz susturana kadar devam eder.</p>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4">
                     <div class="feature-card">
-                        <div class="feature-title"><i class="bi bi-volume-up-fill text-info"></i> Web Audio API Sesli İkaz</div>
-                        <p class="feature-desc">
-                            Harici ses dosyalarına veya internet bağlantısına ihtiyaç duymadan, tarayıcının yerel ses motoruyla net sentetik bip uyarıları üretir.
-                        </p>
+                        <div class="feature-title"><i class="bi bi-check2-circle text-info"></i> Aldım / Ertele / Atla</div>
+                        <p class="feature-desc">Alarm çaldığında kilit ekranından "Aldım" diyebilir, 5–30 dakika erteleyebilir veya dozu atlayabilirsiniz. İnternet yoksa kayıt telefonda bekletilir, uygulama açılınca gönderilir.</p>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4">
                     <div class="feature-card">
-                        <div class="feature-title"><i class="bi bi-shield-exclamation text-danger"></i> Etkileşim Kontrol Motoru</div>
-                        <p class="feature-desc">
-                            Birlikte alındığında birbirinin emilimini bozan maddeler (örn: Demir ve Kalsiyum, Magnezyum ve Çinko) için akıllı güvenlik uyarıları sunar.
-                        </p>
+                        <div class="feature-title"><i class="bi bi-graph-up text-warning"></i> Uyum takibi</div>
+                        <p class="feature-desc">"Bugünün dozları" listesi hangi dozun alındığını, kaçırıldığını gösterir. Son 7 günün uyum yüzdesi ve ilaç bazında oranlar Raporlar sayfasında yer alır.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-title"><i class="bi bi-bell text-primary"></i> Diğer hatırlatıcılar</div>
+                        <p class="feature-desc">Su içme, öğün veya antrenman için de haftanın seçtiğiniz günlerinde çalan hatırlatıcılar kurabilirsiniz.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-title"><i class="bi bi-hourglass-split text-danger"></i> Kür süresi</div>
+                        <p class="feature-desc">Süreli ilaçlar için gün sayısı girin; süre dolunca alarmlar otomatik kapanır ve ilaç "Tamamlanan tedaviler" arşivine geçer.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-title"><i class="bi bi-browser-chrome text-secondary"></i> Tarayıcıda kullanım</div>
+                        <p class="feature-desc">Uygulama tarayıcıdan açıldığında alarmlar yalnızca sayfa açıkken sesli çalar. Güvenilir alarm için Android uygulamasını kurun.</p>
                     </div>
                 </div>
             </div>
@@ -441,26 +453,20 @@ $activePage = 'guide';
             <div class="row g-3">
                 <div class="col-md-6 col-lg-4">
                     <div class="feature-card">
-                        <div class="feature-title"><i class="bi bi-calendar3 text-info"></i> 7 Günlük Haftalık Takvim</div>
-                        <p class="feature-desc">
-                            Pazartesi'den Pazar'a haftanın tüm günlerini tek ekranda görün. Önceki ve sonraki haftalara oklarla kolayca geçiş yapabilirsiniz.
-                        </p>
+                        <div class="feature-title"><i class="bi bi-calendar3 text-info"></i> Haftalık plan</div>
+                        <p class="feature-desc">Antrenmanlarınızı birden çok güne ve 4 haftaya kadar tekrarlayarak planlayın; bitirdiğinizde "Tamamladım" ile işaretleyin.</p>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4">
                     <div class="feature-card">
-                        <div class="feature-title"><i class="bi bi-trophy text-warning"></i> 7 Farklı Spor Branşı</div>
-                        <p class="feature-desc">
-                            Ağırlık Antrenmanı, Kardiyo/Koşu, Fonksiyonel Fitness, HIIT/Kondisyon, Pilates/Yoga, Yüzme ve Boks seçeneklerinden dilediğinizi seçin.
-                        </p>
+                        <div class="feature-title"><i class="bi bi-journal-text text-warning"></i> Egzersiz günlüğü</div>
+                        <p class="feature-desc">Her egzersiz için set, tekrar, ağırlık veya süre kaydedin. Aynı egzersizin bir önceki değerleri otomatik önerilir.</p>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4">
                     <div class="feature-card">
-                        <div class="feature-title"><i class="bi bi-shield-check text-success"></i> Sabit Diyet Felsefesi</div>
-                        <p class="feature-desc">
-                            Antrenman eklemeniz beslenme hedeflerinizi bozmaz. Spor kayıtları kişisel disiplin ve aktivite takibi içindir; kalori açığınız korunur.
-                        </p>
+                        <div class="feature-title"><i class="bi bi-trophy text-success"></i> Rekorlar & gelişim</div>
+                        <p class="feature-desc">En ağır setiniz ve tahmini 1 tekrar maksimumunuz (Epley) hesaplanır; seçtiğiniz egzersizin gelişimi ve haftalık toplam hacim grafikte gösterilir.</p>
                     </div>
                 </div>
             </div>
@@ -468,7 +474,7 @@ $activePage = 'guide';
             <div class="tip-box">
                 <i class="bi bi-check2-circle text-success fs-5"></i>
                 <div>
-                    <strong>Antrenmanı Tamamla:</strong> Antrenmanınızı bitirdiğinizde <em>"Antrenmanı Bitir"</em> butonuna dokunarak günün sporunu tamamlandı olarak işaretleyin. İlerleme grafiğinize anında yansır.
+                    <strong>Antrenmanı Tamamla:</strong> Antrenmanınızı bitirdiğinizde <em>"Tamamladım"</em> butonuna dokunarak günün sporunu tamamlandı olarak işaretleyin. İlerleme grafiğinize anında yansır.
                 </div>
             </div>
         </div>
