@@ -83,7 +83,7 @@ $chart = [
     'w'       => array_map(fn($w) => $w['weight_kg'], $weights),
 ];
 $mealLabels = ['breakfast' => 'Kahvaltı', 'lunch' => 'Öğle', 'dinner' => 'Akşam', 'snack' => 'Ara', 'pre_workout' => 'Ant. öncesi', 'post_workout' => 'Ant. sonrası'];
-$v = '20260929';
+$v = '20260930';
 ?>
 <!DOCTYPE html>
 <html lang="tr">

@@ -73,7 +73,7 @@ $activityLabels = [
 ];
 $goalLabels = ['lose' => ['Kilo ver', '−500 kcal', 'bi-arrow-down'], 'maintain' => ['Koru', 'Denge', 'bi-dash'], 'gain' => ['Kilo al', '+300 kcal', 'bi-arrow-up']];
 $fmt = fn($v) => number_format((float)$v, 0, ',', '.');
-$v = '20260929';
+$v = '20260930';
 ?>
 <!DOCTYPE html>
 <html lang="tr">

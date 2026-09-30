@@ -3,24 +3,40 @@
   "functions": {
     "api/*.php": {
       "runtime": "vercel-php@0.9.0",
-      "includeFiles": "{app/**,config/**,includes/**,database/**,*.php}"
+      "includeFiles": "{app/**,config/**,includes/**,database/**,*.php}",
+      "maxDuration": 30
     }
   },
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-        { "key": "X-XSS-Protection", "value": "1; mode=block" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
       ]
     }
   ],
   "routes": [
     {
       "src": "/assets/(.*)",
-      "dest": "/assets/$1"
+      "dest": "/assets/$1",
+      "headers": {
+        "Cache-Control": "public, max-age=604800, stale-while-revalidate=86400"
+      }
     },
     {
       "src": "/manifest.json",
@@ -28,13 +44,20 @@
     },
     {
       "src": "/sw.js",
-      "dest": "/sw.js"
+      "dest": "/sw.js",
+      "headers": {
+        "Cache-Control": "no-cache",
+        "Service-Worker-Allowed": "/"
+      }
     },
     {
       "src": "/favicon.ico",
       "dest": "/favicon.ico"
     },
-
+    {
+      "src": "/api/(dashboard|reminders|workout|reports|analyze_food|ping)\\.php",
+      "dest": "/api/index.php"
+    },
     {
       "src": "/api/(.*)",
       "dest": "/api/$1"
@@ -43,5 +66,8 @@
       "src": "/(.*)",
       "dest": "/api/index.php"
     }
+  ],
+  "regions": [
+    "fra1"
   ]
 }

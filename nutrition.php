@@ -92,7 +92,7 @@ if (empty($meals)) {
 
 $hasGeminiKey = Config::hasGeminiKey();
 $fmt = fn($v) => number_format((float)$v, 0, ',', '.');
-$v = '20260929';
+$v = '20260930';
 ?>
 <!DOCTYPE html>
 <html lang="tr">

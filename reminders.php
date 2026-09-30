@@ -105,7 +105,7 @@ function fmtDose($amount, $unit): string {
     $a = rtrim(rtrim(number_format((float)$amount, 2, '.', ''), '0'), '.');
     return $a . ' ' . $unit;
 }
-$v = '20260929';
+$v = '20260930';
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -685,7 +685,7 @@ async function syncScheduleToApi(suppId) {
 async function addTimeInline(suppId, input) {
     const t = (input.value || '').trim();
     if (!/^\d{2}:\d{2}$/.test(t)) return;
-    scheduleMap[suppId] ??= new Set();
+    if (!scheduleMap[suppId]) scheduleMap[suppId] = new Set();
     if (scheduleMap[suppId].has(t)) return;
     scheduleMap[suppId].add(t);
     renderTimeBadges(suppId);

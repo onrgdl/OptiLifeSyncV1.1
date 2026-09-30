@@ -104,7 +104,7 @@ $activePage = 'creator';
     <?php require_once __DIR__ . '/includes/pwa-meta.php'; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="assets/css/sidebar.css?v=20260929">
+    <link rel="stylesheet" href="assets/css/sidebar.css?v=20260930">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 
     <style>

@@ -28,7 +28,7 @@ $defaultMeal = $hour < 11 ? 'breakfast' : ($hour < 16 ? 'lunch' : ($hour < 21 ? 
 $trDays = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 $trMonths = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 $todayLabel = $trDays[(int)date('w')] . ', ' . (int)date('j') . ' ' . $trMonths[(int)date('n')];
-$v = '20260929';
+$v = '20260930';
 $shortDay = ['Pazartesi' => 'Pzt', 'Salı' => 'Sal', 'Çarşamba' => 'Çar', 'Perşembe' => 'Per', 'Cuma' => 'Cum', 'Cumartesi' => 'Cmt', 'Pazar' => 'Paz'];
 ?>
 <!DOCTYPE html>

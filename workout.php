@@ -26,7 +26,7 @@ $commonExercises = [
     'Overhead Press', 'Lateral Raise', 'Face Pull', 'Biceps Curl', 'Hammer Curl', 'Triceps Pushdown',
     'Plank', 'Crunch', 'Koşu', 'Yürüyüş', 'Bisiklet', 'Yüzme', 'İp atlama',
 ];
-$v = '20260929';
+$v = '20260930';
 ?>
 <!DOCTYPE html>
 <html lang="tr">

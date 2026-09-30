@@ -26,7 +26,7 @@ $activePage = 'guide';
     <!-- Bootstrap 5 CSS & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="assets/css/sidebar.css?v=20260929">
+    <link rel="stylesheet" href="assets/css/sidebar.css?v=20260930">
 
     <style>
         /* Renk token'ları artık merkezi assets/css/theme.css içinde (sidebar.css @import eder) */
