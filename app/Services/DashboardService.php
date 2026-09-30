@@ -6,6 +6,7 @@ namespace App\Services;
 
 require_once __DIR__ . '/MetabolismCalculator.php';
 require_once __DIR__ . '/ReminderService.php';
+require_once __DIR__ . '/MedicationTracker.php';
 
 use PDO;
 use DateTime;
@@ -146,6 +147,15 @@ class DashboardService
             ");
             $fStmt->execute([$dailyLog['id']]);
             $recentMeals = $fStmt->fetchAll(PDO::FETCH_ASSOC);
+            $tz = new \DateTimeZone(date_default_timezone_get());
+            foreach ($recentMeals as &$rm) {
+                try {
+                    $rm['time'] = (new DateTime((string)$rm['logged_at']))->setTimezone($tz)->format('H:i');
+                } catch (\Throwable) {
+                    $rm['time'] = null;
+                }
+            }
+            unset($rm);
         }
 
         // Bugünkü kilo
@@ -190,7 +200,60 @@ class DashboardService
             'upcoming_alarms' => $upcomingAlarms,
             'recent_meals'    => $recentMeals,
             'weight_today'    => $weight,
+            'weight'          => self::getWeightInfo($pdo, $userId),
+            'doses'           => (new MedicationTracker($pdo))->getDosesForDate($userId, $today),
             'daily_log_id'    => (int)($dailyLog['id'] ?? 0),
+        ];
+    }
+
+    /**
+     * Kilo geçmişi (kaydedilmiş günler), eskiden yeniye.
+     */
+    public static function getWeightHistory(PDO $pdo, int $userId, int $days = 90): array
+    {
+        $from = date('Y-m-d', strtotime('-' . max(1, $days - 1) . ' days'));
+        $stmt = $pdo->prepare("
+            SELECT log_date, weight_kg FROM daily_logs
+            WHERE user_id = ? AND weight_kg IS NOT NULL AND log_date >= ?
+            ORDER BY log_date ASC
+        ");
+        $stmt->execute([$userId, $from]);
+        return array_map(fn($r) => [
+            'date'      => substr((string)$r['log_date'], 0, 10),
+            'weight_kg' => round((float)$r['weight_kg'], 1),
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /**
+     * Son kilo, bugün kayıt girilip girilmediği ve ~7 / ~30 gün önceye göre değişim.
+     */
+    public static function getWeightInfo(PDO $pdo, int $userId): array
+    {
+        $hist = self::getWeightHistory($pdo, $userId, 45);
+        $profile = self::getUserProfile($pdo, $userId);
+        $today = date('Y-m-d');
+        $latest = $hist ? end($hist) : null;
+        $findBefore = function (int $daysAgo) use ($hist): ?float {
+            $cut = date('Y-m-d', strtotime("-{$daysAgo} days"));
+            $val = null;
+            foreach ($hist as $h) {
+                if ($h['date'] <= $cut) {
+                    $val = $h['weight_kg'];
+                }
+            }
+            return $val;
+        };
+        $current = $latest ? (float)$latest['weight_kg'] : (float)($profile['weight_kg'] ?? 0);
+        $w7  = $findBefore(7);
+        $w30 = $findBefore(30);
+        return [
+            'current'       => round($current, 1),
+            'logged_today'  => $latest && $latest['date'] === $today,
+            'last_date'     => $latest['date'] ?? null,
+            'change_7d'     => $w7 !== null ? round($current - $w7, 1) : null,
+            'change_30d'    => $w30 !== null ? round($current - $w30, 1) : null,
+            'goal'          => $profile['goal'] ?? 'maintain',
+            'spark'         => array_slice(array_column($hist, 'weight_kg'), -14),
         ];
     }
 

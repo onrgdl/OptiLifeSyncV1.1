@@ -59,7 +59,10 @@ if (!empty($dbUrl)) {
     }
 
     if ($isPg) {
-        $dsn = "pgsql:host={$host};port={$port};dbname={$dbName};sslmode={$sslmode}";
+        $dsn = "pgsql:host={$host};port={$port};dbname={$dbName};sslmode={$sslmode};connect_timeout=8";
+        // Hız + Supabase havuzlayıcı (pooler) uyumu: sorgular sunucu tarafı "prepare"
+        // yerine tek gidiş-dönüşte gönderilir (her sorguda 3 yerine 1 ağ turu).
+        $options[PDO::ATTR_EMULATE_PREPARES] = true;
     } else {
         $dsn = "mysql:host={$host};port={$port};dbname={$dbName};charset=utf8mb4";
     }
@@ -79,7 +82,8 @@ if (!empty($dbUrl)) {
     $pass    = (string) Config::get('DB_PASS', '');
     $sslmode = (string) Config::get('DB_SSLMODE', 'require');
 
-    $dsn = "pgsql:host={$host};port={$port};dbname={$dbName};sslmode={$sslmode}";
+    $dsn = "pgsql:host={$host};port={$port};dbname={$dbName};sslmode={$sslmode};connect_timeout=8";
+    $options[PDO::ATTR_EMULATE_PREPARES] = true;
 
     try {
         $pdo = new PDO($dsn, $user, $pass, $options);

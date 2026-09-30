@@ -149,8 +149,11 @@ CREATE TABLE IF NOT EXISTS supplement_logs (
     dose_unit VARCHAR(20) NOT NULL DEFAULT 'mg',
     is_taken SMALLINT NOT NULL DEFAULT 1 CHECK (is_taken IN (0, 1)),
     notes TEXT NULL,
+    scheduled_time TIME NULL,
     logged_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE supplement_logs ADD COLUMN IF NOT EXISTS scheduled_time TIME NULL;
+CREATE INDEX IF NOT EXISTS idx_supplement_logs_daily_supp ON supplement_logs (daily_log_id, supplement_id);
 
 -- 4C. EGZERSİZ DETAY LOGLARI (exercise_logs)
 CREATE TABLE IF NOT EXISTS exercise_logs (

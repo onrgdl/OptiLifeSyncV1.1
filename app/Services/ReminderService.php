@@ -202,6 +202,7 @@ class ReminderService
 
             $due[] = [
                 'id'          => (int) $row['id'],
+                'supplement_id' => $row['supplement_id'] !== null ? (int) $row['supplement_id'] : 0,
                 'type'        => $row['type'],
                 'label'       => $row['label'],
                 'remind_at'   => substr($row['remind_at'], 0, 5),
@@ -397,6 +398,71 @@ class ReminderService
         $stmt = $this->db->prepare("DELETE FROM reminders WHERE id = :id AND user_id = :user_id");
         $stmt->execute([':id' => $reminderId, ':user_id' => $userId]);
         return $stmt->rowCount() > 0;
+    }
+
+    // =================================================================
+    // ÖZEL HATIRLATICILAR (İlaca bağlı olmayan: su, öğün, antrenman, diğer)
+    // =================================================================
+
+    /**
+     * İlaca bağlı olmayan bir hatırlatıcı ekler.
+     *
+     * @param  int[] $days 0=Pazar … 6=Cumartesi (boşsa her gün)
+     * @return int   Oluşturulan reminder ID
+     */
+    public function addCustomReminder(int $userId, string $label, string $type, string $time, array $days = []): int
+    {
+        $label = trim($label);
+        if ($label === '' || mb_strlen($label) > 190) {
+            throw new \InvalidArgumentException('Hatırlatıcı adı 1-190 karakter olmalı.');
+        }
+        if (!preg_match('/^(\d{1,2}):(\d{2})$/', trim($time), $m) || (int)$m[1] > 23 || (int)$m[2] > 59) {
+            throw new \InvalidArgumentException('Geçersiz saat.');
+        }
+        $type = in_array($type, ['water', 'meal', 'workout', 'custom'], true) ? $type : 'custom';
+        $days = array_values(array_unique(array_filter(array_map('intval', $days), fn($d) => $d >= 0 && $d <= 6)));
+        sort($days);
+        if (!$days) {
+            $days = [0, 1, 2, 3, 4, 5, 6];
+        }
+
+        $stmt = $this->db->prepare("
+            INSERT INTO reminders (user_id, supplement_id, type, label, remind_at, start_date, end_date, days_of_week, is_active)
+            VALUES (:user_id, NULL, :type, :label, :remind_at, :start_date, NULL, :days, 1)
+        ");
+        $stmt->execute([
+            ':user_id'    => $userId,
+            ':type'       => $type,
+            ':label'      => $label,
+            ':remind_at'  => sprintf('%02d:%02d:00', (int)$m[1], (int)$m[2]),
+            ':start_date' => date('Y-m-d'),
+            ':days'       => json_encode($days),
+        ]);
+
+        return function_exists('dbLastInsertId')
+            ? dbLastInsertId($this->db, 'reminders')
+            : (int) $this->db->lastInsertId();
+    }
+
+    /** İlaca bağlı olmayan hatırlatıcıları listeler. */
+    public function getCustomReminders(int $userId): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT id, type, label, remind_at, days_of_week, is_active
+            FROM reminders
+            WHERE user_id = ? AND supplement_id IS NULL
+            ORDER BY remind_at
+        ");
+        $stmt->execute([$userId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$r) {
+            $r['id'] = (int) $r['id'];
+            $r['remind_at'] = substr((string) $r['remind_at'], 0, 5);
+            $r['days_of_week'] = json_decode((string) ($r['days_of_week'] ?? '[]'), true) ?: [];
+            $r['is_active'] = (int) $r['is_active'];
+        }
+        unset($r);
+        return $rows;
     }
 
     /**

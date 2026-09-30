@@ -37,9 +37,11 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../app/Services/WorkoutService.php';
+require_once __DIR__ . '/../app/Services/ExerciseLogService.php';
 require_once __DIR__ . '/../app/Services/AuthService.php';
 
 use App\Services\WorkoutService;
+use App\Services\ExerciseLogService;
 use App\Services\AuthService;
 
 if (!$pdo) {
@@ -56,6 +58,7 @@ $userId = AuthService::requireAuth(true);
 AuthService::closeSession();
 
 $workoutService = new WorkoutService($pdo);
+$exerciseService = new ExerciseLogService($pdo);
 
 // Parametreleri al (POST veya JSON body; GET-only action'ı engelle)
 $action = $_POST['action'] ?? '';
@@ -133,7 +136,7 @@ try {
                 $days[] = [
                     'date'             => $curStr,
                     'day_number'       => $cur->format('d'),
-                    'month_name'       => $cur->format('M'),
+                    'month_name'       => ['', 'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'][(int)$cur->format('n')],
                     'day_name'         => $dayNamesTr[$isoDay],
                     'is_today'         => ($curStr === $today),
                     'is_past'          => ($curStr < $today),
@@ -283,6 +286,40 @@ try {
 
             $res = $workoutService->deleteWorkout($workoutId, $userId);
             echo json_encode($res, JSON_UNESCAPED_UNICODE);
+        })(),
+
+        // ── 5. EGZERSİZ KAYDI (set / tekrar / ağırlık) ────────────────
+        'log_exercise' => (function () use ($exerciseService, $userId): void {
+            $id = $exerciseService->addExercise($userId, $_POST);
+            echo json_encode(['ok' => true, 'id' => $id, 'message' => 'Egzersiz kaydedildi.'], JSON_UNESCAPED_UNICODE);
+        })(),
+
+        'delete_exercise' => (function () use ($exerciseService, $userId): void {
+            $ok = $exerciseService->deleteExercise($userId, (int)($_POST['id'] ?? 0));
+            echo json_encode(['ok' => $ok], JSON_UNESCAPED_UNICODE);
+        })(),
+
+        'exercises' => (function () use ($exerciseService, $userId): void {
+            echo json_encode(['ok' => true] + $exerciseService->getForDate($userId, $_POST['date'] ?? null), JSON_UNESCAPED_UNICODE);
+        })(),
+
+        'exercise_stats' => (function () use ($exerciseService, $userId): void {
+            echo json_encode([
+                'ok'      => true,
+                'records' => $exerciseService->getPersonalRecords($userId),
+                'weekly'  => $exerciseService->getWeeklyVolume($userId, 8),
+                'names'   => $exerciseService->getExerciseNames($userId),
+            ], JSON_UNESCAPED_UNICODE);
+        })(),
+
+        'exercise_progress' => (function () use ($exerciseService, $userId): void {
+            $name = trim((string)($_POST['name'] ?? ''));
+            echo json_encode([
+                'ok'     => true,
+                'name'   => $name,
+                'points' => $name !== '' ? $exerciseService->getProgress($userId, $name) : [],
+                'last'   => $name !== '' ? $exerciseService->getLastEntry($userId, $name) : null,
+            ], JSON_UNESCAPED_UNICODE);
         })(),
 
         default => (function () use ($action): void {

@@ -31,7 +31,9 @@ class WorkoutService
     public function __construct(PDO $db)
     {
         $this->db = $db;
-        $this->ensureSchemaCompatibility();
+        // Not: Eski uk_workouts_user_date kısıtı Supabase'den kaldırıldı. Her istekte
+        // ALTER TABLE çalıştırmak tabloyu kilitleyip sayfayı dondurabildiği için
+        // kontrol yalnızca ekleme hatası alınırsa (aşağıda) yapılır.
     }
 
     /**

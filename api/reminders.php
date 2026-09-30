@@ -49,10 +49,12 @@ header('X-Content-Type-Options: nosniff');
 
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../app/Services/ReminderService.php';
+require_once __DIR__ . '/../app/Services/MedicationTracker.php';
 
 require_once __DIR__ . '/../app/Services/AuthService.php';
 
 use App\Services\ReminderService;
+use App\Services\MedicationTracker;
 use App\Services\AuthService;
 
 // ── Bağlantı kontrolü ────────────────────────────────────────────────
@@ -67,6 +69,7 @@ $userId = AuthService::requireAuth(true);
 AuthService::closeSession(); // Session kilidini serbest bırak
 
 $service = new ReminderService($pdo);
+$tracker = new MedicationTracker($pdo);
 
 // ── İstek verisi ─────────────────────────────────────────────────────
 $action = trim($_POST['action'] ?? '');  // GET ile tetiklemeyi engelle
@@ -159,6 +162,58 @@ try {
             $remId  = (int)($input['reminder_id'] ?? 0);
             $result = $service->toggleReminder($remId, $userId);
             echo json_encode(['ok' => $result]);
+        })(),
+
+        // ── Bugünün (veya verilen günün) doz listesi ──────────────────
+        'doses' => (function () use ($tracker, $userId, $input): void {
+            echo json_encode(['ok' => true] + $tracker->getDosesForDate($userId, $input['date'] ?? null), JSON_UNESCAPED_UNICODE);
+        })(),
+
+        // ── Dozu "Aldım" / "Atla" olarak işaretle ─────────────────────
+        'log_dose' => (function () use ($tracker, $pdo, $userId, $input): void {
+            $suppId = (int)($input['supplement_id'] ?? 0);
+            if ($suppId <= 0 && !empty($input['reminder_id'])) {
+                $q = $pdo->prepare("SELECT supplement_id FROM reminders WHERE id = ? AND user_id = ?");
+                $q->execute([(int)$input['reminder_id'], $userId]);
+                $suppId = (int) $q->fetchColumn();
+            }
+            if ($suppId <= 0) {
+                // İlaca bağlı olmayan hatırlatıcı: kaydedilecek doz yok, sessizce onayla
+                echo json_encode(['ok' => true, 'skipped' => true]);
+                return;
+            }
+            $status = ($input['status'] ?? 'taken') === 'skipped' ? 'skipped' : 'taken';
+            $res = $tracker->logDose($userId, $suppId, $input['scheduled_time'] ?? null, $input['log_date'] ?? null, $status);
+            echo json_encode($res, JSON_UNESCAPED_UNICODE);
+        })(),
+
+        // ── Doz işaretini geri al ─────────────────────────────────────
+        'undo_dose' => (function () use ($tracker, $userId, $input): void {
+            $ok = $tracker->undoDose($userId, (int)($input['supplement_id'] ?? 0), $input['scheduled_time'] ?? null, $input['log_date'] ?? null);
+            echo json_encode(['ok' => $ok]);
+        })(),
+
+        // ── Uyum (adherence) istatistiği ──────────────────────────────
+        'adherence' => (function () use ($tracker, $userId, $input): void {
+            echo json_encode(['ok' => true] + $tracker->getAdherence($userId, (int)($input['days'] ?? 7)), JSON_UNESCAPED_UNICODE);
+        })(),
+
+        // ── Android uygulaması için tüm aktif alarmlar ────────────────
+        'native_list' => (function () use ($tracker, $userId): void {
+            echo json_encode(['ok' => true, 'alarms' => $tracker->getNativeAlarmList($userId), 'server_time' => date('c')], JSON_UNESCAPED_UNICODE);
+        })(),
+
+        // ── Özel hatırlatıcı ekle (su, öğün, antrenman, diğer) ────────
+        'add_custom' => (function () use ($service, $userId, $input): void {
+            $days = $input['days'] ?? '';
+            $days = is_array($days) ? $days : array_filter(explode(',', (string)$days), fn($d) => $d !== '');
+            $id = $service->addCustomReminder($userId, (string)($input['label'] ?? ''), (string)($input['type'] ?? 'custom'), (string)($input['time'] ?? ''), $days);
+            echo json_encode(['ok' => true, 'id' => $id, 'message' => 'Hatırlatıcı eklendi.']);
+        })(),
+
+        // ── Özel hatırlatıcıları listele ──────────────────────────────
+        'list_custom' => (function () use ($service, $userId): void {
+            echo json_encode(['ok' => true, 'items' => $service->getCustomReminders($userId)], JSON_UNESCAPED_UNICODE);
         })(),
 
         // ── Bilinmeyen action ─────────────────────────────────────────

@@ -1,561 +1,389 @@
 /**
- * OptiLifeSync - Gelişmiş Sesli Alarm Motoru (Web Audio API Synthesizer)
- * ────────────────────────────────────────────────────────────────────────
- * Harici ses dosyasına (MP3/WAV) ihtiyaç duymadan, sıfır gecikmeyle tüm
- * tarayıcılarda ve mobil cihazlarda anında çalan çok melodili synthesizer motoru.
- * 
- * Özellikler:
- * - 5 farklı polifonik melodi seçeneği (Klasik, Melodik Çan, Marimba, Acil Siren, Modern Pulse)
- * - Canlı ses seviyesi kontrolü (Master Gain: %0 - %100)
- * - Otomatik tarayıcı ses kilidi çözümü (Autoplay Policy / User Interaction Unlock)
- * - Haptic titreşim desteği (Mobil)
- * - LocalStorage kalıcılığı
+ * OptiLifeSync — Tarayıcı Alarm Motoru & Alarm İzleyici (v2)
+ * ────────────────────────────────────────────────────────────
+ * 1. OptiAlarmEngine : Web Audio ile harici dosya gerektirmeyen alarm sesi,
+ *                      ses seviyesi, sistem bildirimi, arka plan nöbetçisi.
+ * 2. OptiAlarmWatcher: Sayfa açıkken zamanı gelen alarmları yakalar ve
+ *                      "Aldım / Ertele / Atla" penceresini gösterir.
+ *
+ * Android uygulamasında (APK) alarmlar telefonun kendi alarm sistemiyle
+ * çaldığı için izleyici otomatik olarak devre dışı kalır (çift çalma olmaz).
+ *
+ * Birden fazla kez yüklense de güvenlidir.
  */
+(function () {
+    'use strict';
+    if (window.OptiAlarmEngine) return;
 
-class OptiAlarmEngine {
-    constructor() {
-        this.audioCtx = null;
-        this.masterGain = null;
-        this.isPlaying = false;
-        this.alarmInterval = null;
-        this.isUnlocked = false;
+    const LS = {
+        get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (_) { return d; } },
+        set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
+    };
 
-        // Ayarları LocalStorage'dan al veya varsayılan ata
-        const savedVol = localStorage.getItem('opti_alarm_volume');
-        this.volume = savedVol !== null ? Math.max(0, Math.min(1, parseFloat(savedVol))) : 0.7;
-        this.soundType = localStorage.getItem('opti_alarm_sound') || 'classic';
-
-        // Arka Plan Nöbetçisi (Ekran kapalıyken veya arka plandayken uyutmayan koruyucu)
-        this.isSentinelEnabled = localStorage.getItem('opti_sentinel_enabled') !== 'false';
-        this.sentinelAudio = null;
-        this.wakeLock = null;
-        this.isSentinelActive = false;
-
-        // Melodi tanımları
-        this.availableSounds = {
-            'classic': { id: 'classic', name: '🔔 Klasik Dijital Bip', interval: 1600 },
-            'chime':   { id: 'chime',   name: '🎵 Melodik Çan (Ding-Dong)', interval: 2000 },
-            'marimba': { id: 'marimba', name: '🌿 Yumuşak Marimba', interval: 1800 },
-            'urgent':  { id: 'urgent',  name: '🚨 Acil Uyarı Sireni', interval: 1400 },
-            'pulse':   { id: 'pulse',   name: '⚡ Modern Elektronik Ritim', interval: 1600 }
-        };
-
-        // Tarayıcı otomatik ses engellemesini (Autoplay Policy) aşmak için ilk etkileşimde kilidi aç
-        this.setupUnlockListener();
-    }
-
-    /**
-     * Web Audio Context başlat ve Master Gain bağla
-     */
-    initContext() {
-        if (!this.audioCtx) {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (AudioContext) {
-                this.audioCtx = new AudioContext();
-            }
-        }
-
-        if (this.audioCtx) {
-            if (!this.masterGain) {
-                this.masterGain = this.audioCtx.createGain();
-                this.masterGain.gain.setValueAtTime(this.volume, this.audioCtx.currentTime);
-                this.masterGain.connect(this.audioCtx.destination);
-            }
-            if (this.audioCtx.state === 'suspended') {
-                this.audioCtx.resume();
-            }
-        }
-    }
-
-    setupUnlockListener() {
-        const unlock = () => {
-            this.initContext();
-            this.startSentinel();
-            if (this.audioCtx && this.audioCtx.state === 'running') {
-                this.isUnlocked = true;
-                window.removeEventListener('click', unlock);
-                window.removeEventListener('touchstart', unlock);
-                window.removeEventListener('keydown', unlock);
-            }
-        };
-
-        window.addEventListener('click', unlock, { once: false, passive: true });
-        window.addEventListener('touchstart', unlock, { once: false, passive: true });
-        window.addEventListener('keydown', unlock, { once: false, passive: true });
-    }
-
-    /**
-     * Ses Seviyesini Ayarla (0.0 - 1.0 veya 0 - 100)
-     */
-    setVolume(val) {
-        let num = parseFloat(val);
-        if (isNaN(num)) num = 0.7;
-        if (num > 1) num = num / 100; // 70 girildiyse 0.7 yap
-        this.volume = Math.max(0, Math.min(1, num));
-        localStorage.setItem('opti_alarm_volume', this.volume.toString());
-
-        if (this.audioCtx && this.masterGain) {
-            try {
-                this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
-                this.masterGain.gain.setValueAtTime(this.volume, this.audioCtx.currentTime);
-            } catch (_) {}
-        }
-    }
-
-    getVolume() {
-        return this.volume;
-    }
-
-    getVolumePercent() {
-        return Math.round(this.volume * 100);
-    }
-
-    /**
-     * Alarm Melodisini Ayarla
-     */
-    setSound(soundKey) {
-        if (this.availableSounds[soundKey]) {
-            this.soundType = soundKey;
-            localStorage.setItem('opti_alarm_sound', soundKey);
-        }
-    }
-
-    getSound() {
-        return this.soundType;
-    }
-
-    /**
-     * Tekil bir osilatör tonu oluştur ve master gain'e bağla
-     */
-    playTone(freq, startTime, duration, peakGain = 0.4, type = 'sine') {
-        try {
-            this.initContext();
-            if (!this.audioCtx || !this.masterGain) return;
-
-            const osc = this.audioCtx.createOscillator();
-            const gain = this.audioCtx.createGain();
-
-            osc.type = type;
-            osc.frequency.setValueAtTime(freq, startTime);
-
-            // Yumuşak Attack ve Decay eğrisi (Tık/patlama seslerini engeller)
-            gain.gain.setValueAtTime(0.0001, startTime);
-            gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakGain), startTime + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
-
-            osc.connect(gain);
-            gain.connect(this.masterGain);
-
-            osc.start(startTime);
-            osc.stop(startTime + duration);
-        } catch (e) {
-            console.warn('Ton çalınamadı:', e);
-        }
-    }
-
-    /**
-     * Melodi 1: Klasik Dijital Bip
-     */
-    playClassicSequence(t0) {
-        this.playTone(880,  t0,        0.12, 0.40, 'sine');
-        this.playTone(1175, t0 + 0.14, 0.14, 0.45, 'sine');
-        this.playTone(1760, t0 + 0.30, 0.22, 0.50, 'sine');
-    }
-
-    /**
-     * Melodi 2: Melodik Çan (Ding-Dong / Harmonic Chime)
-     */
-    playChimeSequence(t0) {
-        this.playTone(523.25, t0,        0.45, 0.40, 'sine');     // C5
-        this.playTone(659.25, t0 + 0.14, 0.50, 0.40, 'sine');     // E5
-        this.playTone(783.99, t0 + 0.28, 0.55, 0.45, 'sine');     // G5
-        this.playTone(1046.50,t0 + 0.42, 0.85, 0.50, 'triangle'); // C6
-    }
-
-    /**
-     * Melodi 3: Yumuşak Marimba (Akustik Doğal Ritim)
-     */
-    playMarimbaSequence(t0) {
-        this.playTone(440.00, t0,        0.20, 0.45, 'triangle'); // A4
-        this.playTone(554.37, t0 + 0.12, 0.20, 0.45, 'triangle'); // C#5
-        this.playTone(659.25, t0 + 0.24, 0.22, 0.45, 'triangle'); // E5
-        this.playTone(880.00, t0 + 0.36, 0.35, 0.50, 'triangle'); // A5
-    }
-
-    /**
-     * Melodi 4: Acil Uyarı Sireni (Urgent Alert)
-     */
-    playUrgentSequence(t0) {
-        this.playTone(987.77,  t0,        0.10, 0.35, 'sawtooth'); // B5
-        this.playTone(1318.51, t0 + 0.12, 0.12, 0.35, 'sawtooth'); // E6
-        this.playTone(987.77,  t0 + 0.24, 0.10, 0.35, 'sawtooth'); // B5
-        this.playTone(1318.51, t0 + 0.36, 0.16, 0.40, 'sawtooth'); // E6
-    }
-
-    /**
-     * Melodi 5: Modern Elektronik Ritim (Pulse)
-     */
-    playPulseSequence(t0) {
-        this.playTone(587.33, t0,        0.09, 0.42, 'sine');     // D5
-        this.playTone(587.33, t0 + 0.12, 0.09, 0.42, 'sine');     // D5
-        this.playTone(880.00, t0 + 0.26, 0.30, 0.48, 'triangle'); // A5
-    }
-
-    /**
-     * Belirtilen melodiyi bir kez çal
-     */
-    playMelodyOnce(soundKey = null) {
-        this.initContext();
-        if (!this.audioCtx) return;
-
-        const key = soundKey || this.soundType;
-        const now = this.audioCtx.currentTime + 0.02;
-
-        switch (key) {
-            case 'chime':   this.playChimeSequence(now); break;
-            case 'marimba': this.playMarimbaSequence(now); break;
-            case 'urgent':  this.playUrgentSequence(now); break;
-            case 'pulse':   this.playPulseSequence(now); break;
-            case 'classic':
-            default:
-                this.playClassicSequence(now);
-                break;
-        }
-
-        // Mobil Titreşim
-        if ('vibrate' in navigator) {
-            try { navigator.vibrate([150, 80, 150, 80, 250]); } catch (_) {}
-        }
-    }
-
-    /**
-     * Seçili sesi tek sefer test et
-     */
-    testSound(soundKey = null, vol = null) {
-        if (vol !== null) this.setVolume(vol);
-        if (soundKey) this.setSound(soundKey);
-        this.playMelodyOnce(soundKey);
-    }
-
-    /**
-     * Alarmı Sürekli Döngüde Çalmaya Başla
-     */
-    start() {
-        if (this.isPlaying) return;
-        this.isPlaying = true;
-        this.initContext();
-
-        const soundConf = this.availableSounds[this.soundType] || this.availableSounds['classic'];
-        const intervalMs = soundConf.interval || 1600;
-
-        // İlk vuruş hemen
-        this.playMelodyOnce();
-
-        // Ritmik tekrar
-        this.alarmInterval = setInterval(() => {
-            if (this.isPlaying) {
-                this.playMelodyOnce();
-            } else {
-                clearInterval(this.alarmInterval);
-            }
-        }, intervalMs);
-    }
-
-    /**
-     * Alarmı Durdur
-     */
-    stop() {
-        this.isPlaying = false;
-        if (this.alarmInterval) {
-            clearInterval(this.alarmInterval);
+    class OptiAlarmEngine {
+        constructor() {
+            this.audioCtx = null;
+            this.masterGain = null;
+            this.isPlaying = false;
             this.alarmInterval = null;
-        }
-        if ('vibrate' in navigator) {
-            try { navigator.vibrate(0); } catch (_) {}
-        }
-        // Alarm durdurulduğunda medya oturumu başlığını nöbetçi moduna döndür
-        if (this.isSentinelActive) {
-            this.updateMediaSessionMetadata();
-        }
-    }
+            this.isUnlocked = false;
 
-    /**
-     * ─── ALARM TETİKLEYİCİ & SİSTEM BİLDİRİMİ ───
-     * Alarm vakti geldiğinde hem melodiyi çalar, hem de Android / PWA / Kilit Ekranı
-     * üzerinde görünen sistem bildirimini ateşler.
-     */
-    triggerAlarm(data = {}) {
-        const title = data.title || (data.type === 'medication' ? '💊 İlaç Zamanı!' : '💪 Takviye Zamanı!');
-        const label = data.label || 'İlaç/Takviye';
-        const dose  = data.dose ? ` (${data.dose})` : '';
-        const body  = data.body || `${label}${dose} alma vaktiniz geldi!`;
+            const savedVol = LS.get('opti_alarm_volume', null);
+            this.volume = savedVol !== null ? Math.max(0, Math.min(1, parseFloat(savedVol))) : 0.7;
+            this.soundType = LS.get('opti_alarm_sound', 'classic');
 
-        // 1. Sesli alarmı döngüsel başlat
-        this.start();
+            this.isSentinelEnabled = LS.get('opti_sentinel_enabled', 'true') !== 'false';
+            this.sentinelAudio = null;
+            this.wakeLock = null;
+            this.isSentinelActive = false;
 
-        // 2. Kilit ekranı medya bildirimini hemen kırmızı alarm durumuna geçir
-        if ('mediaSession' in navigator) {
-            try {
-                navigator.mediaSession.metadata = new MediaMetadata({
-                    title: `🚨 ${title}`,
-                    artist: body,
-                    album: 'OptiLifeSync Alarmı'
-                });
-                navigator.mediaSession.playbackState = 'playing';
-            } catch (_) {}
+            this.availableSounds = {
+                classic: { id: 'classic', name: 'Klasik dijital bip', interval: 1600 },
+                chime:   { id: 'chime',   name: 'Melodik çan',        interval: 2000 },
+                marimba: { id: 'marimba', name: 'Yumuşak marimba',    interval: 1800 },
+                urgent:  { id: 'urgent',  name: 'Acil uyarı',         interval: 1400 },
+                pulse:   { id: 'pulse',   name: 'Modern ritim',       interval: 1600 }
+            };
+
+            this.setupUnlockListener();
         }
 
-        // 3. Android Doze / Kilit ekranı sistem bildirimini göster
-        this.showSystemNotification(title, {
-            body: body,
-            tag: 'opti-alarm-' + (data.id || 'now'),
-            data: { id: data.id, url: window.location.origin + '/reminders.php' }
-        });
-    }
-
-    /**
-     * Mobil Chrome'da "Illegal constructor" hatası vermeyen,
-     * Service Worker üzerinden telefon ekranına bildirim basan fonksiyon.
-     */
-    async showSystemNotification(title, options = {}) {
-        const iconUrl = window.location.origin + '/assets/icons/icon-192.png';
-        const finalOpts = {
-            body: options.body || 'OptiLifeSync Alarmı',
-            icon: options.icon || iconUrl,
-            badge: options.badge || iconUrl,
-            tag: options.tag || 'opti-alarm',
-            renotify: true,
-            requireInteraction: true,
-            vibrate: [500, 250, 500, 250, 500, 250, 500],
-            silent: false,
-            timestamp: Date.now(),
-            data: Object.assign({ url: window.location.origin + '/reminders.php' }, options.data || {})
-        };
-
-        // 1. Titreşim desteği
-        if ('vibrate' in navigator) {
-            try { navigator.vibrate(finalOpts.vibrate); } catch (_) {}
-        }
-
-        // 2. Capacitor LocalNotifications (Mobil APK)
-        if (window.Capacitor?.Plugins?.LocalNotifications) {
-            try {
-                await window.Capacitor.Plugins.LocalNotifications.schedule({
-                    notifications: [{
-                        id: Math.floor(Math.random() * 900000) + 100000,
-                        title: title,
-                        body: finalOpts.body,
-                        channelId: 'opti_alarms_channel',
-                        extra: finalOpts.data
-                    }]
-                });
-            } catch (e) {
-                console.warn('Capacitor anlık bildirim hatası:', e);
+        initContext() {
+            if (!this.audioCtx) {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (AC) this.audioCtx = new AC();
             }
-        }
-
-        // 3. Service Worker showNotification (Android Chrome & PWA için ZORUNLU!)
-        if ('serviceWorker' in navigator) {
-            try {
-                const reg = await navigator.serviceWorker.ready;
-                if (reg && typeof reg.showNotification === 'function') {
-                    await reg.showNotification(title, finalOpts);
-                    return true;
+            if (this.audioCtx) {
+                if (!this.masterGain) {
+                    this.masterGain = this.audioCtx.createGain();
+                    this.masterGain.gain.setValueAtTime(this.volume, this.audioCtx.currentTime);
+                    this.masterGain.connect(this.audioCtx.destination);
                 }
-            } catch (err) {
-                console.warn('ServiceWorker showNotification hatası:', err);
+                if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
             }
         }
 
-        // 4. Masaüstü Tarayıcı Fallback
-        if ('Notification' in window && Notification.permission === 'granted') {
+        setupUnlockListener() {
+            const unlock = () => {
+                this.initContext();
+                this.startSentinel();
+                if (this.audioCtx && this.audioCtx.state === 'running') {
+                    this.isUnlocked = true;
+                    ['click', 'touchstart', 'keydown'].forEach(ev => window.removeEventListener(ev, unlock));
+                }
+            };
+            ['click', 'touchstart', 'keydown'].forEach(ev => window.addEventListener(ev, unlock, { passive: true }));
+        }
+
+        setVolume(val) {
+            let num = parseFloat(val);
+            if (isNaN(num)) num = 0.7;
+            if (num > 1) num = num / 100;
+            this.volume = Math.max(0, Math.min(1, num));
+            LS.set('opti_alarm_volume', String(this.volume));
+            if (this.audioCtx && this.masterGain) {
+                try {
+                    this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
+                    this.masterGain.gain.setValueAtTime(this.volume, this.audioCtx.currentTime);
+                } catch (_) {}
+            }
+        }
+        getVolume() { return this.volume; }
+        getVolumePercent() { return Math.round(this.volume * 100); }
+
+        setSound(key) {
+            if (this.availableSounds[key]) {
+                this.soundType = key;
+                LS.set('opti_alarm_sound', key);
+            }
+        }
+        getSound() { return this.soundType; }
+
+        playTone(freq, startTime, duration, peakGain = 0.4, type = 'sine') {
             try {
-                const notif = new Notification(title, finalOpts);
-                notif.onclick = function () {
-                    window.focus();
-                    notif.close();
-                };
-                return true;
-            } catch (err) {
-                console.warn('Notification constructor fallback hatası:', err);
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * ─── ARKA PLAN NÖBETÇİSİ (Background Audio Sentinel & WakeLock) ───
-     * Mobil cihazlarda ekran kilitlendiğinde veya tarayıcı arka plana atıldığında
-     * işletim sisteminin (Android Doze / iOS) JavaScript motorunu uyutmasını engeller.
-     * Sessiz bir ses akışı ve MediaSession API ile arka plan nöbeti tutar.
-     */
-    startSentinel() {
-        if (!this.isSentinelEnabled) return;
-
-        try {
-            if (!this.sentinelAudio) {
-                // 48 baytlık saf sessiz PCM WAV akışı
-                this.sentinelAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
-                this.sentinelAudio.loop = true;
-                this.sentinelAudio.volume = 0.001;
-            }
-
-            const playPromise = this.sentinelAudio.play();
-            if (playPromise !== undefined) {
-                playPromise.then(() => {
-                    this.isSentinelActive = true;
-                    this.updateMediaSessionMetadata();
-                }).catch(() => {
-                    // Kullanıcı etkileşimi beklenir
-                });
-            }
-
-            // Destekleyen tarayıcılarda ekran uyanık tutma desteği
-            if ('wakeLock' in navigator && !this.wakeLock) {
-                navigator.wakeLock.request('screen').then(wl => {
-                    this.wakeLock = wl;
-                }).catch(() => {});
-            }
-        } catch (_) {}
-    }
-
-    stopSentinel() {
-        if (this.sentinelAudio) {
-            try { this.sentinelAudio.pause(); } catch (_) {}
-        }
-        if (this.wakeLock) {
-            try { this.wakeLock.release(); this.wakeLock = null; } catch (_) {}
-        }
-        this.isSentinelActive = false;
-        if ('mediaSession' in navigator) {
-            try { navigator.mediaSession.playbackState = 'none'; } catch (_) {}
-        }
-    }
-
-    toggleSentinel(enabled) {
-        this.isSentinelEnabled = !!enabled;
-        localStorage.setItem('opti_sentinel_enabled', this.isSentinelEnabled ? 'true' : 'false');
-        if (this.isSentinelEnabled) {
-            this.startSentinel();
-        } else {
-            this.stopSentinel();
-        }
-    }
-
-    updateMediaSessionMetadata() {
-        if ('mediaSession' in navigator) {
-            try {
-                navigator.mediaSession.metadata = new MediaMetadata({
-                    title: 'OptiLifeSync Alarm Nöbetçisi',
-                    artist: 'İlaç & Takviye Alarmları İzleniyor',
-                    album: 'OptiLifeSync'
-                });
-                navigator.mediaSession.playbackState = 'playing';
+                this.initContext();
+                if (!this.audioCtx || !this.masterGain) return;
+                const osc = this.audioCtx.createOscillator();
+                const gain = this.audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, startTime);
+                gain.gain.setValueAtTime(0.0001, startTime);
+                gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakGain), startTime + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(startTime);
+                osc.stop(startTime + duration);
             } catch (_) {}
         }
-    }
 
-    /**
-     * ─── TELEFONUN DAHİLİ SAATİNE (ANDROID CLOCK INTENT) ALARM KUR ───
-     * Doğrudan telefonun kendi dahili "Saat / Alarm" uygulamasına (Google Saat / Samsung Saat)
-     * alarm kurar. Telefon kapalı olsa veya tüm uygulamalar kapatılsa dahi %100 kesin çalar!
-     */
-    setNativeClockAlarm(timeStr, label) {
-        if (!timeStr || !timeStr.includes(':')) return false;
-        const [hStr, mStr] = timeStr.split(':');
-        const h = parseInt(hStr, 10);
-        const m = parseInt(mStr, 10);
-        if (isNaN(h) || isNaN(m)) return false;
-
-        const isAndroid = /android/i.test(navigator.userAgent);
-        const cleanLabel = encodeURIComponent(label ? `💊 ${label}` : 'OptiLifeSync İlaç/Takviye');
-
-        if (isAndroid) {
-            const intentUrl = `intent:#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.HOUR=${h};i.android.intent.extra.MINUTES=${m};S.android.intent.extra.MESSAGE=${cleanLabel};B.android.intent.extra.SKIP_UI=false;end`;
-            window.location.href = intentUrl;
-            return true;
-        } else {
-            if (window.Swal) {
-                const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-                const safeTime = esc(timeStr);
-                const safeLabel = esc(label);
-                Swal.fire({
-                    icon: 'info',
-                    title: '📱 Telefon Alarmı',
-                    html: `Telefonunuzun dahili saatine saat <strong>${safeTime}</strong> için <strong>${safeLabel}</strong> alarmı kurmak üzeresiniz.<br><br><small class="text-secondary">Android cihazlarda bu buton doğrudan telefonun kendi Saat / Alarm uygulamasını açıp alarmı kurar.</small>`,
-                    confirmButtonText: 'Anladım',
-                    confirmButtonColor: '#0284c7',
-                    background: '#ffffff',
-                    color: '#1e293b'
-                });
+        playMelodyOnce(soundKey = null) {
+            this.initContext();
+            if (!this.audioCtx) return;
+            const t0 = this.audioCtx.currentTime + 0.02;
+            const T = (f, dt, d, g, w) => this.playTone(f, t0 + dt, d, g, w);
+            switch (soundKey || this.soundType) {
+                case 'chime':
+                    T(523.25, 0, .45, .40, 'sine'); T(659.25, .14, .50, .40, 'sine'); T(783.99, .28, .55, .45, 'sine'); T(1046.5, .42, .85, .50, 'triangle');
+                    break;
+                case 'marimba':
+                    T(440, 0, .20, .45, 'triangle'); T(554.37, .12, .20, .45, 'triangle'); T(659.25, .24, .22, .45, 'triangle'); T(880, .36, .35, .50, 'triangle');
+                    break;
+                case 'urgent':
+                    T(987.77, 0, .10, .35, 'sawtooth'); T(1318.51, .12, .12, .35, 'sawtooth'); T(987.77, .24, .10, .35, 'sawtooth'); T(1318.51, .36, .16, .40, 'sawtooth');
+                    break;
+                case 'pulse':
+                    T(587.33, 0, .09, .42, 'sine'); T(587.33, .12, .09, .42, 'sine'); T(880, .26, .30, .48, 'triangle');
+                    break;
+                default:
+                    T(880, 0, .12, .40, 'sine'); T(1175, .14, .14, .45, 'sine'); T(1760, .30, .22, .50, 'sine');
             }
-            return false;
+            if ('vibrate' in navigator) { try { navigator.vibrate([150, 80, 150, 80, 250]); } catch (_) {} }
         }
-    }
 
-    /**
-     * ─── CAPACITOR NATIVE LOCAL NOTIFICATIONS SENKRONİZASYONU ───
-     * Eğer uygulama Capacitor APK olarak çalışıyorsa, alarmları Android AlarmManager'a kaydeder.
-     */
-    async syncCapacitorNotifications(alarms) {
-        const LN = window.Capacitor?.Plugins?.LocalNotifications;
-        if (!LN || !alarms || !alarms.length) return false;
+        testSound(soundKey = null, vol = null) {
+            if (vol !== null) this.setVolume(vol);
+            if (soundKey) this.setSound(soundKey);
+            this.playMelodyOnce(soundKey);
+        }
 
-        try {
-            const perm = await LN.requestPermissions();
-            if (perm && perm.display !== 'granted') return false;
+        start() {
+            if (this.isPlaying) return;
+            this.isPlaying = true;
+            this.initContext();
+            const conf = this.availableSounds[this.soundType] || this.availableSounds.classic;
+            this.playMelodyOnce();
+            this.alarmInterval = setInterval(() => {
+                if (this.isPlaying) this.playMelodyOnce(); else clearInterval(this.alarmInterval);
+            }, conf.interval || 1600);
+        }
 
-            await LN.createChannel({
-                id: 'opti_alarms_channel',
-                name: 'OptiLifeSync İlaç & Takviye Alarmları',
-                description: 'Uygulama kapalıyken çalan yüksek öncelikli sesli alarm',
-                importance: 5,
-                visibility: 1,
-                vibration: true,
-                sound: 'beep.wav'
+        stop() {
+            this.isPlaying = false;
+            if (this.alarmInterval) { clearInterval(this.alarmInterval); this.alarmInterval = null; }
+            if ('vibrate' in navigator) { try { navigator.vibrate(0); } catch (_) {} }
+            if (this.isSentinelActive) this.updateMediaSessionMetadata();
+        }
+
+        triggerAlarm(data = {}) {
+            const title = data.title || (data.type === 'medication' ? '💊 İlaç zamanı' : '⏰ Hatırlatıcı');
+            const body = data.body || `${data.label || ''}${data.dose ? ' · ' + data.dose : ''}`;
+            this.start();
+            if ('mediaSession' in navigator) {
+                try {
+                    navigator.mediaSession.metadata = new MediaMetadata({ title, artist: body, album: 'OptiLifeSync' });
+                    navigator.mediaSession.playbackState = 'playing';
+                } catch (_) {}
+            }
+            this.showSystemNotification(title, {
+                body,
+                tag: 'opti-alarm-' + (data.id || 'now'),
+                data: { id: data.id, url: window.location.origin + '/reminders.php' }
             });
+        }
 
-            const pending = await LN.getPending();
-            if (pending && pending.notifications && pending.notifications.length > 0) {
-                await LN.cancel({ notifications: pending.notifications });
+        async showSystemNotification(title, options = {}) {
+            const iconUrl = window.location.origin + '/assets/icons/icon-192.png';
+            const opts = {
+                body: options.body || 'OptiLifeSync',
+                icon: options.icon || iconUrl,
+                badge: options.badge || iconUrl,
+                tag: options.tag || 'opti-alarm',
+                renotify: true,
+                requireInteraction: true,
+                vibrate: [500, 250, 500, 250, 500],
+                silent: false,
+                timestamp: Date.now(),
+                data: Object.assign({ url: window.location.origin + '/reminders.php' }, options.data || {})
+            };
+            if ('serviceWorker' in navigator) {
+                try {
+                    const reg = await navigator.serviceWorker.getRegistration();
+                    if (reg && typeof reg.showNotification === 'function' && 'Notification' in window && Notification.permission === 'granted') {
+                        await reg.showNotification(title, opts);
+                        return true;
+                    }
+                } catch (_) {}
             }
-
-            const list = [];
-            let idx = 2000;
-            for (const a of alarms) {
-                if (!a.remind_at || !a.remind_at.includes(':')) continue;
-                const [hStr, mStr] = a.remind_at.split(':');
-                const hour = parseInt(hStr, 10);
-                const minute = parseInt(mStr, 10);
-                if (isNaN(hour) || isNaN(minute)) continue;
-
-                idx++;
-                list.push({
-                    id: idx,
-                    title: a.type === 'medication' ? '💊 İlaç Zamanı!' : '💪 Takviye Zamanı!',
-                    body: `${a.label} — ${a.dose || ''} alma vaktiniz geldi!`.trim(),
-                    channelId: 'opti_alarms_channel',
-                    schedule: {
-                        on: { hour, minute },
-                        allowWhileIdle: true
-                    },
-                    extra: { id: a.id, remind_at: a.remind_at },
-                    smallIcon: 'ic_stat_icon_config_sample'
-                });
+            if ('Notification' in window && Notification.permission === 'granted') {
+                try {
+                    const n = new Notification(title, opts);
+                    n.onclick = () => { window.focus(); n.close(); };
+                    return true;
+                } catch (_) {}
             }
+            return false;
+        }
 
-            if (list.length > 0) {
-                await LN.schedule({ notifications: list });
-                console.log(`📱 ${list.length} adet sistem alarmı Capacitor ile zamanlandı.`);
+        /* ── Arka plan nöbetçisi (tarayıcı sekmesinin uyutulmasını geciktirir) ── */
+        startSentinel() {
+            if (!this.isSentinelEnabled) return;
+            try {
+                if (!this.sentinelAudio) {
+                    this.sentinelAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+                    this.sentinelAudio.loop = true;
+                    this.sentinelAudio.volume = 0.001;
+                }
+                const p = this.sentinelAudio.play();
+                if (p && p.then) p.then(() => { this.isSentinelActive = true; this.updateMediaSessionMetadata(); }).catch(() => {});
+            } catch (_) {}
+        }
+        stopSentinel() {
+            if (this.sentinelAudio) { try { this.sentinelAudio.pause(); } catch (_) {} }
+            if (this.wakeLock) { try { this.wakeLock.release(); } catch (_) {} this.wakeLock = null; }
+            this.isSentinelActive = false;
+            if ('mediaSession' in navigator) { try { navigator.mediaSession.playbackState = 'none'; } catch (_) {} }
+        }
+        toggleSentinel(enabled) {
+            this.isSentinelEnabled = !!enabled;
+            LS.set('opti_sentinel_enabled', this.isSentinelEnabled ? 'true' : 'false');
+            if (this.isSentinelEnabled) this.startSentinel(); else this.stopSentinel();
+        }
+        updateMediaSessionMetadata() {
+            if ('mediaSession' in navigator) {
+                try {
+                    navigator.mediaSession.metadata = new MediaMetadata({ title: 'OptiLifeSync', artist: 'Alarmlar izleniyor', album: 'OptiLifeSync' });
+                    navigator.mediaSession.playbackState = 'playing';
+                } catch (_) {}
             }
-            return true;
-        } catch (err) {
-            console.warn('Capacitor LocalNotifications hatası:', err);
+        }
+
+        /** Android tarayıcısında telefonun Saat uygulamasına alarm kurma ekranını açar. */
+        setNativeClockAlarm(timeStr, label) {
+            if (!timeStr || !timeStr.includes(':')) return false;
+            const [h, m] = timeStr.split(':').map(n => parseInt(n, 10));
+            if (isNaN(h) || isNaN(m)) return false;
+            if (/android/i.test(navigator.userAgent)) {
+                const msg = encodeURIComponent(label ? `💊 ${label}` : 'OptiLifeSync');
+                window.location.href = `intent:#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.HOUR=${h};i.android.intent.extra.MINUTES=${m};S.android.intent.extra.MESSAGE=${msg};B.android.intent.extra.SKIP_UI=false;end`;
+                return true;
+            }
             return false;
         }
     }
-}
 
-// Global Singleton Instance
-window.optiAlarmEngine = new OptiAlarmEngine();
+    /* ═══════════════════════════════════════════════════════════════
+       ALARM İZLEYİCİ — sayfa açıkken alarmı yakalar
+       ═══════════════════════════════════════════════════════════════ */
+    const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    const api = () => (window.API_BASE || '/api') + '/reminders.php';
+    const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+    const Watcher = {
+        started: false,
+        queue: [],
+        showing: false,
+
+        shownKey(r) { return `opti_shown_${todayStr()}_${r.id}_${r.remind_at}`; },
+        wasShown(r) { try { return !!sessionStorage.getItem(this.shownKey(r)); } catch (_) { return false; } },
+        markShown(r) { try { sessionStorage.setItem(this.shownKey(r), '1'); } catch (_) {} },
+
+        start() {
+            if (this.started) return;
+            if (window.OptiNative && OptiNative.isApp()) return; // APK: telefon alarmı çalar
+            this.started = true;
+            this.poll();
+            setInterval(() => this.poll(), 30000);
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) this.poll(); });
+        },
+
+        async poll() {
+            try {
+                const res = await fetch(api(), { method: 'POST', body: new URLSearchParams({ action: 'check_due' }), credentials: 'include' });
+                if (!res.ok) return;
+                const data = await res.json();
+                for (const r of (data.due || [])) {
+                    if (this.wasShown(r)) continue;
+                    this.markShown(r);
+                    this.queue.push(r);
+                }
+                this.next();
+            } catch (_) {}
+        },
+
+        next() {
+            if (this.showing || !this.queue.length) return;
+            this.show(this.queue.shift());
+        },
+
+        /** Alarm penceresi. r: {id, supplement_id, type, label, remind_at, dose, form} */
+        show(r) {
+            this.showing = true;
+            const engine = window.optiAlarmEngine;
+            const trackable = !!r.supplement_id;
+            const isMed = r.type === 'medication';
+            const name = String(r.label || '').replace(/\s+—\s+\d{2}:\d{2}$/, '');
+            const title = isMed ? '💊 İlaç zamanı' : (r.type === 'water' ? '💧 Su zamanı' : trackable ? '🧪 Takviye zamanı' : '⏰ Hatırlatıcı');
+            let snooze = 10;
+            try { snooze = parseInt(localStorage.getItem('opti_snooze_minutes') || '10', 10) || 10; } catch (_) {}
+
+            if (engine) engine.triggerAlarm({ id: r.id, type: r.type, title, body: `${name}${r.dose && trackable ? ' · ' + r.dose.trim() : ''}` });
+
+            const finish = () => { if (engine) engine.stop(); this.showing = false; setTimeout(() => this.next(), 400); };
+
+            if (typeof Swal === 'undefined') {
+                // SweetAlert bu sayfada yüklü değilse yükle, sonra pencereyi göster
+                if (!this._swalLoading) {
+                    this._swalLoading = true;
+                    const css = document.createElement('link');
+                    css.rel = 'stylesheet'; css.href = 'https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css';
+                    document.head.appendChild(css);
+                    const sc = document.createElement('script');
+                    sc.src = 'https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js';
+                    sc.onload = () => { if (engine) engine.stop(); this.showing = false; this.show(r); };
+                    sc.onerror = () => {
+                        const ok = window.confirm(`${title}\n${name}\n\nTamam = ${trackable ? 'Aldım' : 'Kapat'}`);
+                        if (ok && trackable) this.log(r, 'taken');
+                        finish();
+                    };
+                    document.head.appendChild(sc);
+                }
+                return;
+            }
+
+            Swal.fire({
+                title,
+                html: `<div class="alarm-pop">
+                        <div class="alarm-pop-time">${esc(r.remind_at)}</div>
+                        <div class="alarm-pop-name">${esc(name)}</div>
+                        ${trackable && r.dose ? `<div class="alarm-pop-dose">${esc(r.dose)} ${r.form ? '· ' + esc(r.form) : ''}</div>` : ''}
+                       </div>`,
+                showConfirmButton: true,
+                confirmButtonText: trackable ? '✅ Aldım' : 'Tamam',
+                showDenyButton: trackable,
+                denyButtonText: 'Atla',
+                showCancelButton: true,
+                cancelButtonText: `⏰ ${snooze} dk ertele`,
+                reverseButtons: false,
+                allowOutsideClick: false,
+                customClass: { popup: 'alarm-swal' }
+            }).then(res => {
+                if (res.isConfirmed && trackable) this.log(r, 'taken');
+                else if (res.isDenied) this.log(r, 'skipped');
+                else if (res.dismiss === Swal.DismissReason.cancel) {
+                    setTimeout(() => { this.queue.push(r); this.next(); }, snooze * 60000);
+                    Swal.fire({ toast: true, position: 'top', icon: 'info', title: `${snooze} dakika sonra tekrar hatırlatılacak`, showConfirmButton: false, timer: 2500 });
+                }
+                finish();
+            });
+        },
+
+        async log(r, status) {
+            try {
+                const res = await fetch(api(), {
+                    method: 'POST', credentials: 'include',
+                    body: new URLSearchParams({ action: 'log_dose', reminder_id: r.id, supplement_id: r.supplement_id || '', scheduled_time: r.remind_at, status })
+                });
+                const data = await res.json();
+                if (data.ok && typeof Swal !== 'undefined') {
+                    Swal.fire({ toast: true, position: 'top', icon: 'success', title: status === 'taken' ? 'Kaydedildi: alındı' : 'Atlandı olarak kaydedildi', showConfirmButton: false, timer: 2000 });
+                }
+                document.dispatchEvent(new CustomEvent('opti:dose-logged', { detail: { reminder: r, status } }));
+            } catch (_) {}
+        }
+    };
+
+    window.OptiAlarmEngine = OptiAlarmEngine;
+    window.optiAlarmEngine = new OptiAlarmEngine();
+    window.OptiAlarmWatcher = Watcher;
+})();

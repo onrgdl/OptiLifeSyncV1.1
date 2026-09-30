@@ -1,49 +1,122 @@
 /* ═══════════════════════════════════════════════════════════
-   OptiLifeSync - Merkezi Tasarım Token'ları (Theme)
+   OptiLifeSync — Tasarım Token'ları (v2)
    ───────────────────────────────────────────────────────────
-   Tüm renk/yüzey/kenarlık değişkenleri TEK YERDEN buradan yönetilir.
-   Yeni bir sayfa eklerken veya renk değiştirirken sadece bu dosyayı
-   düzenlemek yeterlidir — her sayfada ayrı ayrı :root tanımlamaya
-   gerek yoktur.
-
-   Kullanım: assets/css/sidebar.css bu dosyayı @import eder, bu
-   yüzden sidebar.css'i zaten linkleyen tüm sayfalar (dashboard,
-   nutrition, workout, reminders, reports, guide, creator, index,
-   setup) bu token'lara otomatik erişir. sidebar.css linklemeyen
-   tek sayfa olan login.php ise bu dosyayı doğrudan linkler.
+   Tüm renk / yüzey / gölge / yarıçap değerleri buradan yönetilir.
+   Açık tema varsayılandır; <html data-theme="dark"> ile koyu tema
+   devreye girer. Tema seçimi includes/pwa-meta.php içindeki küçük
+   betik tarafından sayfa boyanmadan önce uygulanır (titreme olmaz).
 ═══════════════════════════════════════════════════════════ */
 :root {
-    /* Temel yüzeyler */
-    --bg:            #f6f3eb;
-    --surface:       #ffffff;
-    --surface-2:     #ede8de;
-    --surface-hover: #fdfbf7;
-    --border:        #e2ddd3;
+    color-scheme: light;
 
-    /* Vurgu / anlam renkleri (kanonik) */
-    --accent:        #0284c7;
-    --accent-dim:    rgba(2, 132, 199, 0.12);
-    --green:         #16a34a;
-    --red:           #dc2626;
-    --yellow:        #d97706;
-    --purple:        #9333ea;
+    /* Yüzeyler */
+    --bg:            #f3f5f9;
+    --bg-grad:       radial-gradient(1200px 600px at 100% -10%, rgba(16,185,129,.07), transparent 60%),
+                     radial-gradient(900px 500px at -10% 110%, rgba(56,189,248,.06), transparent 60%);
+    --surface:       #ffffff;
+    --surface-2:     #f5f7fb;
+    --surface-3:     #eceff5;
+    --surface-hover: #f8fafc;
+    --glass:         rgba(255,255,255,.78);
+    --border:        #e4e8ef;
+    --border-strong: #cfd6e1;
 
     /* Metin */
-    --text:          #1e293b;
+    --text:          #0f172a;
+    --text-2:        #334155;
     --muted:         #64748b;
+    --muted-2:       #94a3b8;
+    --on-accent:     #ffffff;
+
+    /* Marka / vurgu */
+    --accent:        #059669;   /* emerald-600: beyaz üzerinde okunur */
+    --accent-strong: #047857;
+    --accent-bright: #10b981;
+    --accent-2:      #0ea5e9;
+    --accent-dim:    rgba(16,185,129,.12);
+    --accent-ring:   rgba(16,185,129,.28);
+    --brand-grad:    linear-gradient(135deg, #34d399 0%, #10b981 45%, #0d9488 100%);
+
+    /* Anlam renkleri */
+    --green:   #16a34a;  --green-dim:  rgba(22,163,74,.12);
+    --red:     #e11d48;  --red-dim:    rgba(225,29,72,.10);
+    --yellow:  #d97706;  --yellow-dim: rgba(217,119,6,.12);
+    --blue:    #2563eb;  --blue-dim:   rgba(37,99,235,.10);
+    --purple:  #7c3aed;  --purple-dim: rgba(124,58,237,.10);
+    --cyan:    #0891b2;  --cyan-dim:   rgba(8,145,178,.10);
+
+    /* Makro renkleri (tüm grafiklerde aynı) */
+    --c-kcal:    #f97316;
+    --c-protein: #3b82f6;
+    --c-carb:    #eab308;
+    --c-fat:     #a855f7;
+    --c-water:   #06b6d4;
+
+    /* Gölge & yarıçap */
+    --shadow-sm: 0 1px 2px rgba(15,23,42,.05);
+    --shadow:    0 1px 2px rgba(15,23,42,.04), 0 8px 24px -8px rgba(15,23,42,.10);
+    --shadow-lg: 0 24px 60px -20px rgba(15,23,42,.30);
+    --radius-sm: 10px;
+    --radius:    16px;
+    --radius-lg: 22px;
 
     /* Layout */
-    --sidebar-w:     240px;
+    --sidebar-w: 256px;
+    --topbar-h:  68px;
+    --font:      'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
-    /* ── Eski sayfa-bazlı takma adlar (geriye dönük uyumluluk) ──
-       workout.php gibi sayfalar bu isimlerle çağırıyordu; kod
-       tekrarını önlemek için kanonik token'lara işaret ediyorlar. */
+    /* ── Geriye dönük takma adlar (eski sayfa stilleri için) ── */
     --card-bg:       var(--surface);
     --card-hover:    var(--surface-hover);
     --card-border:   var(--border);
     --accent-green:  var(--green);
     --accent-yellow: var(--yellow);
     --accent-red:    var(--red);
-    --accent-blue:   var(--accent);
+    --accent-blue:   var(--blue);
     --accent-purple: var(--purple);
+}
+
+[data-theme="dark"] {
+    color-scheme: dark;
+
+    --bg:            #080d19;
+    --bg-grad:       radial-gradient(1100px 600px at 100% -10%, rgba(16,185,129,.10), transparent 60%),
+                     radial-gradient(900px 520px at -10% 110%, rgba(14,165,233,.08), transparent 60%);
+    --surface:       #0f1729;
+    --surface-2:     #141d31;
+    --surface-3:     #1b263d;
+    --surface-hover: #172136;
+    --glass:         rgba(15,23,41,.78);
+    --border:        rgba(148,163,184,.14);
+    --border-strong: rgba(148,163,184,.26);
+
+    --text:          #e8edf6;
+    --text-2:        #c3cddc;
+    --muted:         #8d9ab0;
+    --muted-2:       #64748b;
+    --on-accent:     #04130d;
+
+    --accent:        #34d399;
+    --accent-strong: #6ee7b7;
+    --accent-bright: #34d399;
+    --accent-2:      #38bdf8;
+    --accent-dim:    rgba(52,211,153,.14);
+    --accent-ring:   rgba(52,211,153,.32);
+
+    --green:   #4ade80;  --green-dim:  rgba(74,222,128,.14);
+    --red:     #fb7185;  --red-dim:    rgba(251,113,133,.14);
+    --yellow:  #fbbf24;  --yellow-dim: rgba(251,191,36,.14);
+    --blue:    #60a5fa;  --blue-dim:   rgba(96,165,250,.14);
+    --purple:  #a78bfa;  --purple-dim: rgba(167,139,250,.14);
+    --cyan:    #22d3ee;  --cyan-dim:   rgba(34,211,238,.14);
+
+    --c-kcal:    #fb923c;
+    --c-protein: #60a5fa;
+    --c-carb:    #facc15;
+    --c-fat:     #c084fc;
+    --c-water:   #22d3ee;
+
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+    --shadow:    0 1px 2px rgba(0,0,0,.35), 0 10px 30px -12px rgba(0,0,0,.6);
+    --shadow-lg: 0 30px 70px -20px rgba(0,0,0,.75);
 }

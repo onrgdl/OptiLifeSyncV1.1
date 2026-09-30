@@ -285,6 +285,7 @@ CREATE TABLE IF NOT EXISTS `supplement_logs` (
     `dose_unit`         VARCHAR(20)     NOT NULL DEFAULT 'mg',
     `is_taken`          TINYINT(1)      NOT NULL DEFAULT 1  COMMENT '1=alındı, 0=atlandı',
     `notes`             TEXT            NULL,
+    `scheduled_time`    TIME            NULL                COMMENT 'Dozun ait olduğu alarm saati',
     `logged_at`         TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     CONSTRAINT `fk_supplement_logs_daily`

@@ -2,43 +2,29 @@
   "appId": "com.optilifesync.app",
   "appName": "OptiLifeSync",
   "webDir": "www",
-  "bundledWebRuntime": false,
   "server": {
-    "url": "http://10.10.18.50/Gyp/dashboard.php",
-    "cleartext": true,
-    "allowNavigation": [
-      "10.10.18.50",
-      "localhost",
-      "127.0.0.1",
-      "*"
-    ]
+    "url": "https://opti-life-sync-v1-1.vercel.app/dashboard.php",
+    "cleartext": false,
+    "androidScheme": "https",
+    "errorPath": "offline.html"
   },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 1800,
+      "launchShowDuration": 1200,
       "launchAutoHide": true,
-      "backgroundColor": "#080f1e",
+      "backgroundColor": "#0B1220",
       "androidScaleType": "CENTER_CROP",
-      "splashFullScreen": true,
-      "splashImmersive": true
+      "showSpinner": false
     },
     "StatusBar": {
-      "backgroundColor": "#080f1e",
+      "overlaysWebView": false,
       "style": "DARK",
-      "overlaysWebView": false
-    },
-    "LocalNotifications": {
-      "smallIcon": "ic_stat_icon_config_sample",
-      "iconColor": "#38bdf8",
-      "sound": "beep.wav"
+      "backgroundColor": "#0B1220"
     }
   },
   "android": {
-    "allowMixedContent": true,
+    "allowMixedContent": false,
     "captureInput": true,
-    "webContentsDebuggingEnabled": true,
-    "buildOptions": {
-      "signingType": "apksigner"
-    }
+    "webContentsDebuggingEnabled": false
   }
 }

@@ -320,6 +320,57 @@ try {
             ], JSON_UNESCAPED_UNICODE);
         })(),
 
+        // ── SIK YENEN BESİNLER (tek dokunuşla tekrar ekleme) ──────────
+        'frequent_foods' => (function () use ($pdo, $userId): void {
+            $from = date('Y-m-d', strtotime('-60 days'));
+            $stmt = $pdo->prepare("
+                SELECT fl.food_label,
+                       COUNT(*)            AS n,
+                       AVG(fl.calories)    AS calories,
+                       AVG(fl.protein_g)   AS protein_g,
+                       AVG(fl.carbs_g)     AS carbs_g,
+                       AVG(fl.fat_g)       AS fat_g,
+                       MAX(fl.logged_at)   AS last_at
+                FROM food_logs fl
+                JOIN daily_logs dl ON dl.id = fl.daily_log_id
+                WHERE dl.user_id = ? AND dl.log_date >= ?
+                GROUP BY fl.food_label
+                ORDER BY COUNT(*) DESC, MAX(fl.logged_at) DESC
+                LIMIT 10
+            ");
+            $stmt->execute([$userId, $from]);
+            $items = array_map(fn($r) => [
+                'food_label' => $r['food_label'],
+                'count'      => (int)$r['n'],
+                'calories'   => round((float)$r['calories']),
+                'protein_g'  => round((float)$r['protein_g'], 1),
+                'carbs_g'    => round((float)$r['carbs_g'], 1),
+                'fat_g'      => round((float)$r['fat_g'], 1),
+            ], $stmt->fetchAll(PDO::FETCH_ASSOC));
+            echo json_encode(['ok' => true, 'items' => $items], JSON_UNESCAPED_UNICODE);
+        })(),
+
+        // ── GÜNLÜK KİLO KAYDI ─────────────────────────────────────────
+        'set_weight' => (function () use ($pdo, $userId, $today): void {
+            $w = (float) str_replace(',', '.', (string)($_POST['weight_kg'] ?? '0'));
+            if ($w < 25 || $w > 350) {
+                http_response_code(400);
+                echo json_encode(['ok' => false, 'error' => 'Geçerli bir kilo girin (25–350 kg).'], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+            $log = getOrCreateDailyLog($pdo, $userId, $today);
+            $pdo->prepare("UPDATE daily_logs SET weight_kg = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$w, $log['id']]);
+            // Profil kilosu da güncellenir: kalori ve su hedefleri güncel kiloya göre hesaplanır
+            $pdo->prepare("UPDATE users SET weight_kg = ? WHERE id = ?")->execute([$w, $userId]);
+            echo json_encode(['ok' => true, 'weight_kg' => $w, 'message' => 'Kilo kaydedildi.'] + DashboardService::getWeightInfo($pdo, $userId), JSON_UNESCAPED_UNICODE);
+        })(),
+
+        // ── KİLO GEÇMİŞİ ──────────────────────────────────────────────
+        'weight_history' => (function () use ($pdo, $userId): void {
+            $days = max(7, min(365, (int)($_POST['days'] ?? 90)));
+            echo json_encode(['ok' => true, 'items' => DashboardService::getWeightHistory($pdo, $userId, $days)], JSON_UNESCAPED_UNICODE);
+        })(),
+
         default => (function() use ($action): void {
             http_response_code(400);
             echo json_encode(['ok'=>false,'error'=>"Bilinmeyen action: $action"]);

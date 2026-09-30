@@ -37,6 +37,8 @@ require_once __DIR__ . '/../config/app.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../app/Services/GeminiService.php';
 require_once __DIR__ . '/../app/Services/AuthService.php';
+require_once __DIR__ . '/../app/Services/MedicationTracker.php';
+require_once __DIR__ . '/../app/Services/ExerciseLogService.php';
 
 use App\Services\GeminiService;
 use App\Services\AuthService;
@@ -83,7 +85,7 @@ try {
 
             // Haftalık günlük loglar
             $dStmt = $pdo->prepare("
-                SELECT log_date, total_calories, total_protein_g, total_carbs_g, total_fat_g, workout_done, weight_kg
+                SELECT log_date, total_calories, total_protein_g, total_carbs_g, total_fat_g, workout_done, weight_kg, water_ml
                 FROM daily_logs
                 WHERE user_id = ? AND log_date BETWEEN ? AND ?
                 ORDER BY log_date ASC
@@ -116,6 +118,21 @@ try {
 
             $plannedWorkoutCount = count($workouts);
 
+            // Ek göstergeler: su, kilo değişimi, ilaç uyumu, egzersiz hacmi
+            $waterAvg = 0; $waterDays = 0; $weights = [];
+            foreach ($dailyLogs as $dl) {
+                if (!empty($dl['water_ml'])) { $waterAvg += (int)$dl['water_ml']; $waterDays++; }
+                if (!empty($dl['weight_kg'])) { $weights[] = (float)$dl['weight_kg']; }
+            }
+            $waterAvg = $waterDays ? (int)round($waterAvg / $waterDays) : 0;
+            $weightNote = count($weights) >= 2 ? sprintf('%.1f kg → %.1f kg', $weights[0], end($weights)) : (count($weights) === 1 ? sprintf('%.1f kg', $weights[0]) : 'kayıt yok');
+            $adh = (new \App\Services\MedicationTracker($pdo))->getAdherence($userId, 7, $weekEnd);
+            $adhNote = $adh['pct'] === null ? 'planlı doz yok' : sprintf('%%%d (%d/%d doz)', $adh['pct'], $adh['taken'], $adh['planned']);
+            $vol = 0;
+            foreach ((new \App\Services\ExerciseLogService($pdo))->getWeeklyVolume($userId, 12) as $wv) {
+                if ($wv['week_start'] === $weekStart) { $vol = $wv['volume']; }
+            }
+
             $summaryPrompt = sprintf(
                 "Kullanıcı Profili:\n- Hedef: %s\n- Kilo: %.1f kg, Boy: %.1f cm\n\n" .
                 "Haftalık Veriler (%s - %s):\n" .
@@ -124,7 +141,9 @@ try {
                 "- Toplam Protein: %.1f g (Günlük Ort: %.1f g)\n" .
                 "- Toplam Karbonhidrat: %.1f g (Günlük Ort: %.1f g)\n" .
                 "- Toplam Yağ: %.1f g (Günlük Ort: %.1f g)\n" .
-                "- Planlanan Antrenman: %d, Tamamlanan Antrenman: %d\n\n" .
+                "- Planlanan Antrenman: %d, Tamamlanan Antrenman: %d\n" .
+                "- Ortalama su: %d ml/gün, Kilo: %s\n" .
+                "- İlaç/takviye uyumu: %s, Haftalık egzersiz hacmi: %d kg\n\n" .
                 "Lütfen bu verilere dayanarak kullanıcıya haftalık bir sağlık, beslenme ve antrenman değerlendirme raporu sun. Motive edici, yapıcı ve doğrudan uygulanabilir tavsiyeler ver.",
                 $u['goal'] ?? 'genel sağlık',
                 (float)($u['weight_kg'] ?? 80),
@@ -141,7 +160,11 @@ try {
                 $totFat,
                 $loggedDays > 0 ? ($totFat / $loggedDays) : 0,
                 $plannedWorkoutCount,
-                $workoutCompletedCount
+                $workoutCompletedCount,
+                $waterAvg,
+                $weightNote,
+                $adhNote,
+                $vol
             );
 
             $gemini = new GeminiService(

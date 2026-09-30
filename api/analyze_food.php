@@ -44,11 +44,13 @@ $userId = AuthService::requireAuth(true);
 AuthService::closeSession(); // Session kilidini hemen serbest bırak (Gemini AI isteği beklenirken session kilitlenmez)
 $today  = date('Y-m-d');
 
-if (!Config::hasGeminiKey()) {
+// Yapay zeka gerektirmeyen işlemler (elle kayıt, listeleme) anahtar olmadan da çalışır
+$aiActions = ['analyze', 'analyze_only', 'analyze_image'];
+if (in_array(trim($_POST['action'] ?? ''), $aiActions, true) && !Config::hasGeminiKey()) {
     http_response_code(503);
     echo json_encode([
         'ok'    => false,
-        'error' => 'Gemini API anahtarı yapılandırılmamış.',
+        'error' => 'Yapay zeka analizi için Gemini API anahtarı tanımlı değil. "Elle" sekmesinden değerleri girerek ekleyebilirsiniz.',
     ]);
     exit;
 }
@@ -56,6 +58,9 @@ if (!Config::hasGeminiKey()) {
 $action   = trim($_POST['action'] ?? '');  // GET ile tetiklemeyi engelle
 $mealText = trim($_POST['meal_text'] ?? '');
 $mealType = trim($_POST['meal_type'] ?? 'snack');
+if (!in_array($mealType, ['breakfast', 'lunch', 'dinner', 'snack', 'pre_workout', 'post_workout'], true)) {
+    $mealType = 'snack';
+}
 
 // ── Girdi Uzunluk Sınırı (Güvenlik + Maliyet Kontrolü) ───────────────────────
 if (!empty($mealText) && mb_strlen($mealText) > 1000) {
@@ -247,7 +252,16 @@ try {
             $carbs    = max(0.0, (float)($_POST['carbs']    ?? $_POST['karb'] ?? 0));
             $fat      = max(0.0, (float)($_POST['fat']      ?? $_POST['yag'] ?? 0));
 
-            $dailyLogId = getOrCreateDailyLog($pdo, $userId, $today);
+            $foodLabel = mb_substr($foodLabel, 0, 190);
+
+            // İsteğe bağlı: geçmiş bir güne kayıt (en fazla 60 gün geriye, gelecek tarih yok)
+            $logDate = $today;
+            $reqDate = trim((string)($_POST['log_date'] ?? ''));
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $reqDate) && $reqDate <= $today && $reqDate >= date('Y-m-d', strtotime('-60 days'))) {
+                $logDate = $reqDate;
+            }
+
+            $dailyLogId = getOrCreateDailyLog($pdo, $userId, $logDate);
             $foodLogId  = insertFoodLog($pdo, $dailyLogId, $foodLabel, $mealType, [
                 'kalori'  => $calories,
                 'protein' => $protein,

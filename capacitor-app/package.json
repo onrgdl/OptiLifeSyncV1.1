@@ -1,33 +1,18 @@
 {
   "name": "optilifesync-mobile",
-  "version": "1.0.0",
-  "description": "OptiLifeSync - Kişisel Sağlık Takip Sistemi Android ve iOS Mobil Uygulaması",
-  "main": "www/index.html",
+  "version": "2.0.0",
+  "private": true,
+  "description": "OptiLifeSync Android uygulaması (Capacitor kabuğu + yerel alarm sistemi)",
   "scripts": {
-    "build": "echo 'Assets ready in www/'",
-    "cap:sync": "npx cap sync",
-    "cap:open:android": "npx cap open android",
-    "cap:run:android": "npx cap run android"
+    "cap:sync": "npx cap sync android"
   },
-  "keywords": [
-    "optilifesync",
-    "health",
-    "fitness",
-    "capacitor",
-    "mobile",
-    "android",
-    "ios"
-  ],
-  "author": "OptiLifeSync",
-  "license": "MIT",
   "dependencies": {
-    "@capacitor/core": "^6.0.0",
-    "@capacitor/android": "^6.0.0",
-    "@capacitor/splash-screen": "^6.0.0",
-    "@capacitor/status-bar": "^6.0.0",
-    "@capacitor/local-notifications": "^6.0.0"
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/splash-screen": "^6.0.2",
+    "@capacitor/status-bar": "^6.0.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.0.0"
+    "@capacitor/cli": "^6.1.2"
   }
 }
