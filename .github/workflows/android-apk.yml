@@ -49,7 +49,14 @@ jobs:
           java-version: 17
 
       - name: Capacitor bağımlılıklarını kur
-        run: npm install --no-audit --no-fund
+        # package-lock.json varsa birebir sürümler kurulur (tekrarlanabilir derleme)
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            echo "::warning::capacitor-app/package-lock.json bulunamadı; npm install kullanılıyor. Kilit dosyasını depoya ekleyin."
+            npm install --no-audit --no-fund
+          fi
 
       - name: Android projesini oluştur
         run: |
@@ -66,8 +73,10 @@ jobs:
           # Uyarlanabilir (adaptive) varsayılan Capacitor ikonlarını kaldır; kendi ikonumuz kullanılsın
           rm -f "$APP/res/mipmap-anydpi-v26/ic_launcher.xml" "$APP/res/mipmap-anydpi-v26/ic_launcher_round.xml"
           rm -f "$APP"/res/mipmap-*/ic_launcher_foreground.png
-          # Sürüm numarası: her derlemede artar (telefona güncelleme olarak kurulabilir)
-          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          # Sürüm numarası: her derlemede artar (telefona güncelleme olarak kurulabilir).
+          # Sabit +1000 ofseti: workflow yeniden oluşturulup run_number sıfırlansa bile
+          # telefonda kurulu olan sürüm kodunun altına düşülmez.
+          sed -i -E "s/versionCode [0-9]+/versionCode $(( ${{ github.run_number }} + 1000 ))/" android/app/build.gradle
           sed -i -E "s/versionName \"[^\"]+\"/versionName \"2.0.${{ github.run_number }}\"/" android/app/build.gradle
           grep -n "versionCode\|versionName" android/app/build.gradle
 
@@ -88,6 +97,46 @@ jobs:
       - name: APK'yı hazırla
         run: cp android/app/build/outputs/apk/debug/app-debug.apk OptiLifeSync.apk
 
+      - name: Özel imza anahtarı tanımlı mı?
+        id: signing
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ] && [ -n "$KS_ALIAS" ] && [ -n "$KEY_PASS" ]; then
+            echo "private=true" >> "$GITHUB_OUTPUT"
+            echo "Özel (private) imza anahtarı kullanılacak."
+          else
+            echo "private=false" >> "$GITHUB_OUTPUT"
+            echo "Özel imza sırları tanımlı değil; depodaki debug.keystore ile imzalı APK kullanılacak."
+          fi
+
+      - name: APK'yı özel anahtarla imzala (isteğe bağlı)
+        if: steps.signing.outputs.private == 'true'
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          BT="$SDK/build-tools/$(ls "$SDK/build-tools" | sort -V | tail -n 1)"
+          echo "build-tools: $BT"
+          KS="$RUNNER_TEMP/release.keystore"
+          echo "$KS_B64" | base64 -d > "$KS"
+          # Önce zipalign, sonra apksigner (sıra önemlidir)
+          "$BT/zipalign" -p -f 4 OptiLifeSync.apk aligned.apk
+          "$BT/apksigner" sign \
+            --ks "$KS" --ks-key-alias "$KS_ALIAS" \
+            --ks-pass env:KS_PASS --key-pass env:KEY_PASS \
+            --out OptiLifeSync-signed.apk aligned.apk
+          "$BT/apksigner" verify --print-certs OptiLifeSync-signed.apk
+          mv -f OptiLifeSync-signed.apk OptiLifeSync.apk
+          rm -f aligned.apk "$KS"
+
       - name: Artifact olarak yükle
         uses: actions/upload-artifact@v4
         with:
@@ -99,9 +148,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete apk-latest --yes --cleanup-tag || true
-          gh release create apk-latest OptiLifeSync.apk \
-            --title "OptiLifeSync Android (son sürüm)" \
-            --notes "Derleme #${{ github.run_number }} — telefona indirip kurun. Güncellerken eski sürümü silmenize gerek yok." \
-            --target "${{ github.sha }}" \
-            --latest
+          NOTES="Derleme #${{ github.run_number }} (${GITHUB_SHA::7}) — telefona indirip kurun. Güncellerken eski sürümü silmenize gerek yok."
+          # Sürüm SİLİNMEZ: yoksa oluşturulur, varsa dosyası değiştirilir (indirme bağlantısı hiç kopmaz)
+          gh release view apk-latest >/dev/null 2>&1 || \
+            gh release create apk-latest \
+              --title "OptiLifeSync Android (son sürüm)" \
+              --notes "$NOTES" \
+              --target "${{ github.sha }}" \
+              --latest
+          gh release upload apk-latest OptiLifeSync.apk --clobber
+          # Notu güncelle; --target desteklenmiyorsa yalnızca notu güncelle
+          gh release edit apk-latest --title "OptiLifeSync Android (son sürüm)" --notes "$NOTES" --target "${{ github.sha }}" \
+            || gh release edit apk-latest --notes "$NOTES"
+          # Etiketi (tag) yeni commit'e taşı; sürüm silinmeden yapılır. Başarısız olursa yayın yine geçerlidir.
+          gh api -X PATCH "repos/${{ github.repository }}/git/refs/tags/apk-latest" \
+            -f sha="${{ github.sha }}" -F force=true >/dev/null \
+            || echo "::warning::apk-latest etiketi taşınamadı (APK yine de yüklendi)."
