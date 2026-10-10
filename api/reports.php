@@ -67,6 +67,27 @@ try {
                 return;
             }
 
+            // Günlük AI kotası (metin analizleriyle ortak sayaç: 60/gün, atomik)
+            try {
+                $q = $pdo->prepare("
+                    INSERT INTO ai_usage_logs (user_id, usage_date, text_count) VALUES (:u, :d, 1)
+                    ON CONFLICT (user_id, usage_date) DO UPDATE SET text_count = ai_usage_logs.text_count + 1
+                    WHERE ai_usage_logs.text_count < 60
+                    RETURNING text_count
+                ");
+                $q->execute([':u' => $userId, ':d' => date('Y-m-d')]);
+                if ($q->fetchColumn() === false) {
+                    http_response_code(429);
+                    echo json_encode(['ok' => false, 'quota_exceeded' => true, 'error' => 'Günlük AI analiz kotanıza ulaştınız. Yarın tekrar deneyebilirsiniz.'], JSON_UNESCAPED_UNICODE);
+                    return;
+                }
+            } catch (\Throwable $e) {
+                error_log('[reports ai quota] ' . $e->getMessage());
+                http_response_code(503);
+                echo json_encode(['ok' => false, 'error' => 'AI kotası şu anda doğrulanamadı. Lütfen birazdan tekrar deneyin.'], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+
             $weekStart = trim($_POST['week_start'] ?? '');
             $weekEnd   = trim($_POST['week_end']   ?? '');
 
