@@ -105,7 +105,7 @@ function fmtDose($amount, $unit): string {
     $a = rtrim(rtrim(number_format((float)$amount, 2, '.', ''), '0'), '.');
     return $a . ' ' . $unit;
 }
-$v = '20260930';
+$v = '20261009';
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -754,7 +754,9 @@ function setDot(id, ok) { const el = document.getElementById(id); if (el) el.cla
 async function refreshNativeStatus() {
     try {
         const s = await OptiNative.status();
-        setDot('stNotif', s.notifications); document.getElementById('fixNotif').classList.toggle('d-none', !!s.notifications);
+        const notifOk = !!s.notifications && !s.channelBlocked; // kanal kapatıldıysa alarm sessiz kalır
+        setDot('stNotif', notifOk); document.getElementById('fixNotif').classList.toggle('d-none', notifOk);
+        window.__channelBlocked = !!s.channelBlocked;
         setDot('stExact', s.exactAlarm); document.getElementById('fixExact').classList.toggle('d-none', !!s.exactAlarm);
         setDot('stFull', s.fullScreen); document.getElementById('fixFull').classList.toggle('d-none', !!s.fullScreen);
         setDot('stBattery', !s.batteryOptimized); document.getElementById('fixBattery').classList.toggle('d-none', !s.batteryOptimized);
@@ -775,7 +777,7 @@ function initReliability() {
     if (isApp) {
         OptiNative.syncFromServer(true).then(refreshNativeStatus);
         OptiNative.flushTakenQueue();
-        document.getElementById('fixNotif').onclick = () => OptiNative.requestPermissions().then(refreshNativeStatus).catch(() => OptiNative.openNotificationSettings());
+        document.getElementById('fixNotif').onclick = () => window.__channelBlocked ? OptiNative.openNotificationSettings() : OptiNative.requestPermissions().then(refreshNativeStatus).catch(() => OptiNative.openNotificationSettings());
         document.getElementById('fixExact').onclick = () => OptiNative.openExactAlarmSettings();
         document.getElementById('fixFull').onclick = () => OptiNative.openFullScreenSettings();
         document.getElementById('fixBattery').onclick = () => OptiNative.openBatterySettings();
@@ -822,7 +824,8 @@ function initReliability() {
 Object.keys(scheduleMap).forEach(id => renderTimeBadges(Number(id)));
 renderDoses();
 initReliability();
-setInterval(refreshDoses, 60000);
+setInterval(() => { if (!document.hidden) refreshDoses(); }, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshDoses(); });
 </script>
 </body>
 </html>

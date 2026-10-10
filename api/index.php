@@ -52,7 +52,8 @@ if (isset($routes[$cleanSlug])) {
 
 // Doğrudan kök dizindeki PHP dosyası çağrılmışsa (örn. /creator.php, /login.php vb.)
 $directFile = dirname(__DIR__) . '/' . $cleanSlug . '.php';
-if (file_exists($directFile) && !str_starts_with($cleanSlug, '.')) {
+$deniedDirect = ['example_usage', 'setup', 'index', 'push_to_github'];
+if (preg_match('/^[a-z0-9_-]+$/', $cleanSlug) && !in_array($cleanSlug, $deniedDirect, true) && file_exists($directFile)) {
     require $directFile;
     exit;
 }
@@ -60,7 +61,7 @@ if (file_exists($directFile) && !str_starts_with($cleanSlug, '.')) {
 // /api/... çağrıları router'a düşerse ilgili API dosyasını çalıştır
 if (str_starts_with($path, 'api/')) {
     $apiFile = __DIR__ . '/' . basename($path);
-    if (file_exists($apiFile) && basename($path) !== 'index.php') {
+    if (preg_match('/^[a-z0-9_]+\.php$/', basename($path)) && file_exists($apiFile) && basename($path) !== 'index.php') {
         require $apiFile;
         exit;
     }

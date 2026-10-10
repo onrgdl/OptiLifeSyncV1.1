@@ -29,6 +29,22 @@ final class DoseReporter {
     static void report(Context ctx, JSONObject ev, BroadcastReceiver.PendingResult pending) {
         final Context app = ctx.getApplicationContext();
         final String base = AlarmStore.getBaseUrl(app);
+
+        // 1) Write-ahead: ağ çağrısından ÖNCE olayı kalıcı sıraya yaz (süreç ölse bile kaybolmaz)
+        String uid = "";
+        try {
+            if (ev.optString("uid", "").isEmpty()) {
+                ev.put("uid", "dose-" + ev.optInt("reminderId") + "-" + ev.optString("date")
+                        + "-" + ev.optString("scheduledTime") + "-" + ev.optString("status", "taken"));
+            }
+            if (!ev.has("createdAt")) ev.put("createdAt", System.currentTimeMillis());
+            uid = ev.optString("uid", "");
+            AlarmStore.addPendingEvent(app, ev);
+        } catch (Throwable t) {
+            Log.w(TAG, "Doz olayı sıraya yazılamadı", t);
+        }
+        final String eventUid = uid;
+
         String cookie = null;
         try {
             cookie = CookieManager.getInstance().getCookie(base);
@@ -44,10 +60,15 @@ final class DoseReporter {
                     ok = post(base + "/api/reminders.php", cookieHeader, ev);
                 }
             } catch (Throwable t) {
-                Log.w(TAG, "Doz gönderilemedi, sıraya alındı", t);
+                Log.w(TAG, "Doz gönderilemedi, sırada kaldı", t);
             }
-            if (!ok) {
-                AlarmStore.addPendingEvent(app, ev);
+            // 2) Başarılıysa sıradan çıkar; değilse uygulama açılınca JS gönderir
+            if (ok) {
+                try {
+                    AlarmStore.removePendingEvent(app, eventUid);
+                } catch (Throwable t) {
+                    Log.w(TAG, "Sıradan çıkarılamadı", t);
+                }
             }
             if (pending != null) {
                 try { pending.finish(); } catch (Throwable ignored) {}
@@ -70,8 +91,8 @@ final class DoseReporter {
 
         HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
         con.setRequestMethod("POST");
-        con.setConnectTimeout(10000);
-        con.setReadTimeout(15000);
+        con.setConnectTimeout(6000);
+        con.setReadTimeout(8000);
         con.setDoOutput(true);
         con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
         con.setRequestProperty("Cookie", cookie);

@@ -178,6 +178,7 @@ public class OptiAlarmPlugin extends Plugin {
         s.put("platform", "android");
         s.put("sdk", Build.VERSION.SDK_INT);
         s.put("notifications", NotificationManagerCompat.from(ctx).areNotificationsEnabled());
+        s.put("channelBlocked", AlarmNotifier.isChannelBlocked(ctx));
         s.put("exactAlarm", AlarmScheduler.canScheduleExact(ctx));
 
         boolean fullScreen = true;

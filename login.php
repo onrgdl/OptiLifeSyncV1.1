@@ -19,6 +19,8 @@ $error = null;
 $success = null;
 $newRecoveryCode = null;
 $action = $_GET['action'] ?? 'login'; // login, register, reset
+$regMode = AuthService::registrationMode(); // open | invite | closed
+if ($action === 'register' && $regMode === 'closed') { $action = 'login'; }
 $redirect = $_GET['redirect'] ?? 'dashboard.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -49,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name = (string)($_POST['reg_name'] ?? '');
         $pin = (string)($_POST['reg_pin'] ?? '');
 
-        $result = $authService->register($username, $pin, $name);
+        $result = $authService->register($username, $pin, $name, (string)($_POST['reg_invite'] ?? ''));
         if ($result['ok']) {
             $newRecoveryCode = $result['recovery_code'];
             $success = "Hesabınız başarıyla oluşturuldu! Lütfen aşağıdaki Kurtarma Kodunu güvenli bir yere kaydedin.";
@@ -83,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php require_once __DIR__ . '/includes/pwa-meta.php'; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="assets/css/sidebar.css?v=20260930">
+    <link rel="stylesheet" href="assets/css/sidebar.css?v=20261009">
     <style>
         body { display: grid !important; grid-template-columns: 1.05fr 1fr; min-height: 100vh; }
         @media (max-width: 991.98px) { body { grid-template-columns: 1fr; } .auth-hero { display: none !important; } }
@@ -178,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <div class="seg" role="tablist">
                 <button type="button" class="<?= $action === 'login' ? 'active' : '' ?>" id="tab-login-btn" onclick="switchTab('login')">Giriş</button>
-                <button type="button" class="<?= $action === 'register' ? 'active' : '' ?>" id="tab-reg-btn" onclick="switchTab('register')">Yeni hesap</button>
+                <?php if ($regMode !== 'closed'): ?><button type="button" class="<?= $action === 'register' ? 'active' : '' ?>" id="tab-reg-btn" onclick="switchTab('register')">Yeni hesap</button><?php endif; ?>
                 <button type="button" class="<?= $action === 'reset' ? 'active' : '' ?>" id="tab-reset-btn" onclick="switchTab('reset')">PIN sıfırla</button>
             </div>
 
@@ -204,6 +206,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div id="panel-register" class="<?= $action === 'register' ? '' : 'd-none' ?>">
                 <form method="POST" action="login.php">
                     <input type="hidden" name="auth_action" value="register">
+                    <?php if ($regMode === 'invite'): ?>
+                    <div class="mb-3">
+                        <label class="form-label">Davet kodu</label>
+                        <input type="text" name="reg_invite" class="form-control" required autocomplete="off" autocapitalize="none">
+                    </div>
+                    <?php endif; ?>
                     <div class="mb-3">
                         <label class="form-label">Kullanıcı adı</label>
                         <input type="text" name="reg_username" class="form-control" placeholder="ör. ahmet_fit" required pattern="^[a-zA-Z0-9_.-]{3,30}$" title="3–30 karakter: harf, rakam, _ . -" autocapitalize="none">

@@ -67,6 +67,15 @@ $today  = date('Y-m-d');
 
 $action = trim($_POST['action'] ?? $_GET['action'] ?? 'load');
 
+// Yazma işlemleri yalnızca POST (GET ile CSRF/önbellek yan etkisi engellenir)
+if ($_SERVER['REQUEST_METHOD'] !== 'POST'
+    && !in_array($action, ['load', 'quick_search', 'frequent_foods', 'weight_history'], true)) {
+    http_response_code(405);
+    header('Allow: POST');
+    echo json_encode(['ok' => false, 'error' => 'Bu işlem için POST gerekli.']);
+    exit;
+}
+
 
 // ── Kullanıcı profilini DB'den çek (yoksa demo değer) ────────────────
 function getUserProfile(PDO $pdo, int $userId): array {
@@ -377,6 +386,12 @@ try {
         })(),
     };
 } catch (\Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    if ($e instanceof \InvalidArgumentException) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    } else {
+        error_log('[dashboard] ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Sunucu hatası. Lütfen tekrar deneyin.']);
+    }
 }

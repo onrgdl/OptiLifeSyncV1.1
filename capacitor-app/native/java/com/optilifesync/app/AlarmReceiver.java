@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.PowerManager;
+import android.util.Log;
 
 import org.json.JSONObject;
 
@@ -13,6 +14,8 @@ import org.json.JSONObject;
  * çalma zamanını kurar.
  */
 public class AlarmReceiver extends BroadcastReceiver {
+
+    private static final String TAG = "OptiAlarm";
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -27,14 +30,27 @@ public class AlarmReceiver extends BroadcastReceiver {
                 wl.acquire(10_000L);
             }
 
-            AlarmNotifier.show(app, intent);
-
             boolean isSnooze = intent.getBooleanExtra(AlarmScheduler.EXTRA_IS_SNOOZE, false);
             boolean isTest = intent.getBooleanExtra(AlarmScheduler.EXTRA_IS_TEST, false);
-            if (!isSnooze && !isTest) {
-                int id = intent.getIntExtra(AlarmScheduler.EXTRA_ID, -1);
-                JSONObject alarm = AlarmStore.findAlarm(app, id);
-                if (alarm != null) AlarmScheduler.scheduleNext(app, alarm);
+            int id = intent.getIntExtra(AlarmScheduler.EXTRA_ID, -1);
+
+            // ÖNCE sonraki çalmayı kur: bildirim gösterimi hata verse bile zincir kopmasın
+            try {
+                if (isSnooze) {
+                    // Ertelemesi çaldı: kalıcı kaydı sil
+                    if (!isTest) AlarmStore.removeSnooze(app, id);
+                } else if (!isTest) {
+                    JSONObject alarm = AlarmStore.findAlarm(app, id);
+                    if (alarm != null) AlarmScheduler.scheduleNext(app, alarm);
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "Sonraki alarm kurulamadı", t);
+            }
+
+            try {
+                AlarmNotifier.show(app, intent);
+            } catch (Throwable t) {
+                Log.e(TAG, "Alarm bildirimi gösterilemedi", t);
             }
         } finally {
             if (wl != null && wl.isHeld()) {

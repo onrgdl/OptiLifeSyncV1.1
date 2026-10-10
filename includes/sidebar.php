@@ -51,7 +51,7 @@ $sbNav = [
 if ($sbIsCreator || $sbIsImpersonating) {
     $sbNav[] = ['key' => 'creator', 'href' => 'creator.php', 'icon' => 'bi-shield-lock', 'label' => 'Creator Paneli', 'creator' => true];
 }
-$sbAssetV = '20260930';
+$sbAssetV = '20261009';
 // Aktif sayfada kullanılacak dolu ikon karşılıkları (Bootstrap Icons'ta mevcut olanlar)
 $sbFill = [
     'bi-house-heart' => 'bi-house-heart-fill', 'bi-lightning-charge' => 'bi-lightning-charge-fill',

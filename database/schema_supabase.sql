@@ -298,3 +298,25 @@ SELECT setval(pg_get_serial_sequence('food_logs', 'id'), COALESCE(MAX(id), 1)) F
 SELECT setval(pg_get_serial_sequence('supplement_logs', 'id'), COALESCE(MAX(id), 1)) FROM supplement_logs;
 SELECT setval(pg_get_serial_sequence('exercise_logs', 'id'), COALESCE(MAX(id), 1)) FROM exercise_logs;
 SELECT setval(pg_get_serial_sequence('workouts', 'id'), COALESCE(MAX(id), 1)) FROM workouts;
+
+-- ===== 2026-10 sertleştirme (bkz. migrations/2026_10_hardening.sql) =====
+CREATE TABLE IF NOT EXISTS ai_usage_logs (
+    user_id     INTEGER NOT NULL,
+    usage_date  DATE    NOT NULL,
+    photo_count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, usage_date)
+);
+ALTER TABLE ai_usage_logs ADD COLUMN IF NOT EXISTS text_count INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS login_attempts (
+    id           BIGSERIAL PRIMARY KEY,
+    throttle_key VARCHAR(128) NOT NULL,
+    attempted_at TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_key_time ON login_attempts (throttle_key, attempted_at);
+
+CREATE INDEX IF NOT EXISTS idx_food_logs_daily        ON food_logs (daily_log_id);
+CREATE INDEX IF NOT EXISTS idx_exercise_logs_daily    ON exercise_logs (daily_log_id);
+CREATE INDEX IF NOT EXISTS idx_supplements_user_active ON supplements (user_id) WHERE is_active = 1;
+CREATE INDEX IF NOT EXISTS idx_reminders_supplement   ON reminders (supplement_id);
+CREATE INDEX IF NOT EXISTS idx_daily_logs_workout     ON daily_logs (user_id, log_date) WHERE workout_done = 1;

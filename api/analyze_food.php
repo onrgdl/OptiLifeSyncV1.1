@@ -82,6 +82,7 @@ try {
             if (empty($mealText)) {
                 throw new \InvalidArgumentException('meal_text parametresi boş olamaz.');
             }
+            checkAndIncrementAiQuota($pdo, $userId, $today, 60, 'text');
 
             $gemini = new GeminiService(
                 Config::get('GEMINI_API_KEY'),
@@ -125,11 +126,12 @@ try {
         // ─────────────────────────────────────────────────────────────
         // SADECE ANALİZ (Önizleme — kaydetmez)
         // ─────────────────────────────────────────────────────────────
-        'analyze_only' => (function () use ($mealText): void {
+        'analyze_only' => (function () use ($pdo, $userId, $today, $mealText): void {
 
             if (empty($mealText)) {
                 throw new \InvalidArgumentException('meal_text parametresi boş olamaz.');
             }
+            checkAndIncrementAiQuota($pdo, $userId, $today, 60, 'text');
 
             $gemini = new GeminiService(
                 Config::get('GEMINI_API_KEY'),
@@ -160,9 +162,9 @@ try {
         // ─────────────────────────────────────────────────────────────
         'analyze_image' => (function () use ($pdo, $userId, $today, $mealType): void {
             // Günlük fotoğraf kotası kontrolü (kullanıcı başı maks 8 analiz)
-            checkAndIncrementAiQuota($pdo, $userId, $today, 8);
+            checkAndIncrementAiQuota($pdo, $userId, $today, 8, 'photo');
 
-            $userNotes = trim($_POST['notes'] ?? $_POST['user_notes'] ?? '');
+            $userNotes = mb_substr(trim((string)($_POST['notes'] ?? $_POST['user_notes'] ?? '')), 0, 300);
             $img = getUploadedImageBase64();
 
             $gemini = new GeminiService(
@@ -196,9 +198,9 @@ try {
         // ─────────────────────────────────────────────────────────────
         'analyze_image_save' => (function () use ($pdo, $userId, $today, $mealType): void {
             // Günlük fotoğraf kotası kontrolü (kullanıcı başı maks 8 analiz)
-            checkAndIncrementAiQuota($pdo, $userId, $today, 8);
+            checkAndIncrementAiQuota($pdo, $userId, $today, 8, 'photo');
 
-            $userNotes = trim($_POST['notes'] ?? $_POST['user_notes'] ?? '');
+            $userNotes = mb_substr(trim((string)($_POST['notes'] ?? $_POST['user_notes'] ?? '')), 0, 300);
             $img = getUploadedImageBase64();
 
             $gemini = new GeminiService(
@@ -368,10 +370,13 @@ try {
     echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
 } catch (\RuntimeException $e) {
     http_response_code(502);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    // Dış servis hata metinlerinden anahtar/URL sızıntısını temizle
+    $m = preg_replace('/(key|token)=[^&\s"\']+/i', '$1=***', $e->getMessage());
+    echo json_encode(['ok' => false, 'error' => mb_substr((string)$m, 0, 300)], JSON_UNESCAPED_UNICODE);
 } catch (\Throwable $e) {
+    error_log('[analyze_food] ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['ok' => false, 'error' => 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.']);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -582,67 +587,41 @@ function getUploadedImageBase64(): array
 }
 
 /**
- * Kullanıcı başına günlük fotoğraflı AI analiz kotasını kontrol eder ve artırır.
- * Maksimum kota aşıldığında 429 yanıtı döndürerek işlemi sonlandırır.
+ * Kullanıcı başına günlük AI kotasını atomik olarak kontrol eder ve artırır.
+ * $kind: 'photo' (photo_count) | 'text' (text_count). Tablo migrasyonla oluşturulur.
+ * Kota aşıldığında 429 döndürüp işlemi sonlandırır.
  */
-function checkAndIncrementAiQuota(PDO $pdo, int $userId, string $date, int $maxQuota = 8): void
+function checkAndIncrementAiQuota(PDO $pdo, int $userId, string $date, int $maxQuota = 8, string $kind = 'photo'): void
 {
+    $col = $kind === 'text' ? 'text_count' : 'photo_count';
+    $ok = true;
     try {
-        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
-        if ($driver === 'pgsql') {
-            $pdo->exec("
-                CREATE TABLE IF NOT EXISTS ai_usage_logs (
-                    user_id INT NOT NULL,
-                    usage_date DATE NOT NULL,
-                    photo_count INT NOT NULL DEFAULT 0,
-                    PRIMARY KEY (user_id, usage_date)
-                )
-            ");
-        } else {
-            $pdo->exec("
-                CREATE TABLE IF NOT EXISTS `ai_usage_logs` (
-                    `user_id` INT NOT NULL,
-                    `usage_date` DATE NOT NULL,
-                    `photo_count` INT NOT NULL DEFAULT 0,
-                    PRIMARY KEY (`user_id`, `usage_date`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            ");
-        }
-    } catch (\Throwable) {}
-
-    // Günlük kullanım sayısını sorgula
-    $stmt = $pdo->prepare("SELECT photo_count FROM ai_usage_logs WHERE user_id = :uid AND usage_date = :dt LIMIT 1");
-    $stmt->execute([':uid' => $userId, ':dt' => $date]);
-    $current = (int)$stmt->fetchColumn();
-
-    if ($current >= $maxQuota) {
-        http_response_code(429);
-        echo json_encode([
-            'ok' => false,
-            'error' => "Günlük fotoğraflı AI analiz kotanıza ({$maxQuota}/{$maxQuota}) ulaştınız. Yarın tekrar deneyebilir veya öğününüzü serbest metin olarak ekleyebilirsiniz.",
-            'quota_exceeded' => true,
-            'current' => $current,
-            'max' => $maxQuota
-        ], JSON_UNESCAPED_UNICODE);
+        $up = $pdo->prepare("
+            INSERT INTO ai_usage_logs (user_id, usage_date, {$col})
+            VALUES (:uid, :dt, 1)
+            ON CONFLICT (user_id, usage_date) DO UPDATE SET {$col} = ai_usage_logs.{$col} + 1
+            WHERE ai_usage_logs.{$col} < :mx
+            RETURNING {$col}
+        ");
+        $up->execute([':uid' => $userId, ':dt' => $date, ':mx' => $maxQuota]);
+        $ok = $up->fetchColumn() !== false;
+    } catch (\Throwable $e) {
+        error_log('[ai-quota] ' . $e->getMessage());
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'error' => 'AI kotası şu anda doğrulanamadı. Lütfen birazdan tekrar deneyin.'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    // Kotayı artır
-    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
-    if ($driver === 'pgsql') {
-        $up = $pdo->prepare("
-            INSERT INTO ai_usage_logs (user_id, usage_date, photo_count)
-            VALUES (:uid, :dt, 1)
-            ON CONFLICT (user_id, usage_date) DO UPDATE SET photo_count = ai_usage_logs.photo_count + 1
-        ");
-        $up->execute([':uid' => $userId, ':dt' => $date]);
-    } else {
-        $up = $pdo->prepare("
-            INSERT INTO ai_usage_logs (user_id, usage_date, photo_count)
-            VALUES (:uid, :dt, 1)
-            ON DUPLICATE KEY UPDATE photo_count = photo_count + 1
-        ");
-        $up->execute([':uid' => $userId, ':dt' => $date]);
+    if (!$ok) {
+        http_response_code(429);
+        $label = $kind === 'text' ? 'metin' : 'fotoğraflı';
+        echo json_encode([
+            'ok' => false,
+            'error' => "Günlük {$label} AI analiz kotanıza ({$maxQuota}/{$maxQuota}) ulaştınız. Yarın tekrar deneyebilirsiniz.",
+            'quota_exceeded' => true,
+            'max' => $maxQuota
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 }
 

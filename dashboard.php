@@ -28,7 +28,7 @@ $defaultMeal = $hour < 11 ? 'breakfast' : ($hour < 16 ? 'lunch' : ($hour < 21 ? 
 $trDays = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 $trMonths = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 $todayLabel = $trDays[(int)date('w')] . ', ' . (int)date('j') . ' ' . $trMonths[(int)date('n')];
-$v = '20260930';
+$v = '20261009';
 $shortDay = ['Pazartesi' => 'Pzt', 'Salı' => 'Sal', 'Çarşamba' => 'Çar', 'Perşembe' => 'Per', 'Cuma' => 'Cum', 'Cumartesi' => 'Cmt', 'Pazar' => 'Paz'];
 ?>
 <!DOCTYPE html>
@@ -321,19 +321,39 @@ async function apiPost(action, extra = {}, endpoint = 'dashboard.php') {
 let dashData = <?= $initialDashboardData ? json_encode($initialDashboardData, JSON_UNESCAPED_UNICODE) : 'null' ?>;
 let authFailureStreak = 0;
 
+let dashInFlight = false, dashDirty = false, dashRetryTimer = null, dashRetryCount = 0;
+
 async function loadDashboard() {
+    // Tek seferde tek istek; istek sürerken yeni tetikleme gelirse bitince bir kez daha yükler
+    if (dashInFlight) { dashDirty = true; return; }
+    dashInFlight = true;
+    clearTimeout(dashRetryTimer);
+    let failed = false;
     try {
         const data = await apiPost('load');
         if (!data.ok) {
             if (data.require_login && ++authFailureStreak >= 3) { location.href = 'login.php?redirect=dashboard.php'; return; }
-            setTimeout(loadDashboard, 4000);
-            return;
+            failed = true;
+        } else {
+            authFailureStreak = 0;
+            dashRetryCount = 0;
+            dashData = data;
+            renderDashboard(data);
         }
-        authFailureStreak = 0;
-        dashData = data;
-        renderDashboard(data);
     } catch (e) {
-        setTimeout(loadDashboard, 4000);
+        failed = true;
+    } finally {
+        dashInFlight = false;
+    }
+    if (failed) {
+        // Üstel geri çekilme: 4s, 8s, 16s, 30s, 30s — 5 denemeden sonra periyodik yenilemeye bırak
+        if (dashRetryCount < 5) {
+            const delay = Math.min(30000, 4000 * Math.pow(2, dashRetryCount++));
+            dashRetryTimer = setTimeout(loadDashboard, delay);
+        }
+    } else if (dashDirty) {
+        dashDirty = false;
+        loadDashboard();
     }
 }
 

@@ -66,6 +66,22 @@ final class AlarmNotifier {
         nm.createNotificationChannel(ch);
     }
 
+    /**
+     * Kullanıcı ayarlardan alarm kanalını tamamen kapattıysa (IMPORTANCE_NONE) true döner.
+     * Android 8 öncesinde kanal kavramı yoktur; hata durumunda false döner.
+     */
+    static boolean isChannelBlocked(Context ctx) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false;
+        try {
+            NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return false;
+            NotificationChannel ch = nm.getNotificationChannel(CHANNEL_ID);
+            return ch != null && ch.getImportance() == NotificationManager.IMPORTANCE_NONE;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     private static int immutable() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0;
     }
@@ -143,8 +159,11 @@ final class AlarmNotifier {
             Log.w(TAG, "Bildirim izni yok", se);
         }
 
-        if (!enabled) {
-            // Bildirim izni kapalıysa: alarm ekranını doğrudan açmayı dene (ses AlarmActivity içinde çalar)
+        boolean blocked = isChannelBlocked(ctx);
+        if (blocked) Log.w(TAG, "Alarm bildirim kanalı kapalı (IMPORTANCE_NONE); alarm ekranı doğrudan açılacak");
+
+        if (!enabled || blocked) {
+            // Bildirim izni ya da kanal kapalıysa: alarm ekranını doğrudan açmayı dene (ses AlarmActivity içinde çalar)
             try {
                 full.putExtra(AlarmActivity.EXTRA_PLAY_SOUND, true);
                 ctx.startActivity(full);

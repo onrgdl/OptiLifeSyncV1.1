@@ -22,12 +22,26 @@ use App\Services\ReminderService;
  */
 class DashboardService
 {
+    /** İstek içi profil önbelleği (aynı istekte 3 kez SELECT * FROM users çalışmasın) */
+    private static array $profileCache = [];
+
+    public static function clearProfileCache(): void
+    {
+        self::$profileCache = [];
+    }
+
     public static function getUserProfile(PDO $pdo, int $userId): array
     {
+        if (isset(self::$profileCache[$userId])) {
+            return self::$profileCache[$userId];
+        }
         $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
         $stmt->execute([$userId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row ?: [
+        if ($row) {
+            return self::$profileCache[$userId] = $row;
+        }
+        return [
             'weight_kg' => 70.0,
             'height_cm' => 170.0,
             'birth_date' => '1996-01-01',
@@ -64,6 +78,7 @@ class DashboardService
     public static function getDashboardData(PDO $pdo, int $userId, ?string $date = null): array
     {
         $today = $date ?: date('Y-m-d');
+        self::clearProfileCache(); // her yüklemede taze başla, sonra istek içinde paylaş
         $profile = self::getUserProfile($pdo, $userId);
         $age = self::calcAge($profile['birth_date']);
         $dailyLog = self::getOrCreateDailyLog($pdo, $userId, $today);

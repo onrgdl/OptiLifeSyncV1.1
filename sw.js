@@ -1,5 +1,5 @@
 /**
- * OptiLifeSync — PWA Service Worker (v4)
+ * OptiLifeSync — PWA Service Worker (v5)
  *
  * Hız stratejisi:
  *  - Sayfalar (HTML): her zaman ağdan, "navigation preload" ile (SW açılışını beklemeden).
@@ -10,7 +10,7 @@
  *  → Modül geçişlerinde yalnızca sayfanın HTML'i indirilir.
  */
 
-const VERSION = 'v4-20260930';
+const VERSION = 'v5-20261009';
 const STATIC_CACHE = 'opti-static-' + VERSION;
 const CDN_CACHE = 'opti-cdn-v1';
 
@@ -19,10 +19,10 @@ const PRECACHE_LOCAL = [
     'favicon.ico',
     'assets/icons/icon-192.png',
     'assets/icons/icon-512.png',
-    'assets/css/sidebar.css?v=20260930',
-    'assets/css/theme.css?v=20260930',
-    'assets/js/native-bridge.js?v=20260930',
-    'assets/js/alarm-engine.js?v=20260930'
+    'assets/css/sidebar.css?v=20261009',
+    'assets/css/theme.css?v=20261009',
+    'assets/js/native-bridge.js?v=20261009',
+    'assets/js/alarm-engine.js?v=20261009'
 ];
 
 const PRECACHE_CDN = [

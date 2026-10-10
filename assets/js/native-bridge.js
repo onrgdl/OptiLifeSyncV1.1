@@ -47,37 +47,80 @@
         return Promise.reject(new Error('plugin-unavailable'));
     }
 
+    /** HTTP/JSON hatalarında anlaşılır bir hata fırlatır ("Unexpected token <" yerine). */
     async function post(params) {
         const body = new URLSearchParams(params);
         const res = await fetch(API(), { method: 'POST', body, credentials: 'include' });
-        return res.json();
+        const ctype = (res.headers && res.headers.get && res.headers.get('content-type')) || '';
+        if (!res.ok) {
+            const err = new Error('Sunucu hatası (HTTP ' + res.status + ')');
+            err.status = res.status;
+            throw err;
+        }
+        if (ctype.toLowerCase().indexOf('json') === -1) {
+            const err = new Error('Sunucudan JSON olmayan yanıt geldi (' + (ctype || 'içerik türü yok') + ')');
+            err.status = res.status;
+            err.notJson = true;
+            throw err;
+        }
+        try {
+            return await res.json();
+        } catch (_) {
+            const err = new Error('Sunucu yanıtı okunamadı (geçersiz JSON)');
+            err.status = res.status;
+            err.notJson = true;
+            throw err;
+        }
     }
 
     let syncing = null;
+    let syncQueued = false;
     let lastSyncAt = 0;
 
-    /** Sunucudaki tüm aktif alarmları çekip telefona kurar. */
+    async function runSync() {
+        try {
+            const data = await post({ action: 'native_list' });
+            if (!data || !data.ok) return false;
+            const settings = readSettings();
+            await call('schedule', {
+                alarms: data.alarms || [],
+                baseUrl: window.location.origin,
+                snoozeMinutes: settings.snoozeMinutes,
+                replaceAll: true
+            });
+            lastSyncAt = Date.now();
+            return true;
+        } catch (e) {
+            console.warn('[OptiNative] senkronizasyon hatası:', e);
+            return false;
+        }
+    }
+
+    /**
+     * Sunucudaki tüm aktif alarmları çekip telefona kurar.
+     * Bir senkronizasyon sürerken yeni bir çağrı gelirse (özellikle force=true),
+     * mevcut bitince çalışacak TEK bir ek senkronizasyon kuyruğa alınır; böylece
+     * kullanıcının son düzenlemesi eski veriyle ezilmez. Throttle (20 sn) zorunlu çağrıları engellemez.
+     */
     function syncFromServer(force) {
         if (!isApp()) return Promise.resolve(false);
-        if (syncing) return syncing;
+        if (syncing) {
+            // Zorunlu istek: sonrasında bir kez daha çalıştır. Zorunlu olmayan: mevcut sonucu paylaş.
+            if (force) syncQueued = true;
+            return syncing;
+        }
         if (!force && Date.now() - lastSyncAt < 20000) return Promise.resolve(true);
         syncing = (async () => {
             try {
-                const data = await post({ action: 'native_list' });
-                if (!data || !data.ok) return false;
-                const settings = readSettings();
-                await call('schedule', {
-                    alarms: data.alarms || [],
-                    baseUrl: window.location.origin,
-                    snoozeMinutes: settings.snoozeMinutes,
-                    replaceAll: true
-                });
-                lastSyncAt = Date.now();
-                return true;
-            } catch (e) {
-                console.warn('[OptiNative] senkronizasyon hatası:', e);
-                return false;
+                let ok = await runSync();
+                // Çalışırken gelen zorunlu istekler için tek bir son senkronizasyon
+                while (syncQueued) {
+                    syncQueued = false;
+                    ok = await runSync();
+                }
+                return ok;
             } finally {
+                syncQueued = false;
                 syncing = null;
             }
         })();
@@ -92,13 +135,35 @@
         return flushing;
     }
 
+    const MAX_EVENT_AGE_MS = 48 * 3600 * 1000;
+    const MAX_CLIENT_ERRORS = 5;
+    const ATTEMPT_KEY = 'opti_event_attempts';
+
+    function readAttempts() {
+        try { return JSON.parse(localStorage.getItem(ATTEMPT_KEY) || '{}') || {}; } catch (_) { return {}; }
+    }
+    function writeAttempts(map) {
+        try { localStorage.setItem(ATTEMPT_KEY, JSON.stringify(map)); } catch (_) {}
+    }
+
     async function doFlush() {
         try {
             const res = await call('getPendingEvents');
             const events = (res && res.events) || [];
             let sent = 0;
             const done = [];
+            const attempts = readAttempts();
+            let attemptsChanged = false;
+            const now = Date.now();
             for (const ev of events) {
+                if (!ev) continue;
+                // 48 saatten eski olaylar artık anlamsız: sil
+                const created = Number(ev.createdAt || ev.at || 0);
+                if (created > 0 && now - created > MAX_EVENT_AGE_MS) {
+                    done.push(ev.uid);
+                    if (ev.uid && attempts[ev.uid] !== undefined) { delete attempts[ev.uid]; attemptsChanged = true; }
+                    continue;
+                }
                 try {
                     const r = await post({
                         action: 'log_dose',
@@ -109,10 +174,28 @@
                         status: ev.status || 'taken',
                         source: 'native'
                     });
-                    if (r && (r.ok || r.duplicate)) { done.push(ev.uid); sent++; }
-                } catch (_) { /* sonraki açılışta tekrar denenir */ }
+                    if (r && (r.ok || r.duplicate)) {
+                        done.push(ev.uid); sent++;
+                        if (ev.uid && attempts[ev.uid] !== undefined) { delete attempts[ev.uid]; attemptsChanged = true; }
+                    }
+                } catch (e) {
+                    // 401/403 (oturum yok): olay sırada kalır. Diğer 4xx hatalarda 5 denemeden sonra vazgeç.
+                    const st = e && e.status;
+                    if (st >= 400 && st < 500 && st !== 401 && st !== 403 && ev.uid) {
+                        const n = (attempts[ev.uid] || 0) + 1;
+                        attempts[ev.uid] = n;
+                        attemptsChanged = true;
+                        if (n > MAX_CLIENT_ERRORS) {
+                            done.push(ev.uid);
+                            delete attempts[ev.uid];
+                        }
+                    }
+                    /* diğer hatalar: sonraki açılışta tekrar denenir */
+                }
             }
-            if (done.length) await call('clearPendingEvents', { uids: done });
+            if (attemptsChanged) writeAttempts(attempts);
+            const uids = done.filter(Boolean);
+            if (uids.length) await call('clearPendingEvents', { uids });
             if (sent) document.dispatchEvent(new CustomEvent('opti:doses-synced', { detail: { count: sent } }));
             return sent;
         } catch (_) { return 0; }
@@ -149,8 +232,15 @@
         call,
         syncFromServer,
         flushTakenQueue,
-        /** İzin ve güvenilirlik durumunu döner. */
-        status: () => call('status'),
+        /**
+         * İzin ve güvenilirlik durumunu döner. Alanlar: notifications, exactAlarm, fullScreen,
+         * batteryOptimized, channelBlocked (alarm bildirim kanalı kullanıcı tarafından kapatıldı mı),
+         * alarmCount, nextTrigger, pendingEvents, snoozeMinutes ...
+         */
+        status: () => call('status').then((s) => {
+            if (s && typeof s === 'object') s.channelBlocked = !!s.channelBlocked;
+            return s;
+        }),
         /** Bildirim + tam ekran + tam zamanlı alarm izinlerini ister. */
         requestPermissions: () => call('requestNotifications'),
         openExactAlarmSettings: () => call('openSettings', { target: 'exact_alarm' }),

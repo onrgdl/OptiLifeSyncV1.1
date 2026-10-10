@@ -617,3 +617,11 @@ div:where(.swal2-container) .alarm-swal .swal2-actions { flex-wrap: wrap; gap: 6
 html.is-navigating .content { opacity: .55; transition: opacity .25s .12s; }
 .bottom-nav-item:active, .nav-item:active { transform: scale(.94); }
 .bottom-nav-item { transition: transform .12s, background .15s, color .15s; }
+
+/* 2026-10: erişilebilirlik — yakınlaştırma serbest, iOS odaklanma zoom'unu engellemek için 16px girdi */
+@media (max-width: 991.98px) {
+  input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea { font-size: max(16px, 1em); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

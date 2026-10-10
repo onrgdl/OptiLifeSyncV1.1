@@ -24,6 +24,7 @@ final class AlarmStore {
     private static final String KEY_SNOOZE = "snooze_minutes";
     private static final String KEY_SCHEDULED_IDS = "scheduled_ids";
     private static final String KEY_EVENTS = "pending_events";
+    private static final String KEY_SNOOZES = "active_snoozes";
 
     static final String DEFAULT_BASE_URL = "https://opti-life-sync-v1-1.vercel.app";
 
@@ -86,10 +87,23 @@ final class AlarmStore {
     }
 
     // ── Çevrimdışı doz olayları ("Aldım" / "Atla") ─────────────
+    /**
+     * Olayı kalıcı olarak sıraya yazar (write-ahead). Aynı uid'li olay zaten varsa
+     * tekrar eklenmez, üzerine yazılır. Disk yazımı commit() ile senkron yapılır;
+     * böylece işlem hemen ölse bile olay kaybolmaz.
+     */
     static synchronized void addPendingEvent(Context ctx, JSONObject ev) {
         try {
-            if (!ev.has("uid")) ev.put("uid", UUID.randomUUID().toString());
-            JSONArray arr = getPendingEvents(ctx);
+            if (!ev.has("uid") || ev.optString("uid", "").isEmpty()) ev.put("uid", UUID.randomUUID().toString());
+            if (!ev.has("createdAt")) ev.put("createdAt", System.currentTimeMillis());
+            String uid = ev.optString("uid", "");
+            JSONArray old = getPendingEvents(ctx);
+            JSONArray arr = new JSONArray();
+            for (int i = 0; i < old.length(); i++) {
+                JSONObject o = old.optJSONObject(i);
+                if (o == null || uid.equals(o.optString("uid", ""))) continue;
+                arr.put(o);
+            }
             arr.put(ev);
             // En fazla 200 olay tut
             if (arr.length() > 200) {
@@ -97,7 +111,7 @@ final class AlarmStore {
                 for (int i = arr.length() - 200; i < arr.length(); i++) trimmed.put(arr.get(i));
                 arr = trimmed;
             }
-            prefs(ctx).edit().putString(KEY_EVENTS, arr.toString()).apply();
+            prefs(ctx).edit().putString(KEY_EVENTS, arr.toString()).commit();
         } catch (JSONException ignored) {
         }
     }
@@ -110,6 +124,14 @@ final class AlarmStore {
         }
     }
 
+    /** Tek bir olayı uid'e göre sıradan çıkarır (sunucuya başarıyla iletildiğinde). */
+    static synchronized void removePendingEvent(Context ctx, String uid) {
+        if (uid == null || uid.isEmpty()) return;
+        Set<String> one = new HashSet<>();
+        one.add(uid);
+        removePendingEvents(ctx, one);
+    }
+
     static synchronized void removePendingEvents(Context ctx, Set<String> uids) {
         JSONArray arr = getPendingEvents(ctx);
         JSONArray keep = new JSONArray();
@@ -118,6 +140,49 @@ final class AlarmStore {
             if (o == null) continue;
             if (!uids.contains(o.optString("uid", ""))) keep.put(o);
         }
-        prefs(ctx).edit().putString(KEY_EVENTS, keep.toString()).apply();
+        prefs(ctx).edit().putString(KEY_EVENTS, keep.toString()).commit();
+    }
+
+    // ── Aktif ertelemeler (telefon yeniden başlayınca kaybolmasın) ──
+    /**
+     * Bir erteleme kaydı: alarm id'si, tetiklenme zamanı (ms) ve bildirimi
+     * yeniden kurmak için gereken ekstralar (başlık, metin, tarih ...).
+     * Aynı alarm için tek kayıt tutulur.
+     */
+    static synchronized JSONArray getSnoozes(Context ctx) {
+        try {
+            return new JSONArray(prefs(ctx).getString(KEY_SNOOZES, "[]"));
+        } catch (JSONException e) {
+            return new JSONArray();
+        }
+    }
+
+    static synchronized void setSnoozes(Context ctx, JSONArray arr) {
+        prefs(ctx).edit().putString(KEY_SNOOZES, arr == null ? "[]" : arr.toString()).commit();
+    }
+
+    static synchronized void putSnooze(Context ctx, JSONObject entry) {
+        int id = entry.optInt("id", -1);
+        JSONArray old = getSnoozes(ctx);
+        JSONArray arr = new JSONArray();
+        for (int i = 0; i < old.length(); i++) {
+            JSONObject o = old.optJSONObject(i);
+            if (o != null && o.optInt("id", -1) != id) arr.put(o);
+        }
+        arr.put(entry);
+        setSnoozes(ctx, arr);
+    }
+
+    static synchronized void removeSnooze(Context ctx, int id) {
+        JSONArray old = getSnoozes(ctx);
+        JSONArray arr = new JSONArray();
+        boolean changed = false;
+        for (int i = 0; i < old.length(); i++) {
+            JSONObject o = old.optJSONObject(i);
+            if (o == null) { changed = true; continue; }
+            if (o.optInt("id", -1) == id) { changed = true; continue; }
+            arr.put(o);
+        }
+        if (changed) setSnoozes(ctx, arr);
     }
 }

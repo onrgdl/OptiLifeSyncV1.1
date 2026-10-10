@@ -9,6 +9,7 @@ import android.os.Build;
 import android.util.Log;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
@@ -43,6 +44,8 @@ final class AlarmScheduler {
     /** Erteleme ve test alarmları için istek kodu ofsetleri (normal alarm id'leriyle çakışmasın). */
     private static final int SNOOZE_OFFSET = 700000000;
     private static final int TEST_REQUEST_CODE = 699999999;
+    /** Zamanı bu süreden fazla geçmiş ertelemeler artık çaldırılmaz. */
+    private static final long SNOOZE_GRACE_MS = 5 * 60_000L;
 
     private AlarmScheduler() {}
 
@@ -71,8 +74,41 @@ final class AlarmScheduler {
             }
         }
         AlarmStore.setScheduledIds(ctx, ids);
+        restoreSnoozes(ctx, alarms);
         Log.i(TAG, "Kurulan alarm sayısı: " + count);
         return count;
+    }
+
+    /**
+     * Saklanan ertelemeleri yeniden kurar. Alarmı artık listede olmayan veya
+     * zamanı birkaç dakikadan fazla geçmiş kayıtlar silinir.
+     */
+    private static void restoreSnoozes(Context ctx, JSONArray alarms) {
+        Set<Integer> existing = new HashSet<>();
+        for (int i = 0; i < alarms.length(); i++) {
+            JSONObject a = alarms.optJSONObject(i);
+            if (a != null) existing.add(a.optInt("id", -1));
+        }
+        long now = System.currentTimeMillis();
+        JSONArray stored = AlarmStore.getSnoozes(ctx);
+        JSONArray keep = new JSONArray();
+        for (int i = 0; i < stored.length(); i++) {
+            JSONObject e = stored.optJSONObject(i);
+            if (e == null) continue;
+            int id = e.optInt("id", -1);
+            long at = e.optLong("at", 0);
+            if (id < 0 || at <= 0 || !existing.contains(id) || at < now - SNOOZE_GRACE_MS) {
+                cancelSnoozePi(ctx, id);
+                continue;
+            }
+            try {
+                armSnooze(ctx, e);
+                keep.put(e);
+            } catch (Throwable t) {
+                Log.w(TAG, "Erteleme yeniden kurulamadı", t);
+            }
+        }
+        AlarmStore.setSnoozes(ctx, keep);
     }
 
     /** Tek bir alarmın bir sonraki çalma zamanını kurar. */
@@ -91,15 +127,69 @@ final class AlarmScheduler {
     /** "Ertele": aynı alarmı N dakika sonra tek seferlik tekrar çaldırır. */
     static void snooze(Context ctx, Intent original, int minutes) {
         int id = original.getIntExtra(EXTRA_ID, 0);
+        long trigger = System.currentTimeMillis() + minutes * 60_000L;
+        try {
+            JSONObject e = new JSONObject();
+            e.put("id", id);
+            e.put("at", trigger);
+            e.put("title", original.getStringExtra(EXTRA_TITLE));
+            e.put("body", original.getStringExtra(EXTRA_BODY));
+            e.put("supplementId", original.getIntExtra(EXTRA_SUPPLEMENT_ID, 0));
+            e.put("time", original.getStringExtra(EXTRA_TIME));
+            e.put("date", original.getStringExtra(EXTRA_DATE));
+            e.put("trackable", original.getBooleanExtra(EXTRA_TRACKABLE, false));
+            boolean test = original.getBooleanExtra(EXTRA_IS_TEST, false);
+            e.put("test", test);
+            armSnooze(ctx, e);
+            // Test alarmı ertelemesi kalıcı tutulmaz (yalnızca gerçek alarmlar)
+            if (!test) AlarmStore.putSnooze(ctx, e);
+        } catch (JSONException ex) {
+            Log.w(TAG, "Erteleme kaydedilemedi", ex);
+        }
+    }
+
+    private static Intent snoozeIntent(Context ctx, int id) {
         Intent intent = new Intent(ctx, AlarmReceiver.class);
         intent.setAction(ACTION_FIRE);
         intent.setData(Uri.parse("opti://alarm/snooze/" + id));
-        if (original.getExtras() != null) intent.putExtras(original.getExtras());
+        return intent;
+    }
+
+    /** Kayıtlı bir erteleme girdisinden AlarmManager alarmını kurar. */
+    private static void armSnooze(Context ctx, JSONObject e) {
+        int id = e.optInt("id", 0);
+        Intent intent = snoozeIntent(ctx, id);
+        intent.putExtra(EXTRA_ID, id);
+        String title = e.optString("title", "");
+        intent.putExtra(EXTRA_TITLE, title.isEmpty() || "null".equals(title) ? "⏰ Hatırlatıcı" : title);
+        String body = e.optString("body", "");
+        intent.putExtra(EXTRA_BODY, "null".equals(body) ? "" : body);
+        intent.putExtra(EXTRA_SUPPLEMENT_ID, e.optInt("supplementId", 0));
+        String time = e.optString("time", "");
+        intent.putExtra(EXTRA_TIME, "null".equals(time) ? "" : time);
+        String date = e.optString("date", "");
+        intent.putExtra(EXTRA_DATE, date.isEmpty() || "null".equals(date) ? formatDate(System.currentTimeMillis()) : date);
+        intent.putExtra(EXTRA_TRACKABLE, e.optBoolean("trackable", false));
+        intent.putExtra(EXTRA_IS_TEST, e.optBoolean("test", false));
         intent.putExtra(EXTRA_IS_SNOOZE, true);
-        long trigger = System.currentTimeMillis() + minutes * 60_000L;
         PendingIntent pi = PendingIntent.getBroadcast(ctx, SNOOZE_OFFSET + (id % 100000000), intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | immutableFlag());
-        setExact(ctx, trigger, pi);
+        setExact(ctx, e.optLong("at", System.currentTimeMillis()), pi);
+    }
+
+    private static void cancelSnoozePi(Context ctx, int id) {
+        try {
+            AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+            if (am == null) return;
+            PendingIntent pi = PendingIntent.getBroadcast(ctx, SNOOZE_OFFSET + (id % 100000000), snoozeIntent(ctx, id),
+                    PendingIntent.FLAG_NO_CREATE | immutableFlag());
+            if (pi != null) {
+                am.cancel(pi);
+                pi.cancel();
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Erteleme iptal edilemedi", t);
+        }
     }
 
     /** Test alarmı: birkaç saniye sonra çalar. */
@@ -179,6 +269,12 @@ final class AlarmScheduler {
             }
         }
         AlarmStore.setScheduledIds(ctx, new HashSet<String>());
+        // Ertelemeler: önce hepsini iptal et; geçerli olanlar rescheduleAll içinde yeniden kurulur
+        JSONArray snoozes = AlarmStore.getSnoozes(ctx);
+        for (int i = 0; i < snoozes.length(); i++) {
+            JSONObject e = snoozes.optJSONObject(i);
+            if (e != null) cancelSnoozePi(ctx, e.optInt("id", -1));
+        }
     }
 
     static long nextTriggerOfAll(Context ctx) {

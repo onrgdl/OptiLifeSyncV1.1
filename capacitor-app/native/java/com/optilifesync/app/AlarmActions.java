@@ -68,7 +68,12 @@ final class AlarmActions {
             ev.put("scheduledTime", time == null ? "" : time);
             ev.put("date", date == null ? AlarmScheduler.formatDate(System.currentTimeMillis()) : date);
             ev.put("status", status);
-            ev.put("at", System.currentTimeMillis());
+            long now = System.currentTimeMillis();
+            ev.put("at", now);
+            ev.put("createdAt", now);
+            // Kararlı uid: aynı doz için tekrar basılsa bile tek kayıt oluşur
+            ev.put("uid", "dose-" + ev.optInt("reminderId") + "-" + ev.optString("date")
+                    + "-" + ev.optString("scheduledTime") + "-" + status);
             return ev;
         } catch (JSONException e) {
             return null;

@@ -269,25 +269,102 @@
     const api = () => (window.API_BASE || '/api') + '/reminders.php';
     const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
+    const SNOOZE_STORE = 'opti_web_snoozes';
+    const SNOOZE_LATE_MS = 30 * 60000;   // zamanı bundan fazla geçmiş ertelemeler atılır
+    const MIN_POLL_GAP = 10000;          // iki sorgu arası en az 10 sn
+
+    /** Swal yoksa da görünen küçük bildirim. */
+    function toast(icon, title) {
+        if (typeof Swal !== 'undefined') {
+            try { Swal.fire({ toast: true, position: 'top', icon, title, showConfirmButton: false, timer: 2500 }); return; } catch (_) {}
+        }
+        try {
+            const el = document.createElement('div');
+            el.setAttribute('role', 'status');
+            el.textContent = title;
+            el.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:2147483647;max-width:90vw;padding:10px 16px;border-radius:12px;background:#0f172a;color:#fff;font:600 14px system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35)';
+            document.body.appendChild(el);
+            setTimeout(() => { try { el.remove(); } catch (_) {} }, 3500);
+        } catch (_) {}
+    }
+
     const Watcher = {
         started: false,
         queue: [],
         showing: false,
+        lastPollAt: 0,
+        polling: false,
+        snoozeTimers: {},
 
         shownKey(r) { return `opti_shown_${todayStr()}_${r.id}_${r.remind_at}`; },
         wasShown(r) { try { return !!sessionStorage.getItem(this.shownKey(r)); } catch (_) { return false; } },
         markShown(r) { try { sessionStorage.setItem(this.shownKey(r), '1'); } catch (_) {} },
+        unmarkShown(r) { try { sessionStorage.removeItem(this.shownKey(r)); } catch (_) {} },
+
+        /* ── Erteleme kalıcılığı: localStorage { anahtar: { until, r } } ── */
+        snoozeKey(r) { return `${todayStr()}_${r.id}_${r.remind_at}`; },
+        readSnoozes() {
+            try {
+                const o = JSON.parse(LS.get(SNOOZE_STORE, '{}'));
+                return (o && typeof o === 'object') ? o : {};
+            } catch (_) { return {}; }
+        },
+        writeSnoozes(o) { LS.set(SNOOZE_STORE, JSON.stringify(o)); },
+
+        scheduleSnooze(r, minutes) {
+            const until = Date.now() + minutes * 60000;
+            const key = this.snoozeKey(r);
+            const all = this.readSnoozes();
+            all[key] = { until, r };
+            this.writeSnoozes(all);
+            this.armSnooze(key, r, until);
+        },
+
+        armSnooze(key, r, until) {
+            if (this.snoozeTimers[key]) clearTimeout(this.snoozeTimers[key]);
+            this.snoozeTimers[key] = setTimeout(() => {
+                delete this.snoozeTimers[key];
+                const all = this.readSnoozes();
+                delete all[key];
+                this.writeSnoozes(all);
+                this.queue.push(r);
+                this.next();
+            }, Math.max(0, until - Date.now()));
+        },
+
+        /** Sayfa açılırken bekleyen ertelemeleri geri yükler, eskileri temizler. */
+        restoreSnoozes() {
+            const all = this.readSnoozes();
+            const now = Date.now();
+            let changed = false;
+            Object.keys(all).forEach(key => {
+                const e = all[key];
+                const until = typeof e === 'number' ? e : (e && Number(e.until));
+                if (!e || typeof e !== 'object' || !e.r || !until || until < now - SNOOZE_LATE_MS) {
+                    delete all[key]; changed = true; return;
+                }
+                if (!this.snoozeTimers[key]) this.armSnooze(key, e.r, until);
+            });
+            if (changed) this.writeSnoozes(all);
+        },
 
         start() {
             if (this.started) return;
             if (window.OptiNative && OptiNative.isApp()) return; // APK: telefon alarmı çalar
             this.started = true;
+            this.restoreSnoozes();
             this.poll();
-            setInterval(() => this.poll(), 30000);
-            document.addEventListener('visibilitychange', () => { if (!document.hidden) this.poll(); });
+            // Sekme gizliyken sorgulama yapma (pil/ağ); görünür olunca hemen sorgula
+            setInterval(() => { if (!document.hidden) this.poll(); }, 30000);
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && Date.now() - this.lastPollAt >= MIN_POLL_GAP) this.poll();
+            });
         },
 
         async poll() {
+            if (this.polling) return;
+            this.polling = true;
+            this.lastPollAt = Date.now();
             try {
                 const res = await fetch(api(), { method: 'POST', body: new URLSearchParams({ action: 'check_due' }), credentials: 'include' });
                 if (!res.ok) return;
@@ -298,12 +375,50 @@
                     this.queue.push(r);
                 }
                 this.next();
-            } catch (_) {}
+            } catch (_) {
+            } finally {
+                this.polling = false;
+            }
         },
 
         next() {
             if (this.showing || !this.queue.length) return;
             this.show(this.queue.shift());
+        },
+
+        /** SweetAlert yüklenemediğinde kullanılan, bağımlılıksız basit alarm penceresi. */
+        showFallback(r, title, name, trackable, snooze, done) {
+            let overlay = null;
+            try {
+                overlay = document.createElement('div');
+                overlay.setAttribute('role', 'alertdialog');
+                overlay.setAttribute('aria-modal', 'true');
+                overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(2,6,23,.75)';
+                const box = document.createElement('div');
+                box.style.cssText = 'width:100%;max-width:360px;border-radius:20px;padding:22px;background:#fff;color:#0f172a;text-align:center;font-family:system-ui,sans-serif;box-shadow:0 20px 60px rgba(0,0,0,.5)';
+                box.innerHTML = `<div style="font-size:20px;font-weight:800;margin-bottom:6px">${esc(title)}</div>
+                    <div style="font-size:28px;font-weight:800;color:#059669">${esc(r.remind_at)}</div>
+                    <div style="font-size:16px;margin:6px 0 16px">${esc(name)}${trackable && r.dose ? ' · ' + esc(String(r.dose).trim()) : ''}</div>`;
+                const mk = (label, bg, fg, action) => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.textContent = label;
+                    b.style.cssText = `display:block;width:100%;margin:8px 0 0;padding:13px;border:0;border-radius:12px;font-size:16px;font-weight:700;background:${bg};color:${fg};cursor:pointer`;
+                    b.addEventListener('click', () => {
+                        try { overlay.remove(); } catch (_) {}
+                        done(action);
+                    });
+                    box.appendChild(b);
+                };
+                mk(trackable ? '✅ Aldım' : 'Tamam', '#10b981', '#fff', 'taken');
+                if (trackable) mk('Atla', '#e2e8f0', '#0f172a', 'skipped');
+                mk(`⏰ ${snooze} dk ertele`, '#1e293b', '#fff', 'snooze');
+                overlay.appendChild(box);
+                document.body.appendChild(overlay);
+            } catch (_) {
+                // DOM'a eklenemediyse kuyruk takılı kalmasın
+                done('close');
+            }
         },
 
         /** Alarm penceresi. r: {id, supplement_id, type, label, remind_at, dose, form} */
@@ -320,23 +435,49 @@
             if (engine) engine.triggerAlarm({ id: r.id, type: r.type, title, body: `${name}${r.dose && trackable ? ' · ' + r.dose.trim() : ''}` });
 
             const finish = () => { if (engine) engine.stop(); this.showing = false; setTimeout(() => this.next(), 400); };
+            const done = (action) => {
+                try {
+                    if (action === 'taken' && trackable) this.log(r, 'taken');
+                    else if (action === 'skipped') this.log(r, 'skipped');
+                    else if (action === 'snooze') {
+                        this.scheduleSnooze(r, snooze);
+                        toast('info', `${snooze} dakika sonra tekrar hatırlatılacak`);
+                    }
+                } finally {
+                    finish();
+                }
+            };
 
             if (typeof Swal === 'undefined') {
+                const recentlyFailed = this._swalFailedAt && (Date.now() - this._swalFailedAt < 5 * 60000);
+                if (recentlyFailed) { this.showFallback(r, title, name, trackable, snooze, done); return; }
                 // SweetAlert bu sayfada yüklü değilse yükle, sonra pencereyi göster
                 if (!this._swalLoading) {
                     this._swalLoading = true;
+                    let settled = false;
+                    const fail = () => {
+                        if (settled) return;
+                        settled = true;
+                        this._swalLoading = false;       // sonraki alarm yeniden deneyebilsin
+                        this._swalFailedAt = Date.now();
+                        this.showFallback(r, title, name, trackable, snooze, done);
+                    };
                     const css = document.createElement('link');
                     css.rel = 'stylesheet'; css.href = 'https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css';
                     document.head.appendChild(css);
                     const sc = document.createElement('script');
                     sc.src = 'https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js';
-                    sc.onload = () => { if (engine) engine.stop(); this.showing = false; this.show(r); };
-                    sc.onerror = () => {
-                        const ok = window.confirm(`${title}\n${name}\n\nTamam = ${trackable ? 'Aldım' : 'Kapat'}`);
-                        if (ok && trackable) this.log(r, 'taken');
-                        finish();
+                    sc.onload = () => {
+                        if (settled) return;
+                        settled = true;
+                        this._swalLoading = false;
+                        if (engine) engine.stop();
+                        this.showing = false;
+                        this.show(r);
                     };
+                    sc.onerror = fail;
                     document.head.appendChild(sc);
+                    setTimeout(() => { if (typeof Swal === 'undefined') fail(); }, 8000);
                 }
                 return;
             }
@@ -358,14 +499,11 @@
                 allowOutsideClick: false,
                 customClass: { popup: 'alarm-swal' }
             }).then(res => {
-                if (res.isConfirmed && trackable) this.log(r, 'taken');
-                else if (res.isDenied) this.log(r, 'skipped');
-                else if (res.dismiss === Swal.DismissReason.cancel) {
-                    setTimeout(() => { this.queue.push(r); this.next(); }, snooze * 60000);
-                    Swal.fire({ toast: true, position: 'top', icon: 'info', title: `${snooze} dakika sonra tekrar hatırlatılacak`, showConfirmButton: false, timer: 2500 });
-                }
-                finish();
-            });
+                if (res.isConfirmed) done('taken');
+                else if (res.isDenied) done('skipped');
+                else if (res.dismiss === Swal.DismissReason.cancel) done('snooze');
+                else done('close');
+            }, () => finish());
         },
 
         async log(r, status) {
@@ -374,12 +512,16 @@
                     method: 'POST', credentials: 'include',
                     body: new URLSearchParams({ action: 'log_dose', reminder_id: r.id, supplement_id: r.supplement_id || '', scheduled_time: r.remind_at, status })
                 });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
-                if (data.ok && typeof Swal !== 'undefined') {
-                    Swal.fire({ toast: true, position: 'top', icon: 'success', title: status === 'taken' ? 'Kaydedildi: alındı' : 'Atlandı olarak kaydedildi', showConfirmButton: false, timer: 2000 });
-                }
+                if (!data || !data.ok) throw new Error('Sunucu kaydı reddetti');
+                toast('success', status === 'taken' ? 'Kaydedildi: alındı' : 'Atlandı olarak kaydedildi');
                 document.dispatchEvent(new CustomEvent('opti:dose-logged', { detail: { reminder: r, status } }));
-            } catch (_) {}
+            } catch (_) {
+                // Sessizce kaybetme: kullanıcıyı uyar ve alarmı tekrar çalmaya uygun bırak
+                this.unmarkShown(r);
+                toast('error', 'Doz kaydedilemedi. Bağlantı gelince alarm tekrar gösterilecek.');
+            }
         }
     };
 

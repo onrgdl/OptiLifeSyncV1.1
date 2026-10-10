@@ -20,6 +20,15 @@ use App\Services\AuthService;
 $authService = $pdo ? new AuthService($pdo) : null;
 $isCreator = AuthService::isCreator();
 
+// Kurulum/durum aracı yalnızca Creator oturumuyla erişilebilir (bilgi sızıntısını önler).
+// İlk kurulumda (henüz kullanıcı yokken) SETUP_ALLOW=1 ortam değişkeniyle açılabilir.
+if (!$isCreator && getenv('SETUP_ALLOW') !== '1') {
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo 'Not found';
+    exit;
+}
+
 $driver = $pdo ? $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) : 'none';
 $isPgsql = ($driver === 'pgsql');
 

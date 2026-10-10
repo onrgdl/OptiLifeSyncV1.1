@@ -175,12 +175,32 @@ class AuthService
             return false;
         }
 
-        // Oturumu güvenle geri yükle
+        // Oturumu geri yüklerken kullanıcıyı ve rolü DB'den doğrula (silinmiş/rolü değişmiş hesaplar)
+        $role = $payload['role'] ?? 'user';
+        $dbUser = null;
+        if (function_exists('getDbConnection') && ($pdoNow = getDbConnection()) instanceof PDO) {
+            try {
+                $q = $pdoNow->prepare('SELECT id, role, username, name FROM users WHERE id = :id LIMIT 1');
+                $q->execute([':id' => (int)$payload['id']]);
+                $dbUser = $q->fetch(PDO::FETCH_ASSOC) ?: false;
+            } catch (\Throwable) {
+                $dbUser = null; // DB geçici erişilemez: çerez imzasına güven
+            }
+            if ($dbUser === false) {
+                return false; // kullanıcı silinmiş
+            }
+        }
+        if (is_array($dbUser)) {
+            $role = $dbUser['role'];
+            $payload['username'] = $dbUser['username'];
+            $payload['name'] = $dbUser['name'] ?: $dbUser['username'];
+        }
+
         $_SESSION['user'] = [
             'id'       => (int)$payload['id'],
             'name'     => $payload['name'] ?? $payload['username'],
             'username' => $payload['username'],
-            'role'     => $payload['role'] ?? 'user',
+            'role'     => $role,
             'email'    => $payload['email'] ?? ($payload['username'] . '@optilifesync.local'),
         ];
 
@@ -326,25 +346,11 @@ class AuthService
             return ['ok' => false, 'error' => 'Kullanıcı adı ve PIN boş bırakılamaz.'];
         }
 
-        // Kaba Kuvvet (Brute-Force) Koruması: 5 hatalı denemede 60 saniye kilitleme
+        // Kaba kuvvet koruması: veritabanı tabanlı (oturum çerezi silinerek aşılamaz)
         self::startSession();
-        $failedAttempts = (int)($_SESSION['login_failed_attempts'] ?? 0);
-        $lastFailedTime = (int)($_SESSION['login_last_failed_time'] ?? 0);
-        $lockoutSeconds = 60;
-
-        if ($failedAttempts >= 5) {
-            $elapsed = time() - $lastFailedTime;
-            if ($elapsed < $lockoutSeconds) {
-                $remaining = $lockoutSeconds - $elapsed;
-                return [
-                    'ok' => false,
-                    'error' => "Çok fazla hatalı PIN denemesi yapıldı. Güvenliğiniz için lütfen {$remaining} saniye bekleyin."
-                ];
-            } else {
-                // Kilit süresi doldu, sayacı sıfırla
-                $_SESSION['login_failed_attempts'] = 0;
-                $failedAttempts = 0;
-            }
+        $lock = $this->throttleCheck('login', $username);
+        if ($lock > 0) {
+            return ['ok' => false, 'error' => "Çok fazla hatalı deneme yapıldı. Lütfen {$lock} saniye sonra tekrar deneyin."];
         }
 
         // Giriş yalnızca username ile — name alanı artık kullanılmıyor (kullanıcı adı tarama saldırısını önler)
@@ -359,6 +365,7 @@ class AuthService
 
         if (!$user) {
             // Kullanıcı adı bulunamadı mesajını kasıtlı olarak genel tutuyoruz (kullanıcı adı taramasını engeller)
+            $this->throttleFail('login', $username);
             return ['ok' => false, 'error' => 'Kullanıcı adı veya PIN hatalı.'];
         }
 
@@ -371,17 +378,10 @@ class AuthService
         }
 
         if (!$valid) {
-            $_SESSION['login_failed_attempts'] = $failedAttempts + 1;
-            $_SESSION['login_last_failed_time'] = time();
-            $remainingAttempts = max(0, 5 - ($failedAttempts + 1));
-            $msg = 'Kullanıcı adı veya PIN hatalı.';
-            if ($remainingAttempts > 0 && $remainingAttempts <= 3) {
-                $msg .= " ({$remainingAttempts} deneme hakkınız kaldı)";
-            } elseif ($remainingAttempts === 0) {
-                $msg .= " Art arda 5 hatalı giriş nedeniyle sistem 60 saniye kilitlendi.";
-            }
-            return ['ok' => false, 'error' => $msg];
+            $this->throttleFail('login', $username);
+            return ['ok' => false, 'error' => 'Kullanıcı adı veya PIN hatalı.'];
         }
+        $this->throttleClear('login', $username);
 
         // Oturumu başlat
         $this->setUserSession($user);
@@ -392,8 +392,31 @@ class AuthService
     /**
      * Sadece Kullanıcı Adı ve PIN ile Hızlı Kayıt
      */
-    public function register(string $username, string $pin, ?string $name = null): array
+    /** Kayıt açık mı? REGISTRATION_OPEN=1 ya da INVITE_CODE tanımlıysa. Varsayılan: kapalı. */
+    public static function registrationMode(): string
     {
+        if (in_array(strtolower((string)getenv('REGISTRATION_OPEN')), ['1', 'true', 'yes'], true)) {
+            return 'open';
+        }
+        return ((string)getenv('INVITE_CODE')) !== '' ? 'invite' : 'closed';
+    }
+
+    public function register(string $username, string $pin, ?string $name = null, string $inviteCode = ''): array
+    {
+        $mode = self::registrationMode();
+        if ($mode === 'closed') {
+            return ['ok' => false, 'error' => 'Yeni kayıtlar şu anda kapalı.'];
+        }
+        if ($mode === 'invite') {
+            $lock = $this->throttleCheck('invite', 'x');
+            if ($lock > 0) {
+                return ['ok' => false, 'error' => "Çok fazla hatalı deneme. {$lock} saniye sonra tekrar deneyin."];
+            }
+            if (!hash_equals((string)getenv('INVITE_CODE'), trim($inviteCode))) {
+                $this->throttleFail('invite', 'x');
+                return ['ok' => false, 'error' => 'Davet kodu hatalı.'];
+            }
+        }
         $username = trim($username);
         $pin = trim($pin);
         $name = trim((string)$name);
@@ -496,6 +519,11 @@ class AuthService
             return ['ok' => false, 'error' => 'Yeni PIN en az 6 haneli olmalıdır.'];
         }
 
+        $lock = $this->throttleCheck('reset', $username);
+        if ($lock > 0) {
+            return ['ok' => false, 'error' => "Çok fazla hatalı deneme yapıldı. Lütfen {$lock} saniye sonra tekrar deneyin."];
+        }
+
         $stmt = $this->db->prepare("
             SELECT id, username, recovery_code 
             FROM users 
@@ -505,8 +533,11 @@ class AuthService
         $stmt->execute([':u' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
+        // Kullanıcı yoksa ya da kod hatalıysa aynı genel mesaj (kullanıcı adı taramasını önler)
+        $genericFail = ['ok' => false, 'error' => 'Kullanıcı adı veya kurtarma kodu hatalı.'];
         if (!$user) {
-            return ['ok' => false, 'error' => 'Kullanıcı bulunamadı.'];
+            $this->throttleFail('reset', $username);
+            return $genericFail;
         }
 
         $storedCode = strtoupper(trim((string)$user['recovery_code']));
@@ -514,9 +545,11 @@ class AuthService
         $cleanStored = str_replace(['-', ' '], '', $storedCode);
 
         // Sabit zamanlı karşılaştırma (timing attack önlemi)
-        if (!hash_equals($cleanStored, $cleanInput)) {
-            return ['ok' => false, 'error' => 'Kurtarma kodu hatalı! Lütfen kaydettiğiniz kodu kontrol edin.'];
+        if ($cleanStored === '' || !hash_equals($cleanStored, $cleanInput)) {
+            $this->throttleFail('reset', $username);
+            return $genericFail;
         }
+        $this->throttleClear('reset', $username);
 
         // Yeni PIN'i kaydet ve yeni bir kurtarma kodu üret
         $newPinHash = password_hash($newPin, PASSWORD_DEFAULT);
@@ -680,6 +713,90 @@ class AuthService
         unset($_COOKIE[self::AUTH_COOKIE_NAME]);
         session_destroy();
     }
+
+    /* ------------------------------------------------------------------
+     * Veritabanı tabanlı deneme sınırlama (kullanıcı adı + IP)
+     * Tablo yoksa/DB hatasında oturum tabanlı yedeğe düşer (fail-soft).
+     * ------------------------------------------------------------------ */
+    private const THROTTLE_USER_MAX = 5;     // kullanıcı başına
+    private const THROTTLE_IP_MAX   = 20;    // IP başına
+    private const THROTTLE_WINDOW   = 300;   // saniye
+
+    private static function clientIp(): string
+    {
+        $xff = (string)($_SERVER['HTTP_X_FORWARDED_FOR'] ?? '');
+        if ($xff !== '') {
+            $ip = trim(explode(',', $xff)[0]);
+            if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                return $ip;
+            }
+        }
+        return (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+    }
+
+    /** @return string[] [kullanıcı anahtarı, ip anahtarı] */
+    private function throttleKeys(string $scope, string $username): array
+    {
+        return [
+            $scope . ':u:' . substr(sha1(strtolower(trim($username))), 0, 24),
+            $scope . ':i:' . substr(sha1(self::clientIp()), 0, 24),
+        ];
+    }
+
+    /** Kilit varsa kalan saniyeyi, yoksa 0 döner. */
+    private function throttleCheck(string $scope, string $username): int
+    {
+        [$ku, $ki] = $this->throttleKeys($scope, $username);
+        try {
+            $stmt = $this->db->prepare(
+                "SELECT throttle_key, COUNT(*) AS c, MIN(attempted_at) AS first_at
+                   FROM login_attempts
+                  WHERE throttle_key IN (:a, :b)
+                    AND attempted_at > now() - (:w || ' seconds')::interval
+                  GROUP BY throttle_key"
+            );
+            $stmt->execute([':a' => $ku, ':b' => $ki, ':w' => (string)self::THROTTLE_WINDOW]);
+            $wait = 0;
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $max = ($r['throttle_key'] === $ku) ? self::THROTTLE_USER_MAX : self::THROTTLE_IP_MAX;
+                if ((int)$r['c'] >= $max) {
+                    $left = self::THROTTLE_WINDOW - (time() - (int)strtotime((string)$r['first_at']));
+                    $wait = max($wait, $left);
+                }
+            }
+            return max(0, min($wait, self::THROTTLE_WINDOW));
+        } catch (\Throwable) {
+            $n = (int)($_SESSION['thr_' . $scope] ?? 0);
+            $t = (int)($_SESSION['thr_t_' . $scope] ?? 0);
+            return ($n >= self::THROTTLE_USER_MAX && time() - $t < 60) ? 60 - (time() - $t) : 0;
+        }
+    }
+
+    private function throttleFail(string $scope, string $username): void
+    {
+        [$ku, $ki] = $this->throttleKeys($scope, $username);
+        try {
+            $this->db->prepare("INSERT INTO login_attempts (throttle_key) VALUES (:a), (:b)")
+                     ->execute([':a' => $ku, ':b' => $ki]);
+            if (random_int(1, 20) === 1) {
+                $this->db->exec("DELETE FROM login_attempts WHERE attempted_at < now() - interval '1 day'");
+            }
+        } catch (\Throwable) {
+            $_SESSION['thr_' . $scope] = (int)($_SESSION['thr_' . $scope] ?? 0) + 1;
+            $_SESSION['thr_t_' . $scope] = time();
+        }
+    }
+
+    private function throttleClear(string $scope, string $username): void
+    {
+        [$ku] = $this->throttleKeys($scope, $username);
+        try {
+            $this->db->prepare("DELETE FROM login_attempts WHERE throttle_key = :a")->execute([':a' => $ku]);
+        } catch (\Throwable) {
+            unset($_SESSION['thr_' . $scope], $_SESSION['thr_t_' . $scope]);
+        }
+    }
+
 
     /**
      * Session'a kullanıcı bilgilerini yazar ve kalıcı auth çerezi üretir

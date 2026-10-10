@@ -224,6 +224,12 @@ try {
     };
 
 } catch (\Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    if ($e instanceof \InvalidArgumentException) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    } else {
+        error_log('[reminders] ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Sunucu hatası. Lütfen tekrar deneyin.']);
+    }
 }
