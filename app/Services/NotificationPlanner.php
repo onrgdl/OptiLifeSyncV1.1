@@ -283,7 +283,10 @@ final class NotificationPlanner
         $date = $date && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) ? $date : date('Y-m-d');
         $dash = DashboardService::getDashboardData($this->db, $userId, $date);
         $doses = $dash['doses']['doses'] ?? [];
-        $openDoses = array_values(array_filter($doses, fn($d) => in_array($d['status'], ['pending', 'due', 'missed'], true)));
+        // Eksik: saati gelmiş/geçmiş ama işaretlenmemiş dozlar (saati gelmemiş "pending" dozlar eksik sayılmaz;
+        // geçmiş günlerde tüm işaretlenmemişler "missed" olarak gelir)
+        $openDoses = array_values(array_filter($doses, fn($d) => in_array($d['status'], ['due', 'missed'], true)));
+        $laterDoses = array_values(array_filter($doses, fn($d) => $d['status'] === 'pending'));
 
         $workouts = [];
         try {
@@ -309,6 +312,7 @@ final class NotificationPlanner
             'date'          => $date,
             'doses'         => $doses,
             'open_doses'    => $openDoses,
+            'later_doses'   => $laterDoses,
             'dose_summary'  => $dash['doses']['summary'] ?? null,
             'workouts'      => $workouts,
             'open_workouts' => $openWorkouts,
@@ -355,6 +359,24 @@ final class NotificationPlanner
     private static function msg(string $title, string $body, array $actions = [], string $url = '/dashboard.php'): array
     {
         return ['show' => true, 'title' => $title, 'body' => $body, 'actions' => $actions, 'url' => $url];
+    }
+
+    /** "18:00'de", "19:30'da", "17:45'te" — saatin okunuşuna göre Türkçe bulunma eki. */
+    public static function atTime(string $hm): string
+    {
+        [$h, $m] = array_map('intval', explode(':', substr($hm, 0, 5)));
+        $n = $m > 0 ? $m : ($h % 12 === 0 && $h !== 0 ? 12 : $h);
+        if ($n === 0) {
+            return $hm . "'da"; // sıfır
+        }
+        $ones = $n % 10;
+        $tens = intdiv($n, 10) * 10;
+        $last = $ones !== 0 ? $ones : $tens;
+        $suffix = [
+            1 => "'de", 2 => "'de", 3 => "'te", 4 => "'te", 5 => "'te", 6 => "'da", 7 => "'de", 8 => "'de", 9 => "'da",
+            10 => "'da", 20 => "'de", 30 => "'da", 40 => "'ta", 50 => "'de",
+        ][$last] ?? "'de";
+        return $hm . $suffix;
     }
 
     private static function liters(int $ml): string
@@ -480,7 +502,7 @@ final class NotificationPlanner
         $desc = $w['antrenman_tipi'] . ' · ' . $w['zorluk_seviyesi'];
         $done = [['id' => 'workout_done', 'label' => '✅ Yaptım'], ['id' => 'workout_skip', 'label' => 'Yapmadım']];
         return match ($kind) {
-            'workout_pre'   => self::msg('🏋️ Antrenman ' . $time . "'de", $desc . "\nSu şişeni ve ekipmanını hazırla.", [], '/workout.php'),
+            'workout_pre'   => self::msg('🏋️ Antrenman ' . self::atTime($time), $desc . "\nSu şişeni ve ekipmanını hazırla.", [], '/workout.php'),
             'workout_start' => self::msg('🏋️ Antrenman zamanı', $desc . "\nİyi antrenmanlar! Bitince işaretlemeyi unutma.", [['id' => 'workout_done', 'label' => '✅ Yaptım']], '/workout.php'),
             default         => self::msg('🏋️ Antrenmanını yaptın mı?', $desc . " ({$time})", $done, '/workout.php'),
         };
@@ -493,6 +515,10 @@ final class NotificationPlanner
         if ($s['open_doses']) {
             $names = array_map(fn($d) => $d['name'] . ' ' . $d['time'], array_slice($s['open_doses'], 0, 3));
             $lines[] = '💊 ' . count($s['open_doses']) . ' doz işaretlenmedi: ' . implode(', ', $names);
+        }
+        if ($s['later_doses']) {
+            $names = array_map(fn($d) => $d['time'] . ' ' . $d['name'], array_slice($s['later_doses'], 0, 2));
+            $lines[] = '⏰ Gece dozu: ' . implode(', ', $names);
         }
         foreach ($s['open_workouts'] as $w) {
             $lines[] = '🏋️ ' . $w['type'] . ' — yaptın mı?';

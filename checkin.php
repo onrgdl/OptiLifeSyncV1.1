@@ -125,7 +125,7 @@ const L = ml => (ml / 1000).toLocaleString('tr-TR', { maximumFractionDigits: 1 }
 function render() {
     // Dozlar
     const doses = S.doses || [];
-    const open = doses.filter(d => ['pending', 'due', 'missed'].includes(d.status));
+    const open = doses.filter(d => ['due', 'missed'].includes(d.status)); // saati gelmemişler eksik sayılmaz
     document.getElementById('doseChip').textContent = doses.length ? `${doses.filter(d => d.status === 'taken').length}/${doses.length} alındı` : '—';
     document.getElementById('doseList').innerHTML = !doses.length
         ? '<div class="empty-state py-2"><i class="bi bi-capsule"></i>Bu gün için planlı doz yok.</div>'
@@ -167,7 +167,7 @@ function render() {
 
     // Skor
     const items = [
-        ...doses.map(d => d.status === 'taken' || d.status === 'skipped'),
+        ...doses.filter(d => d.status !== 'pending').map(d => d.status === 'taken' || d.status === 'skipped'),
         ...ws.map(x => x.status !== 'open'),
         wp >= 100, S.meals_count > 0,
     ];
