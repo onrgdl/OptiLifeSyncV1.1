@@ -105,7 +105,7 @@ function fmtDose($amount, $unit): string {
     $a = rtrim(rtrim(number_format((float)$amount, 2, '.', ''), '0'), '.');
     return $a . ' ' . $unit;
 }
-$v = '20261009';
+$v = '20261019';
 ?>
 <!DOCTYPE html>
 <html lang="tr">

@@ -167,6 +167,8 @@ try {
             $workoutId  = !empty($_POST['workout_id']) ? (int)$_POST['workout_id'] : null;
             $type       = trim($_POST['antrenman_tipi'] ?? '');
             $difficulty = trim($_POST['zorluk_seviyesi'] ?? 'Orta');
+            $planTime   = trim((string)($_POST['planlanan_saat'] ?? '')) ?: null;
+            $planDur    = ($_POST['sure_dk'] ?? '') !== '' ? (int)$_POST['sure_dk'] : null;
 
             // Eğer düzenleme modundaysak (belirli bir workout_id gönderilmişse)
             if ($workoutId !== null && $workoutId > 0) {
@@ -180,7 +182,7 @@ try {
                     return;
                 }
 
-                $res = $workoutService->saveWorkout($userId, $date, $type, $difficulty, $workoutId);
+                $res = $workoutService->saveWorkout($userId, $date, $type, $difficulty, $workoutId, $planTime, $planDur);
                 echo json_encode([
                     'ok'      => true,
                     'message' => 'Antrenman başarıyla güncellendi.',
@@ -224,7 +226,7 @@ try {
                 }
                 for ($w = 0; $w < $repeatWeeks; $w++) {
                     $targetDate = (new DateTime($baseDate))->modify("+{$w} weeks")->format('Y-m-d');
-                    $lastRes = $workoutService->saveWorkout($userId, $targetDate, $type, $difficulty);
+                    $lastRes = $workoutService->saveWorkout($userId, $targetDate, $type, $difficulty, null, $planTime, $planDur);
                     if (!empty($lastRes['ok'])) {
                         $savedCount++;
                         $allSavedDates[] = $targetDate;

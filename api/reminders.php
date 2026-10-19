@@ -225,8 +225,19 @@ try {
         })(),
 
         // ── Android uygulaması için tüm aktif alarmlar ────────────────
-        'native_list' => (function () use ($tracker, $userId): void {
-            echo json_encode(['ok' => true, 'alarms' => $tracker->getNativeAlarmList($userId), 'server_time' => date('c')], JSON_UNESCAPED_UNICODE);
+        'native_list' => (function () use ($tracker, $userId, $input, $pdo): void {
+            $alarms = $tracker->getNativeAlarmList($userId);
+            // Akıllı bildirimler yalnızca bunları destekleyen yeni APK'ya gönderilir
+            // (eski APK bunları tam ekran alarm olarak çalardı).
+            if (str_contains((string)($input['caps'] ?? ''), 'smart')) {
+                try {
+                    require_once __DIR__ . '/../app/Services/NotificationPlanner.php';
+                    $alarms = array_merge($alarms, (new \App\Services\NotificationPlanner($pdo))->plan($userId, $alarms));
+                } catch (\Throwable $e) {
+                    error_log('[native_list smart] ' . $e->getMessage());
+                }
+            }
+            echo json_encode(['ok' => true, 'alarms' => $alarms, 'server_time' => date('c')], JSON_UNESCAPED_UNICODE);
         })(),
 
         // ── Özel hatırlatıcı ekle (su, öğün, antrenman, diğer) ────────

@@ -79,7 +79,10 @@
 
     async function runSync() {
         try {
-            const data = await post({ action: 'native_list' });
+            // Yeni APK akıllı bildirimleri destekliyorsa (status.smartNotify) onları da iste
+            let caps = '';
+            try { const st = await call('status'); if (st && st.smartNotify) caps = 'smart'; } catch (_) {}
+            const data = await post({ action: 'native_list', caps });
             if (!data || !data.ok) return false;
             const settings = readSettings();
             await call('schedule', {

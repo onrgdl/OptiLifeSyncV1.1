@@ -26,7 +26,7 @@ $commonExercises = [
     'Overhead Press', 'Lateral Raise', 'Face Pull', 'Biceps Curl', 'Hammer Curl', 'Triceps Pushdown',
     'Plank', 'Crunch', 'Koşu', 'Yürüyüş', 'Bisiklet', 'Yüzme', 'İp atlama',
 ];
-$v = '20261009';
+$v = '20261019';
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -270,6 +270,21 @@ $v = '20261009';
                             </select>
                         </div>
                     </div>
+                    <div class="row g-2 mt-1">
+                        <div class="col-6">
+                            <label class="form-label">Saat <span style="color:var(--muted);font-weight:500">(bildirim için)</span></label>
+                            <input type="time" class="form-control" name="planlanan_saat" id="modalTime">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Süre</label>
+                            <select class="form-select" name="sure_dk" id="modalDuration">
+                                <option value="">Varsayılan</option>
+                                <option value="30">30 dk</option><option value="45">45 dk</option><option value="60">60 dk</option>
+                                <option value="75">75 dk</option><option value="90">90 dk</option><option value="120">120 dk</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-text">Saatten önce hatırlatılır, bitiminde "yaptın mı?" diye sorulur. <a href="notifications.php">Bildirim ayarları</a></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Vazgeç</button>
@@ -349,12 +364,12 @@ function renderCalendar(data) {
                     <div class="dropdown">
                         <button class="icon-btn" style="width:28px;height:28px;border:0" data-bs-toggle="dropdown" aria-label="İşlemler"><i class="bi bi-three-dots"></i></button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault();openEditModal(${w.id}, '${escapeHtml(day.date)}', ${escapeHtml(JSON.stringify(w.antrenman_tipi))}, '${escapeHtml(w.zorluk_seviyesi)}')"><i class="bi bi-pencil me-2"></i>Düzenle</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault();openEditModal(${w.id}, '${escapeHtml(day.date)}', ${escapeHtml(JSON.stringify(w.antrenman_tipi))}, '${escapeHtml(w.zorluk_seviyesi)}', '${escapeHtml(w.planlanan_saat || '')}', '${w.sure_dk || ''}')"><i class="bi bi-pencil me-2"></i>Düzenle</a></li>
                             <li><a class="dropdown-item" href="#" style="color:var(--red)" onclick="event.preventDefault();confirmDeleteWorkout(${w.id})"><i class="bi bi-trash3 me-2"></i>Kaldır</a></li>
                         </ul>
                     </div>
                 </div>
-                <span class="diff ${diff}">${escapeHtml(w.zorluk_seviyesi)}</span>
+                <span class="diff ${diff}">${escapeHtml(w.zorluk_seviyesi)}</span>${w.planlanan_saat ? `<span class="small ms-1" style="color:var(--muted)"><i class="bi bi-clock me-1"></i>${escapeHtml(w.planlanan_saat)}</span>` : ''}${w.atlandi_mi ? `<span class="small ms-1" style="color:var(--muted)">· yapılmadı</span>` : ''}
                 ${done ? `<div class="done-pill"><i class="bi bi-check-circle-fill"></i>Tamamlandı ${w.tamamlanma_saati ? '· ' + w.tamamlanma_saati.slice(0, 5) : ''}</div>`
                        : `<button class="btn-finish" onclick="completeWorkout(${w.id}, this)"><i class="bi bi-check2 me-1"></i>Tamamladım</button>`}
             </div>`;
@@ -399,6 +414,7 @@ async function completeWorkout(id, btn) {
         const data = await post({ action: 'complete', workout_id: id });
         if (!data.ok) throw new Error(data.error || 'İşlem tamamlanamadı');
         Swal.fire({ icon: 'success', title: 'Tebrikler! 🏆', text: 'Antrenman tamamlandı. Yaptığın egzersizleri günlüğe eklemeyi unutma.', confirmButtonText: 'Harika' });
+        resyncNative();
         loadWeekData(formatDateToIso(currentRefDate));
     } catch (e) {
         Swal.fire({ icon: 'error', title: 'Hata', text: e.message });
@@ -448,6 +464,7 @@ async function handleWorkoutSubmit(e) {
         if (!data.ok) throw new Error(data.error || 'Kaydedilemedi');
         workoutModalInstance.hide();
         toast(isEditMode ? 'Antrenman güncellendi' : 'Antrenman planlandı');
+        resyncNative();
         loadWeekData(formatDateToIso(currentRefDate));
     } catch (err) {
         Swal.fire({ icon: 'error', title: 'Hata', text: err.message });
@@ -458,9 +475,12 @@ async function confirmDeleteWorkout(id) {
     const r = await Swal.fire({ icon: 'warning', title: 'Antrenman kaldırılsın mı?', showCancelButton: true, confirmButtonText: 'Kaldır', cancelButtonText: 'Vazgeç' });
     if (!r.isConfirmed) return;
     const data = await post({ action: 'delete', workout_id: id });
-    if (data.ok) { toast('Kaldırıldı', 'info'); loadWeekData(formatDateToIso(currentRefDate)); }
+    if (data.ok) { toast('Kaldırıldı', 'info'); resyncNative(); loadWeekData(formatDateToIso(currentRefDate)); }
     else Swal.fire({ icon: 'error', title: 'Hata', text: data.error || '' });
 }
+
+/** Android uygulamasında antrenman bildirimlerini yeniden kur */
+function resyncNative() { try { if (window.OptiNative && OptiNative.isApp()) OptiNative.syncFromServer(true).catch(() => {}); } catch (_) {} }
 
 function openAddModal(dateStr = '') {
     isEditMode = false;
@@ -472,12 +492,14 @@ function openAddModal(dateStr = '') {
     document.getElementById('modalType').value = '';
     document.getElementById('modalDifficulty').value = 'Orta';
     document.getElementById('modalRepeatWeeks').value = '1';
+    document.getElementById('modalTime').value = '';
+    document.getElementById('modalDuration').value = '';
     selectedPlanDates.clear();
     selectedPlanDates.add(dateStr || formatDateToIso(new Date()));
     renderWeekDayChips();
     workoutModalInstance.show();
 }
-function openEditModal(id, dateStr, type, diff) {
+function openEditModal(id, dateStr, type, diff, time = '', dur = '') {
     isEditMode = true;
     document.getElementById('workoutModalTitle').textContent = 'Antrenmanı düzenle';
     document.getElementById('modalWorkoutId').value = id;
@@ -487,6 +509,8 @@ function openEditModal(id, dateStr, type, diff) {
     document.getElementById('singleDateInput').value = dateStr;
     document.getElementById('modalType').value = type;
     document.getElementById('modalDifficulty').value = diff;
+    document.getElementById('modalTime').value = time || '';
+    document.getElementById('modalDuration').value = dur || '';
     workoutModalInstance.show();
 }
 function navigateWeek(delta) { currentRefDate.setDate(currentRefDate.getDate() + delta * 7); loadWeekData(formatDateToIso(currentRefDate)); }

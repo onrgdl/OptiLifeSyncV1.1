@@ -194,7 +194,15 @@ public class OptiAlarmPlugin extends Plugin {
             batteryOptimized = pm != null && !pm.isIgnoringBatteryOptimizations(ctx.getPackageName());
         }
         s.put("batteryOptimized", batteryOptimized);
-        s.put("alarmCount", AlarmStore.getAlarms(ctx).length());
+        // Akıllı bildirimler (Aşama 2) ayrı sayılır; "alarm" sayısı yalnızca ilaç/hatırlatıcı alarmları
+        org.json.JSONArray all = AlarmStore.getAlarms(ctx);
+        int alarmCount = 0, smartCount = 0;
+        for (int i = 0; i < all.length(); i++) {
+            if (AlarmScheduler.isSmart(all.optJSONObject(i))) smartCount++; else alarmCount++;
+        }
+        s.put("alarmCount", alarmCount);
+        s.put("smartCount", smartCount);
+        s.put("smartNotify", true);
         s.put("nextTrigger", AlarmScheduler.nextTriggerOfAll(ctx));
         s.put("pendingEvents", AlarmStore.getPendingEvents(ctx).length());
         s.put("snoozeMinutes", AlarmStore.getSnoozeMinutes(ctx));

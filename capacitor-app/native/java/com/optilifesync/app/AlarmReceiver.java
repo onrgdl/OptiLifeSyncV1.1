@@ -47,6 +47,17 @@ public class AlarmReceiver extends BroadcastReceiver {
                 Log.e(TAG, "Sonraki alarm kurulamadı", t);
             }
 
+            String kind = intent.getStringExtra(AlarmScheduler.EXTRA_KIND);
+            if (kind != null && !kind.isEmpty() && !isSnooze && !isTest) {
+                // Akıllı bildirim: içerik o anki verilerle sunucudan alınır (arka planda)
+                try {
+                    SmartNotifier.handle(app, intent, goAsync());
+                } catch (Throwable t) {
+                    Log.e(TAG, "Akıllı bildirim gösterilemedi", t);
+                }
+                return;
+            }
+
             try {
                 AlarmNotifier.show(app, intent);
             } catch (Throwable t) {

@@ -55,6 +55,9 @@
         <!-- Bildirim butonları: Aldım / Ertele / Atla -->
         <receiver android:name=".AlarmActionReceiver" android:exported="false" />
 
+        <!-- Akıllı bildirim butonları: +250 ml / Aldım / Yaptım / Yapmadım -->
+        <receiver android:name=".SmartActionReceiver" android:exported="false" />
+
         <!-- Yeniden başlatma / güncelleme / saat değişimi sonrası alarmları geri kur -->
         <receiver android:name=".BootReceiver" android:exported="true">
             <intent-filter>

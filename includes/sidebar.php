@@ -24,6 +24,8 @@ if (!isset($activePage)) {
         'reports.php'   => 'reports',
         'guide.php'     => 'guide',
         'creator.php'   => 'creator',
+        'notifications.php' => 'notify',
+        'checkin.php'   => 'checkin',
         default         => 'dashboard',
     };
 }
@@ -45,18 +47,20 @@ $sbNav = [
     ['section' => 'Analiz'],
     ['key' => 'reports',   'href' => 'reports.php',   'icon' => 'bi-bar-chart-line',  'label' => 'Raporlar'],
     ['key' => 'bmr',       'href' => 'index.php',     'icon' => 'bi-person-gear',     'label' => 'Profil & Hedefler'],
+    ['key' => 'checkin',   'href' => 'checkin.php',   'icon' => 'bi-check2-square',   'label' => 'Gün Sonu'],
     ['section' => 'Sistem'],
+    ['key' => 'notify',    'href' => 'notifications.php', 'icon' => 'bi-bell',        'label' => 'Bildirim Ayarları'],
     ['key' => 'guide',     'href' => 'guide.php',     'icon' => 'bi-book',            'label' => 'Kullanım Kılavuzu'],
 ];
 if ($sbIsCreator || $sbIsImpersonating) {
     $sbNav[] = ['key' => 'creator', 'href' => 'creator.php', 'icon' => 'bi-shield-lock', 'label' => 'Creator Paneli', 'creator' => true];
 }
-$sbAssetV = '20261009';
+$sbAssetV = '20261019';
 // Aktif sayfada kullanılacak dolu ikon karşılıkları (Bootstrap Icons'ta mevcut olanlar)
 $sbFill = [
     'bi-house-heart' => 'bi-house-heart-fill', 'bi-lightning-charge' => 'bi-lightning-charge-fill',
     'bi-bar-chart-line' => 'bi-bar-chart-line-fill', 'bi-book' => 'bi-book-fill',
-    'bi-shield-lock' => 'bi-shield-lock-fill', 'bi-capsule' => 'bi-capsule-pill', 'bi-grid' => 'bi-grid-fill',
+    'bi-shield-lock' => 'bi-shield-lock-fill', 'bi-bell' => 'bi-bell-fill', 'bi-capsule' => 'bi-capsule-pill', 'bi-grid' => 'bi-grid-fill',
 ];
 ?>
 <!-- Karartma katmanı -->
@@ -123,7 +127,7 @@ $sbFill = [
             <i class="bi <?= $activePage === $k ? ($sbFill[$ic] ?? $ic) : $ic ?>"></i><span><?= $lb ?></span>
         </a>
     <?php endforeach; ?>
-    <?php $sbMoreActive = in_array($activePage, ['reports', 'bmr', 'guide', 'creator'], true); ?>
+    <?php $sbMoreActive = in_array($activePage, ['reports', 'bmr', 'guide', 'creator', 'notify', 'checkin'], true); ?>
     <button type="button" class="bottom-nav-item <?= $sbMoreActive ? 'active' : '' ?>" onclick="openMoreSheet()" aria-label="Daha fazla">
         <i class="bi bi-grid<?= $sbMoreActive ? '-fill' : '' ?>"></i><span>Daha</span>
     </button>
@@ -143,6 +147,8 @@ $sbFill = [
     <div class="more-grid">
         <a href="reports.php" class="<?= $activePage === 'reports' ? 'active' : '' ?>"><i class="bi bi-bar-chart-line"></i>Raporlar</a>
         <a href="index.php" class="<?= $activePage === 'bmr' ? 'active' : '' ?>"><i class="bi bi-person-gear"></i>Profil &amp; Hedefler</a>
+        <a href="checkin.php" class="<?= $activePage === 'checkin' ? 'active' : '' ?>"><i class="bi bi-check2-square"></i>Gün Sonu</a>
+        <a href="notifications.php" class="<?= $activePage === 'notify' ? 'active' : '' ?>"><i class="bi bi-bell"></i>Bildirimler</a>
         <a href="guide.php" class="<?= $activePage === 'guide' ? 'active' : '' ?>"><i class="bi bi-book"></i>Kılavuz</a>
         <?php if ($sbIsCreator || $sbIsImpersonating): ?>
             <a href="creator.php" class="<?= $activePage === 'creator' ? 'active' : '' ?>"><i class="bi bi-shield-lock" style="color:var(--yellow)"></i>Creator</a>

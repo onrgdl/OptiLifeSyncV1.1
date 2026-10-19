@@ -43,7 +43,7 @@
       "dest": "/favicon.ico"
     },
     {
-      "src": "/api/(dashboard|reminders|workout|reports|analyze_food|ping)\\.php",
+      "src": "/api/(dashboard|reminders|workout|reports|analyze_food|ping|notify)\\.php",
       "dest": "/api/index.php"
     },
     {

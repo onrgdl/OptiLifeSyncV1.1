@@ -328,3 +328,16 @@ ALTER TABLE supplements ADD COLUMN IF NOT EXISTS pack_size      NUMERIC(8,2) NUL
 ALTER TABLE supplements ADD COLUMN IF NOT EXISTS units_per_dose NUMERIC(6,2) NOT NULL DEFAULT 1;
 ALTER TABLE supplements ADD COLUMN IF NOT EXISTS low_stock_days SMALLINT     NOT NULL DEFAULT 5;
 ALTER TABLE supplements ADD COLUMN IF NOT EXISTS repurchase     SMALLINT     NOT NULL DEFAULT 1;
+
+-- ===== 2026-10 akıllı bildirimler (bkz. migrations/2026_10_notify.sql) =====
+ALTER TABLE workouts ADD COLUMN IF NOT EXISTS planlanan_saat TIME     NULL;
+ALTER TABLE workouts ADD COLUMN IF NOT EXISTS sure_dk        SMALLINT NULL;
+ALTER TABLE workouts ADD COLUMN IF NOT EXISTS atlandi_mi     SMALLINT NOT NULL DEFAULT 0;
+
+-- Kullanıcı başına bildirim tercihleri (JSON)
+CREATE TABLE IF NOT EXISTS notification_prefs (
+    user_id    BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    prefs      JSONB       NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE notification_prefs ENABLE ROW LEVEL SECURITY;

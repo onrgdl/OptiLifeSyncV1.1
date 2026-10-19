@@ -40,6 +40,10 @@ final class AlarmScheduler {
     static final String EXTRA_TRACKABLE = "trackable";
     static final String EXTRA_IS_SNOOZE = "is_snooze";
     static final String EXTRA_IS_TEST = "is_test";
+    /** Akıllı bildirim (Aşama 2): tür, referans (JSON) ve çevrimdışı yedek metin gösterilsin mi */
+    static final String EXTRA_KIND = "smart_kind";
+    static final String EXTRA_REF = "smart_ref";
+    static final String EXTRA_FALLBACK = "smart_fallback";
 
     /** Erteleme ve test alarmları için istek kodu ofsetleri (normal alarm id'leriyle çakışmasın). */
     private static final int SNOOZE_OFFSET = 700000000;
@@ -120,7 +124,8 @@ final class AlarmScheduler {
 
         Intent intent = buildFireIntent(ctx, alarm, id, formatDate(trigger), false, false);
         PendingIntent pi = PendingIntent.getBroadcast(ctx, id, intent, PendingIntent.FLAG_UPDATE_CURRENT | immutableFlag());
-        setExact(ctx, trigger, pi);
+        // Akıllı bildirimler telefonun "sıradaki alarm" göstergesine girmesin
+        setExact(ctx, trigger, pi, !isSmart(alarm));
         return true;
     }
 
@@ -174,7 +179,7 @@ final class AlarmScheduler {
         intent.putExtra(EXTRA_IS_SNOOZE, true);
         PendingIntent pi = PendingIntent.getBroadcast(ctx, SNOOZE_OFFSET + (id % 100000000), intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | immutableFlag());
-        setExact(ctx, e.optLong("at", System.currentTimeMillis()), pi);
+        setExact(ctx, e.optLong("at", System.currentTimeMillis()), pi, true);
     }
 
     private static void cancelSnoozePi(Context ctx, int id) {
@@ -205,7 +210,7 @@ final class AlarmScheduler {
         long trigger = System.currentTimeMillis() + Math.max(2, seconds) * 1000L;
         PendingIntent pi = PendingIntent.getBroadcast(ctx, TEST_REQUEST_CODE, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | immutableFlag());
-        setExact(ctx, trigger, pi);
+        setExact(ctx, trigger, pi, true);
     }
 
     static Intent buildFireIntent(Context ctx, JSONObject a, int id, String date, boolean snooze, boolean test) {
@@ -221,13 +226,31 @@ final class AlarmScheduler {
         intent.putExtra(EXTRA_TRACKABLE, a.optBoolean("trackable", false));
         intent.putExtra(EXTRA_IS_SNOOZE, snooze);
         intent.putExtra(EXTRA_IS_TEST, test);
+        if (isSmart(a)) {
+            intent.putExtra(EXTRA_KIND, a.optString("kind", ""));
+            JSONObject ref = a.optJSONObject("ref");
+            intent.putExtra(EXTRA_REF, ref == null ? "{}" : ref.toString());
+            intent.putExtra(EXTRA_FALLBACK, a.optBoolean("fallback", false));
+        }
         return intent;
     }
 
-    private static void setExact(Context ctx, long triggerAt, PendingIntent pi) {
+    /** Sunucudan gelen akıllı bildirim kaydı mı (sabah özeti, su, makro, gün sonu …) */
+    static boolean isSmart(JSONObject a) {
+        return a != null && (a.optBoolean("smart", false) || "smart".equals(a.optString("type", "")))
+                && !a.optString("kind", "").isEmpty();
+    }
+
+    private static void setExact(Context ctx, long triggerAt, PendingIntent pi, boolean alarmClock) {
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
         if (am == null) return;
         try {
+            if (!alarmClock && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                // Akıllı bildirim: Doze'da da çalışır ama durum çubuğunda alarm simgesi göstermez
+                if (canScheduleExact(ctx)) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi);
+                else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi);
+                return;
+            }
             if (canScheduleExact(ctx)) {
                 Intent show = new Intent(ctx, MainActivity.class);
                 show.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -283,7 +306,7 @@ final class AlarmScheduler {
         long now = System.currentTimeMillis();
         for (int i = 0; i < alarms.length(); i++) {
             JSONObject a = alarms.optJSONObject(i);
-            if (a == null) continue;
+            if (a == null || isSmart(a)) continue;
             long t = computeNextTrigger(a, now);
             if (t > 0 && (best < 0 || t < best)) best = t;
         }

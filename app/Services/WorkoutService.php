@@ -70,7 +70,7 @@ class WorkoutService
     {
         $stmt = $this->db->prepare("
             SELECT id, user_id, tarih, antrenman_tipi, zorluk_seviyesi,
-                   tamamlandi_mi, tamamlanma_saati, created_at, updated_at
+                   tamamlandi_mi, tamamlanma_saati, planlanan_saat, sure_dk, atlandi_mi, created_at, updated_at
             FROM workouts
             WHERE user_id = :user_id
               AND tarih BETWEEN :start_date AND :end_date
@@ -86,6 +86,8 @@ class WorkoutService
         $indexed = [];
         foreach ($rows as $row) {
             $row['tamamlandi_mi'] = (bool)$row['tamamlandi_mi'];
+            $row['atlandi_mi']    = (bool)($row['atlandi_mi'] ?? false);
+            $row['planlanan_saat'] = !empty($row['planlanan_saat']) ? substr((string)$row['planlanan_saat'], 0, 5) : null;
             $indexed[$row['tarih']][] = $row;
         }
 
@@ -160,8 +162,11 @@ class WorkoutService
      * @param  int|null  $workoutId  Mevcut kaydı güncellemek için id (null ise yeni ekler/varsa günceller)
      * @return array     Kayıt ve dinamik makro durumu
      */
-    public function saveWorkout(int $userId, string $date, string $type, string $difficulty = 'Orta', ?int $workoutId = null): array
+    public function saveWorkout(int $userId, string $date, string $type, string $difficulty = 'Orta', ?int $workoutId = null, ?string $time = null, ?int $duration = null): array
     {
+        // Planlanan saat (HH:MM) ve süre (dk) — akıllı bildirimler için; boşsa varsayılan kullanılır
+        $time = ($time !== null && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', substr(trim($time), 0, 5))) ? substr(trim($time), 0, 5) : null;
+        $duration = ($duration !== null && $duration >= 10 && $duration <= 300) ? $duration : null;
         $validDifficulties = ['Kolay', 'Orta', 'Zor'];
         if (!in_array($difficulty, $validDifficulties, true)) {
             $difficulty = 'Orta';
@@ -172,12 +177,17 @@ class WorkoutService
                 UPDATE workouts
                 SET antrenman_tipi   = :antrenman_tipi,
                     zorluk_seviyesi  = :zorluk_seviyesi,
+                    planlanan_saat   = :saat,
+                    sure_dk          = :sure,
+                    atlandi_mi       = 0,
                     updated_at       = CURRENT_TIMESTAMP
                 WHERE id = :id AND user_id = :user_id
             ");
             $stmt->execute([
                 ':antrenman_tipi'  => $type,
                 ':zorluk_seviyesi' => $difficulty,
+                ':saat'            => $time,
+                ':sure'            => $duration,
                 ':id'              => $workoutId,
                 ':user_id'         => $userId,
             ]);
@@ -201,25 +211,32 @@ class WorkoutService
                 $upd = $this->db->prepare("
                     UPDATE workouts
                     SET zorluk_seviyesi = :zorluk_seviyesi,
+                        planlanan_saat  = :saat,
+                        sure_dk         = :sure,
+                        atlandi_mi      = 0,
                         updated_at      = CURRENT_TIMESTAMP
                     WHERE id = :id
                 ");
                 $upd->execute([
                     ':zorluk_seviyesi' => $difficulty,
+                    ':saat'            => $time,
+                    ':sure'            => $duration,
                     ':id'              => $existingId,
                 ]);
                 $targetId = (int)$existingId;
             } else {
                 try {
                     $ins = $this->db->prepare("
-                        INSERT INTO workouts (user_id, tarih, antrenman_tipi, zorluk_seviyesi, tamamlandi_mi)
-                        VALUES (:user_id, :tarih, :antrenman_tipi, :zorluk_seviyesi, 0)
+                        INSERT INTO workouts (user_id, tarih, antrenman_tipi, zorluk_seviyesi, tamamlandi_mi, planlanan_saat, sure_dk)
+                        VALUES (:user_id, :tarih, :antrenman_tipi, :zorluk_seviyesi, 0, :saat, :sure)
                     ");
                     $ins->execute([
                         ':user_id'         => $userId,
                         ':tarih'           => $date,
                         ':antrenman_tipi'  => $type,
                         ':zorluk_seviyesi' => $difficulty,
+                        ':saat'            => $time,
+                        ':sure'            => $duration,
                     ]);
                     $targetId = (int)$this->db->lastInsertId();
                 } catch (\PDOException $pe) {
@@ -227,14 +244,16 @@ class WorkoutService
                     if (str_contains($pe->getMessage(), 'uk_workouts_user_date') || $pe->getCode() === '23505') {
                         $this->db->exec("ALTER TABLE workouts DROP CONSTRAINT IF EXISTS uk_workouts_user_date;");
                         $ins = $this->db->prepare("
-                            INSERT INTO workouts (user_id, tarih, antrenman_tipi, zorluk_seviyesi, tamamlandi_mi)
-                            VALUES (:user_id, :tarih, :antrenman_tipi, :zorluk_seviyesi, 0)
+                            INSERT INTO workouts (user_id, tarih, antrenman_tipi, zorluk_seviyesi, tamamlandi_mi, planlanan_saat, sure_dk)
+                            VALUES (:user_id, :tarih, :antrenman_tipi, :zorluk_seviyesi, 0, :saat, :sure)
                         ");
                         $ins->execute([
                             ':user_id'         => $userId,
                             ':tarih'           => $date,
                             ':antrenman_tipi'  => $type,
                             ':zorluk_seviyesi' => $difficulty,
+                            ':saat'            => $time,
+                            ':sure'            => $duration,
                         ]);
                         $targetId = (int)$this->db->lastInsertId();
                     } else {
