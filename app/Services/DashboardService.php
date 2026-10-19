@@ -51,6 +51,16 @@ class DashboardService
         ];
     }
 
+    /** Bitmek üzere olan takviyeler (stok sütunları yoksa boş liste). */
+    private static function safeLowStock(PDO $pdo, int $userId): array
+    {
+        try {
+            return (new ReminderService($pdo))->getLowStock($userId);
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
     public static function calcAge(string $birthDate): int
     {
         return (int) (new DateTime($birthDate))->diff(new DateTime())->y;
@@ -217,6 +227,7 @@ class DashboardService
             'weight_today'    => $weight,
             'weight'          => self::getWeightInfo($pdo, $userId),
             'doses'           => (new MedicationTracker($pdo))->getDosesForDate($userId, $today),
+            'low_stock'       => self::safeLowStock($pdo, $userId),
             'daily_log_id'    => (int)($dailyLog['id'] ?? 0),
         ];
     }

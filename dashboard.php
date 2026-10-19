@@ -128,6 +128,11 @@ $shortDay = ['Pazartesi' => 'Pzt', 'Salı' => 'Sal', 'Çarşamba' => 'Çar', 'Pe
 
     .skeleton { background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%; animation: sk 1.2s infinite; border-radius: 12px; }
     @keyframes sk { to { background-position: -200% 0; } }
+    .stock-alert { display: flex; align-items: center; gap: 8px; padding: 9px 12px; margin-bottom: 8px; border-radius: 12px; font-size: 13px; text-decoration: none; color: var(--text);
+        background: color-mix(in srgb, var(--yellow, #f59e0b) 12%, var(--surface-2)); border: 1px solid color-mix(in srgb, var(--yellow, #f59e0b) 45%, transparent); }
+    .stock-alert i { color: var(--yellow, #f59e0b); }
+    .stock-alert.empty { background: color-mix(in srgb, var(--red) 10%, var(--surface-2)); border-color: color-mix(in srgb, var(--red) 45%, transparent); }
+    .stock-alert.empty i { color: var(--red); }
 </style>
 </head>
 <body>
@@ -210,6 +215,7 @@ $shortDay = ['Pazartesi' => 'Pzt', 'Salı' => 'Sal', 'Çarşamba' => 'Çar', 'Pe
                     <h2 class="card-title-sm"><i class="bi bi-capsule-pill"></i>İlaç & takviye</h2>
                     <span class="chip accent" id="doseChip">—</span>
                 </div>
+                <div id="stockAlerts"></div>
                 <div id="doseMiniList"><div class="skeleton" style="height:120px"></div></div>
                 <a href="reminders.php" class="btn btn-light btn-sm w-100 mt-3">Tümünü yönet <i class="bi bi-arrow-right ms-1"></i></a>
             </section>
@@ -384,9 +390,22 @@ function renderDashboard(d) {
     wb.innerHTML = d.is_training ? '<i class="bi bi-lightning-charge-fill"></i> Antrenman günü' : '<i class="bi bi-moon-stars"></i> Dinlenme günü';
 
     renderDoses(d.doses);
+    renderStockAlerts(d.low_stock || []);
     renderWater(d.water);
     renderWeight(d.weight);
     renderMeals(d.recent_meals || []);
+}
+
+/* ── Bitmek üzere olan takviyeler ───────────────────────── */
+function renderStockAlerts(items) {
+    const el = document.getElementById('stockAlerts');
+    if (!el) return;
+    if (!items.length) { el.innerHTML = ''; return; }
+    el.innerHTML = items.slice(0, 3).map(x => `
+        <a href="reminders.php#supp-${x.supplement_id}" class="stock-alert ${x.status}">
+            <i class="bi ${x.status === 'empty' ? 'bi-x-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i>
+            <span><b>${esc(x.name)}</b> · ${x.status === 'empty' ? 'paket bitti' : esc(x.label)}</span>
+        </a>`).join('') + (items.length > 3 ? `<div class="small mb-2" style="color:var(--muted)">+${items.length - 3} takviye daha azaldı</div>` : '');
 }
 
 /* ── Dozlar ──────────────────────────────────────────────── */
@@ -417,7 +436,14 @@ function renderDoses(doses) {
 
 async function takeDose(suppId, time) {
     const res = await apiPost('log_dose', { supplement_id: suppId, scheduled_time: time, status: 'taken' }, 'reminders.php');
-    if (res.ok) { toast('Alındı olarak işaretlendi'); loadDashboard(); }
+    if (res.ok) {
+        const st = res.stock;
+        if (st && (st.status === 'low' || st.status === 'empty') && window.Swal) {
+            Swal.fire({ icon: 'warning', title: st.status === 'empty' ? `${st.name}: paket bitti` : `${st.name} bitmek üzere`,
+                text: st.status === 'empty' ? (st.final_pack ? 'Tedavi tamamlandıysa İlaçlar sayfasından bitirebilirsiniz.' : 'Yeni paket almayı unutmayın.') : `${st.label}. Yeni paket almayı unutmayın.`, confirmButtonText: 'Tamam' });
+        } else toast('Alındı olarak işaretlendi');
+        loadDashboard();
+    }
     else toast(res.error || 'Kaydedilemedi', 'error');
 }
 document.addEventListener('opti:dose-logged', loadDashboard);

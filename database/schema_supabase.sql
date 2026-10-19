@@ -320,3 +320,11 @@ CREATE INDEX IF NOT EXISTS idx_exercise_logs_daily    ON exercise_logs (daily_lo
 CREATE INDEX IF NOT EXISTS idx_supplements_user_active ON supplements (user_id) WHERE is_active = 1;
 CREATE INDEX IF NOT EXISTS idx_reminders_supplement   ON reminders (supplement_id);
 CREATE INDEX IF NOT EXISTS idx_daily_logs_workout     ON daily_logs (user_id, log_date) WHERE workout_done = 1;
+
+-- ===== 2026-10 stok takibi (bkz. migrations/2026_10_stock.sql) =====
+ALTER TABLE supplements ADD COLUMN IF NOT EXISTS track_stock    SMALLINT     NOT NULL DEFAULT 0;
+ALTER TABLE supplements ADD COLUMN IF NOT EXISTS stock_quantity NUMERIC(8,2) NULL;
+ALTER TABLE supplements ADD COLUMN IF NOT EXISTS pack_size      NUMERIC(8,2) NULL;
+ALTER TABLE supplements ADD COLUMN IF NOT EXISTS units_per_dose NUMERIC(6,2) NOT NULL DEFAULT 1;
+ALTER TABLE supplements ADD COLUMN IF NOT EXISTS low_stock_days SMALLINT     NOT NULL DEFAULT 5;
+ALTER TABLE supplements ADD COLUMN IF NOT EXISTS repurchase     SMALLINT     NOT NULL DEFAULT 1;

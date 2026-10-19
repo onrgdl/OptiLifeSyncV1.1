@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use PDO;
+
+require_once __DIR__ . '/StockHelper.php';
 use DateTime;
 
 /**
@@ -284,11 +286,16 @@ class MedicationTracker
         }
 
         $duplicate = false;
+        $stockDelta = 0; // -1: bir doz düş, +1: bir doz geri ekle
         if ($existing) {
             $duplicate = (int) $existing['is_taken'] === $isTaken;
+            if (!$duplicate) {
+                $stockDelta = $isTaken ? -1 : 1;
+            }
             $this->db->prepare("UPDATE supplement_logs SET is_taken = ?, taken_at = ? WHERE id = ?")
                 ->execute([$isTaken, date('H:i:s'), $existing['id']]);
         } else {
+            $stockDelta = $isTaken ? -1 : 0;
             $takenAt = ($date === date('Y-m-d')) ? date('H:i:s') : (($slot ?? date('H:i')) . ':00');
             $this->db->prepare("
                 INSERT INTO supplement_logs (daily_log_id, supplement_id, taken_at, dose_taken, dose_unit, is_taken, scheduled_time)
@@ -301,7 +308,10 @@ class MedicationTracker
         }
 
         $this->recalcDailyTotals($dailyLogId);
-        return ['ok' => true, 'duplicate' => $duplicate];
+        if ($stockDelta !== 0) {
+            $this->adjustStock($supplementId, $stockDelta);
+        }
+        return ['ok' => true, 'duplicate' => $duplicate, 'stock' => $this->stockSummary($supplementId, $userId)];
     }
 
     /** Doz işaretini geri alır (kaydı siler). */
@@ -317,22 +327,29 @@ class MedicationTracker
             return false;
         }
 
+        $restored = 0; // silinen "alındı" kayıtları kadar stok geri eklenir
         if ($slot !== null) {
-            $del = $this->db->prepare("DELETE FROM supplement_logs WHERE daily_log_id = ? AND supplement_id = ? AND scheduled_time = ?");
+            $del = $this->db->prepare("DELETE FROM supplement_logs WHERE daily_log_id = ? AND supplement_id = ? AND scheduled_time = ? RETURNING is_taken");
             $del->execute([$dailyLogId, $supplementId, $slot . ':00']);
-            $count = $del->rowCount();
+            $rows = $del->fetchAll(PDO::FETCH_COLUMN);
+            $count = count($rows);
+            $restored = count(array_filter($rows, fn($v) => (int)$v === 1));
         } else {
             $count = 0;
         }
         if ($count === 0) {
             // Saatsiz son kaydı sil
-            $q = $this->db->prepare("SELECT id FROM supplement_logs WHERE daily_log_id = ? AND supplement_id = ? ORDER BY id DESC LIMIT 1");
+            $q = $this->db->prepare("SELECT id, is_taken FROM supplement_logs WHERE daily_log_id = ? AND supplement_id = ? ORDER BY id DESC LIMIT 1");
             $q->execute([$dailyLogId, $supplementId]);
-            $lid = (int) $q->fetchColumn();
-            if ($lid > 0) {
-                $this->db->prepare("DELETE FROM supplement_logs WHERE id = ?")->execute([$lid]);
+            $last = $q->fetch(PDO::FETCH_ASSOC);
+            if ($last) {
+                $this->db->prepare("DELETE FROM supplement_logs WHERE id = ?")->execute([(int)$last['id']]);
                 $count = 1;
+                $restored = (int)$last['is_taken'] === 1 ? 1 : 0;
             }
+        }
+        if ($restored > 0) {
+            $this->adjustStock($supplementId, $restored);
         }
         $this->recalcDailyTotals($dailyLogId);
         return $count > 0;
@@ -516,4 +533,40 @@ class MedicationTracker
         }
         return $alarms;
     }
+
+    /**
+     * Stok takibi açık takviyede kalan adedi doz sayısı kadar değiştirir.
+     * $doses < 0: düş (alındı), > 0: geri ekle (geri alındı/atlandı). Sıfırın altına inmez.
+     */
+    private function adjustStock(int $supplementId, int $doses): void
+    {
+        try {
+            $this->db->prepare("
+                UPDATE supplements
+                   SET stock_quantity = GREATEST(0, stock_quantity + (? * units_per_dose))
+                 WHERE id = ? AND track_stock = 1 AND stock_quantity IS NOT NULL
+            ")->execute([$doses, $supplementId]);
+        } catch (\Throwable $e) {
+            error_log('[stock] ' . $e->getMessage()); // stok sütunları yoksa doz kaydı yine de geçerli
+        }
+    }
+
+    /** Doz işaretlendikten sonra arayüze dönecek stok özeti (takip yoksa null). */
+    private function stockSummary(int $supplementId, int $userId): ?array
+    {
+        try {
+            $q = $this->db->prepare("
+                SELECT id, name, form, doses_per_day, schedule_times, end_date,
+                       track_stock, stock_quantity, pack_size, units_per_dose, low_stock_days, repurchase
+                  FROM supplements WHERE id = ? AND user_id = ? LIMIT 1
+            ");
+            $q->execute([$supplementId, $userId]);
+            $row = $q->fetch(PDO::FETCH_ASSOC);
+            $st = $row ? StockHelper::compute($row) : null;
+            return $st ? ['name' => $row['name']] + $st : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
 }

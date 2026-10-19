@@ -136,6 +136,32 @@ try {
             echo json_encode(['ok' => true, 'message' => 'Alarm saatleri güncellendi.']);
         })(),
 
+        // ── Stok (kalan adet) ayarı: takibi aç/kapat, adedi düzelt ─────
+        'update_stock' => (function () use ($service, $userId, $input): void {
+            $suppId = (int)($input['supplement_id'] ?? 0);
+            if ($suppId <= 0) {
+                throw new \InvalidArgumentException('Geçersiz supplement_id.');
+            }
+            $st = $service->updateStock($suppId, $userId, $input);
+            echo json_encode(['ok' => true, 'stock' => $st, 'message' => 'Stok bilgisi kaydedildi.'], JSON_UNESCAPED_UNICODE);
+        })(),
+
+        // ── "Yeni paket aldım" ────────────────────────────────────────
+        'refill_stock' => (function () use ($service, $userId, $input): void {
+            $suppId = (int)($input['supplement_id'] ?? 0);
+            $amount = isset($input['amount']) && $input['amount'] !== '' ? (float)str_replace(',', '.', (string)$input['amount']) : null;
+            $st = $service->refillStock($suppId, $userId, $amount);
+            if ($st === null) {
+                throw new \InvalidArgumentException('Paketteki adet bilinmiyor; lütfen adet girin.');
+            }
+            echo json_encode(['ok' => true, 'stock' => $st, 'message' => 'Stok güncellendi.'], JSON_UNESCAPED_UNICODE);
+        })(),
+
+        // ── Bitmek üzere olanlar ──────────────────────────────────────
+        'low_stock' => (function () use ($service, $userId): void {
+            echo json_encode(['ok' => true, 'items' => $service->getLowStock($userId)], JSON_UNESCAPED_UNICODE);
+        })(),
+
         // ── Takviyeyi sil (bağlı tüm alarmları da siler) ──────────────
         'delete_supplement' => (function () use ($service, $userId, $input): void {
             $suppId = (int)($input['supplement_id'] ?? 0);

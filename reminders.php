@@ -201,7 +201,16 @@ $v = '20261009';
         details.settings summary::-webkit-details-marker { display: none; }
         details.settings[open] summary .bi-chevron-down { transform: rotate(180deg); }
         .finished-list .med { opacity: .7; }
-    </style>
+            .stock { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+        .stock .bar span { background: var(--accent); }
+        .stock.low { border-color: color-mix(in srgb, var(--yellow, #f59e0b) 55%, transparent); background: color-mix(in srgb, var(--yellow, #f59e0b) 10%, var(--surface-2)); }
+        .stock.low .stock-label { color: var(--yellow, #b45309); font-weight: 600; }
+        .stock.low .bar span { background: var(--yellow, #f59e0b); }
+        .stock.empty { border-color: color-mix(in srgb, var(--red) 55%, transparent); background: color-mix(in srgb, var(--red) 8%, var(--surface-2)); }
+        .stock.empty .stock-label { color: var(--red); font-weight: 600; }
+        .stock-box { padding: 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+        .stock-enable { color: var(--muted); text-decoration: none; }
+</style>
 </head>
 <body>
 <?php $activePage = 'reminders'; require_once __DIR__ . '/includes/sidebar.php'; ?>
@@ -339,6 +348,34 @@ $v = '20261009';
                                     </div>
                                     <div class="bar"><span style="width:<?= max(3, min(100, round(($dur - $rem) / max(1, $dur) * 100))) ?>%"></span></div>
                                 </div>
+                            <?php endif; ?>
+
+                            <?php $st = $supp['stock'] ?? null;
+                                  $stockCfg = [
+                                      'id' => (int)$supp['id'], 'name' => $supp['name'],
+                                      'track' => (int)($supp['track_stock'] ?? 0), 'qty' => $supp['stock_quantity'] ?? null,
+                                      'pack' => $supp['pack_size'] ?? null, 'upd' => $supp['units_per_dose'] ?? 1,
+                                      'thr' => (int)($supp['low_stock_days'] ?? 5), 'rebuy' => (int)($supp['repurchase'] ?? 1),
+                                  ]; ?>
+                            <?php if ($st): ?>
+                                <div class="stock <?= $st['status'] ?>" id="stock-<?= (int)$supp['id'] ?>">
+                                    <div class="d-flex justify-content-between align-items-center gap-2 small mb-1">
+                                        <span class="stock-label"><i class="bi <?= $st['status'] === 'ok' ? 'bi-box-seam' : 'bi-exclamation-triangle-fill' ?> me-1"></i><?= htmlspecialchars($st['label']) ?></span>
+                                        <?php if ($st['final_pack']): ?><span class="chip" style="padding:1px 8px;font-size:11px">Son paket</span><?php endif; ?>
+                                    </div>
+                                    <?php if ($st['pct'] !== null): ?><div class="bar"><span style="width:<?= max(2, $st['pct']) ?>%"></span></div><?php endif; ?>
+                                    <div class="d-flex gap-2 mt-2">
+                                        <?php if (!$st['final_pack']): ?>
+                                            <button type="button" class="btn btn-sm btn-light" onclick='refillStock(<?= json_encode($stockCfg, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'><i class="bi bi-bag-plus me-1"></i>Yeni paket aldım</button>
+                                        <?php endif; ?>
+                                        <button type="button" class="btn btn-sm btn-light" onclick='editStock(<?= json_encode($stockCfg, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'><i class="bi bi-pencil me-1"></i>Düzenle</button>
+                                    </div>
+                                    <?php if ($st['status'] === 'empty' && $st['final_pack']): ?>
+                                        <div class="small mt-2" style="color:var(--muted)">Paket bitti. Tedavi tamamlandıysa menüden <b>Tedaviyi bitir</b> diyebilirsiniz.</div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <button type="button" class="btn btn-link btn-sm px-0 mt-1 stock-enable" onclick='editStock(<?= json_encode($stockCfg, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'><i class="bi bi-box-seam me-1"></i>Kalan adedi takip et</button>
                             <?php endif; ?>
 
                             <?php if (!empty($supp['notes'])): ?>
@@ -573,6 +610,48 @@ $v = '20261009';
                 </div>
                 <div class="form-text">Kür süresi dolunca alarmlar otomatik kapanır.</div>
 
+                <div class="stock-box mt-3">
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" role="switch" name="track_stock" value="1" id="trackStock" onchange="document.getElementById('stockFields').hidden = !this.checked">
+                        <label class="form-check-label fw-semibold" for="trackStock">Paketteki adedi takip et</label>
+                    </div>
+                    <div class="form-text mt-1">Her "Aldım" dediğinizde kalan adet düşer, bitmeden önce uyarılırsınız.</div>
+                    <div id="stockFields" hidden>
+                        <div class="row g-2 mt-1">
+                            <div class="col-6">
+                                <label class="form-label">Paketteki adet</label>
+                                <input type="number" name="pack_size" class="form-control" min="1" max="100000" step="1" placeholder="ör. 60">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Her dozda</label>
+                                <div class="input-group">
+                                    <input type="number" name="units_per_dose" class="form-control" min="0.5" max="100" step="0.5" value="1">
+                                    <span class="input-group-text">adet</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-2 mt-1">
+                            <div class="col-6">
+                                <label class="form-label">Elde kalan <span style="color:var(--muted);font-weight:500">(açık paket)</span></label>
+                                <input type="number" name="stock_quantity" class="form-control" min="0" max="100000" step="0.5" placeholder="Yeni ise boş bırakın">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Bitmeden uyar</label>
+                                <div class="input-group">
+                                    <input type="number" name="low_stock_days" class="form-control" min="0" max="60" value="5">
+                                    <span class="input-group-text">gün önce</span>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" name="repurchase" value="0">
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" name="repurchase" value="1" id="repurchase" checked>
+                            <label class="form-check-label" for="repurchase">Bitince yenisini alacağım <span style="color:var(--muted)">(düzenli kullanım)</span></label>
+                        </div>
+                        <div class="form-text">Kısa süreli bir ilaç kullanıyorsanız (ör. hastalıkta antibiyotik) bu kutuyu boş bırakın: yenisini alma uyarısı gelmez, sadece düzenli alımınız ve kalan adet takip edilir.</div>
+                    </div>
+                </div>
+
                 <div class="mt-3">
                     <label class="form-label">Not</label>
                     <textarea name="notes" class="form-control" rows="2" placeholder="Tok karnına, doktor notu…"></textarea>
@@ -646,8 +725,78 @@ async function logDose(suppId, time, status) {
     if (d) { d.status = status; renderDoses(); }
     const res = await post({ action: 'log_dose', supplement_id: suppId, scheduled_time: time, status });
     if (!res.ok) toast(res.error || 'Kaydedilemedi', 'error');
-    else toast(status === 'taken' ? 'Alındı olarak işaretlendi' : 'Atlandı');
+    else if (!stockWarn(res.stock)) toast(status === 'taken' ? 'Alındı olarak işaretlendi' : 'Atlandı');
+    if (res.ok && res.stock) paintStock(suppId, res.stock);
     refreshDoses();
+}
+
+/* ── Stok (kalan adet) ───────────────────────────────────── */
+function stockWarn(st) {
+    if (!st || !window.Swal) return false;
+    if (st.status === 'low') {
+        Swal.fire({ icon: 'warning', title: `${st.name} bitmek üzere`, text: `${st.label}. Yeni paket almayı unutmayın.`, confirmButtonText: 'Tamam' });
+        return true;
+    }
+    if (st.status === 'empty') {
+        Swal.fire({ icon: st.final_pack ? 'info' : 'warning', title: `${st.name}: paket bitti`,
+            text: st.final_pack ? 'Tedavi tamamlandıysa menüden "Tedaviyi bitir" diyebilirsiniz.' : 'Yeni paket aldığınızda "Yeni paket aldım" düğmesine basın.', confirmButtonText: 'Tamam' });
+        return true;
+    }
+    return false;
+}
+
+function paintStock(suppId, st) {
+    const box = document.getElementById('stock-' + suppId);
+    if (!box || !st) return;
+    box.className = 'stock ' + st.status;
+    const lbl = box.querySelector('.stock-label');
+    if (lbl) lbl.innerHTML = `<i class="bi ${st.status === 'ok' ? 'bi-box-seam' : 'bi-exclamation-triangle-fill'} me-1"></i>${esc(st.label)}`;
+    const bar = box.querySelector('.bar span');
+    if (bar && st.pct !== null) bar.style.width = Math.max(2, st.pct) + '%';
+}
+
+async function refillStock(cfg) {
+    let amount = '';
+    if (!cfg.pack) {
+        const r = await Swal.fire({ title: 'Yeni paket', input: 'number', inputLabel: 'Pakette kaç adet var?', inputAttributes: { min: 1, step: 1 }, showCancelButton: true, confirmButtonText: 'Ekle', cancelButtonText: 'Vazgeç' });
+        if (!r.isConfirmed || !r.value) return;
+        amount = r.value;
+    } else {
+        const r = await Swal.fire({ title: 'Yeni paket aldınız mı?', text: `${cfg.name} stoğuna ${Number(cfg.pack)} adet eklenecek.`, icon: 'question', showCancelButton: true, confirmButtonText: 'Evet, ekle', cancelButtonText: 'Vazgeç' });
+        if (!r.isConfirmed) return;
+    }
+    const res = await post({ action: 'refill_stock', supplement_id: cfg.id, amount });
+    if (res.ok) { toast('Stok güncellendi'); setTimeout(() => location.reload(), 600); }
+    else toast(res.error || 'Kaydedilemedi', 'error');
+}
+
+async function editStock(cfg) {
+    const num = v => (v === null || v === undefined || v === '') ? '' : Number(v);
+    const r = await Swal.fire({
+        title: cfg.name,
+        html: `<div class="text-start">
+            <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="swTrack" ${cfg.track || !cfg.qty ? 'checked' : ''}><label class="form-check-label fw-semibold" for="swTrack">Paketteki adedi takip et</label></div>
+            <div class="row g-2">
+              <div class="col-6"><label class="form-label small">Elde kalan adet</label><input id="swQty" type="number" min="0" step="0.5" class="form-control" value="${num(cfg.qty)}"></div>
+              <div class="col-6"><label class="form-label small">Paketteki adet</label><input id="swPack" type="number" min="1" step="1" class="form-control" value="${num(cfg.pack)}"></div>
+              <div class="col-6"><label class="form-label small">Her dozda (adet)</label><input id="swUpd" type="number" min="0.5" step="0.5" class="form-control" value="${num(cfg.upd) || 1}"></div>
+              <div class="col-6"><label class="form-label small">Kaç gün önce uyar</label><input id="swThr" type="number" min="0" max="60" class="form-control" value="${cfg.thr ?? 5}"></div>
+            </div>
+            <div class="form-check mt-3"><input class="form-check-input" type="checkbox" id="swRebuy" ${cfg.rebuy ? 'checked' : ''}><label class="form-check-label" for="swRebuy">Bitince yenisini alacağım</label></div>
+            <div class="small mt-1" style="color:var(--muted)">Kısa süreli ilaçlarda boş bırakın: yenisini alma uyarısı gelmez, sadece düzenli alım takip edilir.</div>
+        </div>`,
+        showCancelButton: true, confirmButtonText: 'Kaydet', cancelButtonText: 'Vazgeç', focusConfirm: false,
+        preConfirm: () => {
+            const v = id => document.getElementById(id);
+            const track = v('swTrack').checked;
+            if (track && v('swQty').value === '' && v('swPack').value === '') { Swal.showValidationMessage('Elde kalan ya da paketteki adedi girin'); return false; }
+            return { track_stock: track ? 1 : 0, stock_quantity: v('swQty').value, pack_size: v('swPack').value, units_per_dose: v('swUpd').value || 1, low_stock_days: v('swThr').value || 5, repurchase: v('swRebuy').checked ? 1 : 0 };
+        }
+    });
+    if (!r.isConfirmed) return;
+    const res = await post({ action: 'update_stock', supplement_id: cfg.id, ...r.value });
+    if (res.ok) { toast('Kaydedildi'); setTimeout(() => location.reload(), 600); }
+    else toast(res.error || 'Kaydedilemedi', 'error');
 }
 
 async function undoDose(suppId, time) {

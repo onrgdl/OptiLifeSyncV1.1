@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use PDO;
+
+require_once __DIR__ . '/StockHelper.php';
 use DateTime;
 
 /**
@@ -245,7 +247,8 @@ class ReminderService
                 id, name, type, form,
                 dose_amount, dose_unit, doses_per_day,
                 schedule_times, start_date, end_date, duration_days,
-                is_active, notes, created_at
+                is_active, notes, created_at,
+                track_stock, stock_quantity, pack_size, units_per_dose, low_stock_days, repurchase
             FROM supplements
             WHERE user_id = :user_id
             ORDER BY is_active DESC, type, name
@@ -280,6 +283,7 @@ class ReminderService
 
             $row['is_expired']      = $isExpired;
             $row['remaining_days']  = $remainingDays;
+            $row['stock']           = StockHelper::compute($row, $today);
         }
 
         return $rows;
@@ -312,12 +316,15 @@ class ReminderService
             INSERT INTO supplements
                 (user_id, name, type, form, dose_amount, dose_unit,
                  doses_per_day, schedule_times, start_date, end_date, duration_days,
-                 calories_per_dose, protein_g, carbs_g, fat_g, notes, is_active)
+                 calories_per_dose, protein_g, carbs_g, fat_g, notes, is_active,
+                 track_stock, stock_quantity, pack_size, units_per_dose, low_stock_days, repurchase)
             VALUES
                 (:user_id, :name, :type, :form, :dose_amount, :dose_unit,
                  :doses_per_day, '[]', :start_date, :end_date, :duration_days,
-                 0, 0, 0, 0, :notes, 1)
+                 0, 0, 0, 0, :notes, 1,
+                 :track_stock, :stock_quantity, :pack_size, :units_per_dose, :low_stock_days, :repurchase)
         ");
+        $stock = self::normalizeStockInput($data);
         $stmt->execute([
             ':user_id'       => $userId,
             ':name'          => trim($data['name'] ?? ''),
@@ -330,6 +337,12 @@ class ReminderService
             ':end_date'      => $endDate,
             ':duration_days' => $durationDays,
             ':notes'         => trim($data['notes'] ?? ''),
+            ':track_stock'    => $stock['track_stock'],
+            ':stock_quantity' => $stock['stock_quantity'],
+            ':pack_size'      => $stock['pack_size'],
+            ':units_per_dose' => $stock['units_per_dose'],
+            ':low_stock_days' => $stock['low_stock_days'],
+            ':repurchase'     => $stock['repurchase'],
         ]);
 
         return function_exists('dbLastInsertId')
@@ -479,4 +492,115 @@ class ReminderService
         $stmt->execute([':id' => $reminderId, ':user_id' => $userId]);
         return $stmt->rowCount() > 0;
     }
+
+    // =================================================================
+    // STOK (KALAN ADET) TAKİBİ
+    // =================================================================
+
+    /** Form/API verisinden stok alanlarını doğrulayıp normalleştirir. */
+    public static function normalizeStockInput(array $d): array
+    {
+        $on = !empty($d['track_stock']) && !in_array((string)$d['track_stock'], ['0', 'false', 'off'], true);
+        $num = static function ($v, float $min, float $max): ?float {
+            if ($v === null || $v === '') {
+                return null;
+            }
+            $f = (float)str_replace(',', '.', (string)$v);
+            return ($f < $min || $f > $max) ? null : round($f, 2);
+        };
+        $qty  = $num($d['stock_quantity'] ?? null, 0, 100000);
+        $pack = $num($d['pack_size'] ?? null, 1, 100000);
+        if ($qty === null && $pack !== null) {
+            $qty = $pack;          // yeni eklenen paket: kalan = paketteki adet
+        }
+        if ($pack === null && $qty !== null && $qty > 0) {
+            $pack = $qty;
+        }
+        $upd = $num($d['units_per_dose'] ?? null, 0.01, 100) ?? 1.0;
+        $thr = (int)($d['low_stock_days'] ?? 5);
+        $rebuy = !isset($d['repurchase']) || !in_array((string)$d['repurchase'], ['0', 'false', 'off', ''], true);
+
+        if (!$on || $qty === null) {
+            return ['track_stock' => 0, 'stock_quantity' => null, 'pack_size' => $pack, 'units_per_dose' => $upd,
+                    'low_stock_days' => max(0, min(60, $thr)), 'repurchase' => $rebuy ? 1 : 0];
+        }
+        return [
+            'track_stock'    => 1,
+            'stock_quantity' => $qty,
+            'pack_size'      => $pack,
+            'units_per_dose' => $upd,
+            'low_stock_days' => max(0, min(60, $thr)),
+            'repurchase'     => $rebuy ? 1 : 0,
+        ];
+    }
+
+    /** Stok ayarlarını günceller (takibi açma/kapama, adet düzeltme). */
+    public function updateStock(int $supplementId, int $userId, array $data): ?array
+    {
+        $st = self::normalizeStockInput($data);
+        $stmt = $this->db->prepare("
+            UPDATE supplements
+               SET track_stock = :t, stock_quantity = :q, pack_size = :p, units_per_dose = :u,
+                   low_stock_days = :l, repurchase = :r, updated_at = CURRENT_TIMESTAMP
+             WHERE id = :id AND user_id = :uid
+        ");
+        $stmt->execute([
+            ':t' => $st['track_stock'], ':q' => $st['stock_quantity'], ':p' => $st['pack_size'],
+            ':u' => $st['units_per_dose'], ':l' => $st['low_stock_days'], ':r' => $st['repurchase'],
+            ':id' => $supplementId, ':uid' => $userId,
+        ]);
+        return $stmt->rowCount() > 0 ? $this->getStock($supplementId, $userId) : null;
+    }
+
+    /** "Yeni paket aldım": stoğa paket adedini (ya da verilen adedi) ekler. */
+    public function refillStock(int $supplementId, int $userId, ?float $amount = null): ?array
+    {
+        $stmt = $this->db->prepare("
+            UPDATE supplements
+               SET stock_quantity = COALESCE(stock_quantity, 0) + COALESCE(:a, pack_size, 0),
+                   pack_size      = COALESCE(pack_size, :a2),
+                   track_stock    = 1,
+                   updated_at     = CURRENT_TIMESTAMP
+             WHERE id = :id AND user_id = :uid
+               AND COALESCE(:a3, pack_size, 0) > 0
+        ");
+        $a = ($amount !== null && $amount > 0 && $amount <= 100000) ? round($amount, 2) : null;
+        $stmt->execute([':a' => $a, ':a2' => $a, ':a3' => $a, ':id' => $supplementId, ':uid' => $userId]);
+        return $stmt->rowCount() > 0 ? $this->getStock($supplementId, $userId) : null;
+    }
+
+    /** Tek bir takviyenin stok özeti. */
+    public function getStock(int $supplementId, int $userId): ?array
+    {
+        $q = $this->db->prepare("
+            SELECT id, name, form, doses_per_day, schedule_times, end_date,
+                   track_stock, stock_quantity, pack_size, units_per_dose, low_stock_days, repurchase
+              FROM supplements WHERE id = ? AND user_id = ? LIMIT 1
+        ");
+        $q->execute([$supplementId, $userId]);
+        $row = $q->fetch(PDO::FETCH_ASSOC);
+        return $row ? StockHelper::compute($row) : null;
+    }
+
+    /** Bitmek üzere / bitmiş aktif takviyeler (dashboard uyarısı için). */
+    public function getLowStock(int $userId): array
+    {
+        $q = $this->db->prepare("
+            SELECT id, name, form, doses_per_day, schedule_times, end_date,
+                   track_stock, stock_quantity, pack_size, units_per_dose, low_stock_days, repurchase
+              FROM supplements
+             WHERE user_id = ? AND is_active = 1 AND track_stock = 1 AND stock_quantity IS NOT NULL
+        ");
+        $q->execute([$userId]);
+        $out = [];
+        foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $st = StockHelper::compute($row);
+            if ($st && ($st['status'] === 'low' || ($st['status'] === 'empty' && !$st['final_pack']))) {
+                $out[] = ['supplement_id' => (int)$row['id'], 'name' => $row['name']] + $st;
+            }
+        }
+        usort($out, fn($a, $b) => ($a['days_left'] ?? 0) <=> ($b['days_left'] ?? 0));
+        return $out;
+    }
+
 }
