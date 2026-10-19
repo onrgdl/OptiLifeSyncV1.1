@@ -85,7 +85,11 @@ class DashboardService
         return $row ?: [];
     }
 
-    public static function getDashboardData(PDO $pdo, int $userId, ?string $date = null): array
+    /**
+     * @param bool $lite true: yalnızca makro/su verisi (alarm, kilo, doz, stok, antrenman, öğün listesi sorgulanmaz).
+     *                   Beslenme sayfası ve su/makro bildirimleri için daha az sorgu.
+     */
+    public static function getDashboardData(PDO $pdo, int $userId, ?string $date = null, bool $lite = false): array
     {
         $today = $date ?: date('Y-m-d');
         self::clearProfileCache(); // her yüklemede taze başla, sonra istek içinde paylaş
@@ -143,8 +147,11 @@ class DashboardService
             ORDER BY r.remind_at
             LIMIT 10
         ");
-        $rStmt->execute([$userId, $today, $today, $nowTime, $futTime]);
-        $allReminders = $rStmt->fetchAll(PDO::FETCH_ASSOC);
+        $allReminders = [];
+        if (!$lite) {
+            $rStmt->execute([$userId, $today, $today, $nowTime, $futTime]);
+            $allReminders = $rStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
 
         $upcomingAlarms = [];
         foreach ($allReminders as $r) {
@@ -163,7 +170,7 @@ class DashboardService
 
         // Son öğünler (id dahil)
         $recentMeals = [];
-        if (!empty($dailyLog['id'])) {
+        if (!$lite && !empty($dailyLog['id'])) {
             $fStmt = $pdo->prepare("
                 SELECT id, food_label, meal_type, calories, protein_g, carbs_g, fat_g, logged_at
                 FROM food_logs
@@ -225,9 +232,10 @@ class DashboardService
             'upcoming_alarms' => $upcomingAlarms,
             'recent_meals'    => $recentMeals,
             'weight_today'    => $weight,
-            'weight'          => self::getWeightInfo($pdo, $userId),
-            'doses'           => (new MedicationTracker($pdo))->getDosesForDate($userId, $today),
-            'low_stock'       => self::safeLowStock($pdo, $userId),
+            'weight'          => $lite ? null : self::getWeightInfo($pdo, $userId),
+            'doses'           => $lite ? null : (new MedicationTracker($pdo))->getDosesForDate($userId, $today),
+            'low_stock'       => $lite ? [] : self::safeLowStock($pdo, $userId),
+            'workouts_today'  => $lite ? [] : self::getWorkoutsForDate($pdo, $userId, $today),
             'daily_log_id'    => (int)($dailyLog['id'] ?? 0),
         ];
     }
@@ -451,4 +459,94 @@ class DashboardService
             'days_with_food' => $daysWithFood,
         ];
     }
+
+    /** O günün antrenmanları (Bugün kartı için). */
+    public static function getWorkoutsForDate(PDO $pdo, int $userId, string $date): array
+    {
+        try {
+            $q = $pdo->prepare("
+                SELECT id, antrenman_tipi, zorluk_seviyesi, planlanan_saat, sure_dk, tamamlandi_mi, atlandi_mi
+                  FROM workouts WHERE user_id = ? AND tarih = ? ORDER BY planlanan_saat NULLS LAST, id
+            ");
+            $q->execute([$userId, $date]);
+            return array_map(fn($w) => [
+                'id'     => (int)$w['id'],
+                'type'   => $w['antrenman_tipi'],
+                'level'  => $w['zorluk_seviyesi'],
+                'time'   => $w['planlanan_saat'] ? substr((string)$w['planlanan_saat'], 0, 5) : null,
+                'status' => (int)$w['tamamlandi_mi'] === 1 ? 'done' : ((int)($w['atlandi_mi'] ?? 0) === 1 ? 'skipped' : 'open'),
+            ], $q->fetchAll(PDO::FETCH_ASSOC));
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * Son N günün (bugün hariç) makro eğilimi: her makroda hedefin altında / içinde / üstünde
+     * kalınan gün sayısı ve okunabilir öneriler. Yalnızca öğün girilmiş günler sayılır.
+     */
+    public static function getMacroTrend(PDO $pdo, int $userId, int $days = 7): array
+    {
+        $profile = self::getUserProfile($pdo, $userId);
+        $calc = new MetabolismCalculator(
+            (float)($profile['weight_kg'] ?? 70),
+            (float)($profile['height_cm'] ?? 170),
+            self::calcAge($profile['birth_date'] ?? '1996-01-01'),
+            $profile['gender'] ?? 'male',
+            $profile['activity_level'] ?? 'moderately_active',
+            $profile['goal'] ?? 'maintain'
+        );
+        $t = $calc->getDailyMacros();
+
+        $q = $pdo->prepare("
+            SELECT log_date, total_calories, total_protein_g, total_carbs_g, total_fat_g
+              FROM daily_logs
+             WHERE user_id = ? AND log_date >= ? AND log_date < ? AND total_calories > 0
+             ORDER BY log_date
+        ");
+        $q->execute([$userId, date('Y-m-d', strtotime("-{$days} days")), date('Y-m-d')]);
+        $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        $defs = [
+            'calories'  => ['col' => 'total_calories',  'name' => 'Kalori',       'low' => 0.85, 'high' => 1.10],
+            'protein_g' => ['col' => 'total_protein_g', 'name' => 'Protein',      'low' => 0.85, 'high' => 1.30],
+            'carbs_g'   => ['col' => 'total_carbs_g',   'name' => 'Karbonhidrat', 'low' => 0.70, 'high' => 1.20],
+            'fat_g'     => ['col' => 'total_fat_g',     'name' => 'Yağ',          'low' => 0.70, 'high' => 1.20],
+        ];
+        $out = [];
+        $insights = [];
+        $n = count($rows);
+        foreach ($defs as $k => $d) {
+            $target = (float)($t[$k] ?? 0);
+            $low = $ok = $high = 0;
+            $sumPct = 0.0;
+            foreach ($rows as $r) {
+                $pct = $target > 0 ? (float)$r[$d['col']] / $target : 0;
+                $sumPct += $pct;
+                if ($pct < $d['low']) {
+                    $low++;
+                } elseif ($pct > $d['high']) {
+                    $high++;
+                } else {
+                    $ok++;
+                }
+            }
+            $avg = $n ? (int)round($sumPct / $n * 100) : null;
+            $out[$k] = ['name' => $d['name'], 'low' => $low, 'ok' => $ok, 'high' => $high, 'avg_pct' => $avg, 'target' => round($target)];
+            if ($n >= 3) {
+                if ($low >= max(2, (int)ceil($n * 0.5))) {
+                    $insights[] = ['level' => 'warn', 'macro' => $k, 'text' => "{$d['name']}: son {$n} kayıtlı günde {$low} gün hedefin altında (ort. %{$avg})."];
+                } elseif ($high >= max(2, (int)ceil($n * 0.5))) {
+                    $insights[] = ['level' => 'warn', 'macro' => $k, 'text' => "{$d['name']}: son {$n} kayıtlı günde {$high} gün hedefin üstünde (ort. %{$avg})."];
+                }
+            }
+        }
+        if ($n >= 3 && !$insights) {
+            $insights[] = ['level' => 'ok', 'macro' => null, 'text' => "Son {$n} günde makroların genel olarak hedefte 👏"];
+        } elseif ($n < 3) {
+            $insights[] = ['level' => 'info', 'macro' => null, 'text' => 'Eğilim için en az 3 gün öğün kaydı gerekiyor (şu an ' . $n . ' gün).'];
+        }
+        return ['days_logged' => $n, 'window' => $days, 'macros' => $out, 'insights' => $insights];
+    }
+
 }

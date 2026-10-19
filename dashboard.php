@@ -11,11 +11,13 @@ use App\Services\DashboardService;
 $initialDashboardData = null;
 $weeklyBreakdown = null;
 $currentStreak = 0;
+$macroTrend = null;
 if ($pdo && isset($userId) && $userId > 0) {
     try {
         $initialDashboardData = DashboardService::getDashboardData($pdo, (int)$userId);
         $weeklyBreakdown      = DashboardService::getWeeklyBreakdown($pdo, (int)$userId);
         $currentStreak        = DashboardService::getStreak($pdo, (int)$userId);
+        $macroTrend           = DashboardService::getMacroTrend($pdo, (int)$userId, 7);
     } catch (\Throwable $e) {
         error_log('Dashboard SSR hatası: ' . $e->getMessage());
     }
@@ -133,6 +135,28 @@ $shortDay = ['Pazartesi' => 'Pzt', 'Salı' => 'Sal', 'Çarşamba' => 'Çar', 'Pe
     .stock-alert i { color: var(--yellow, #f59e0b); }
     .stock-alert.empty { background: color-mix(in srgb, var(--red) 10%, var(--surface-2)); border-color: color-mix(in srgb, var(--red) 45%, transparent); }
     .stock-alert.empty i { color: var(--red); }
+    .today-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+    .today-pills .tp { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--border); font-size: 12.5px; color: var(--text-2); text-decoration: none; }
+    .today-pills .tp b { color: var(--text); }
+    .today-pills .tp.warn { border-color: color-mix(in srgb, var(--yellow) 45%, transparent); background: var(--yellow-dim); }
+    .today-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 18px; }
+    .today-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); min-width: 0; }
+    .today-item .t { font-weight: 800; width: 46px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    .today-item .ic { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; background: var(--surface-2); }
+    .today-item .n { flex: 1; min-width: 0; }
+    .today-item .n div:first-child { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .today-item .n div:last-child { font-size: 12px; color: var(--muted); }
+    .today-item.done { opacity: .55; }
+    .trend-note { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; padding: 6px 0; color: var(--text-2); }
+    .trend-note.warn i { color: var(--yellow); } .trend-note.ok i { color: var(--green); } .trend-note.info i { color: var(--muted); }
+    .trend-grid { margin-top: 8px; }
+    .trend-row { display: grid; grid-template-columns: 100px 1fr 44px; align-items: center; gap: 10px; padding: 4px 0; font-size: 12.5px; }
+    .trend-row .nm { color: var(--text-2); font-weight: 600; }
+    .trend-row .pc { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+    .trend-row .tb { display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: var(--surface-3); }
+    .trend-row .tb i, .lg { display: block; height: 100%; }
+    .lg { display: inline-block; width: 10px; height: 8px; border-radius: 3px; vertical-align: middle; }
+    .tr-lo { background: var(--yellow); } .tr-ok { background: var(--green); } .tr-hi { background: var(--red); }
 </style>
 </head>
 <body>
@@ -170,6 +194,20 @@ $shortDay = ['Pazartesi' => 'Pzt', 'Salı' => 'Sal', 'Çarşamba' => 'Çar', 'Pe
         </div>
 
         <div class="dash">
+            <!-- ═══ BUGÜNÜN PLANI ═══ -->
+            <section class="card card-pad span-12 fade-in">
+                <div class="card-head">
+                    <h2 class="card-title-sm"><i class="bi bi-list-check"></i>Bugünün planı</h2>
+                    <span class="chip accent" id="todayChip">—</span>
+                </div>
+                <div class="today-pills" id="todayPills"></div>
+                <div id="todayList" class="today-list"></div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span class="small" style="color:var(--muted)" id="todayHint"></span>
+                    <a href="checkin.php" class="small fw-semibold" style="color:var(--accent)">Gün sonu kontrolü →</a>
+                </div>
+            </section>
+
             <!-- ═══ ENERJİ ═══ -->
             <section class="card card-pad span-7 fade-in">
                 <div class="card-head">
@@ -297,6 +335,28 @@ $shortDay = ['Pazartesi' => 'Pzt', 'Salı' => 'Sal', 'Çarşamba' => 'Çar', 'Pe
                     </div>
                     <div class="chart-box mt-3"><canvas id="weeklyTrendChart"></canvas></div>
                 <?php endif; ?>
+                <?php if (!empty($macroTrend)): ?>
+                    <div class="trend mt-3">
+                        <div class="eyebrow mb-2">Son 7 gün eğilimi</div>
+                        <?php foreach ($macroTrend['insights'] as $in): ?>
+                            <div class="trend-note <?= $in['level'] ?>"><i class="bi <?= $in['level'] === 'warn' ? 'bi-exclamation-triangle-fill' : ($in['level'] === 'ok' ? 'bi-check-circle-fill' : 'bi-info-circle') ?>"></i><span><?= htmlspecialchars($in['text']) ?></span></div>
+                        <?php endforeach; ?>
+                        <?php if ($macroTrend['days_logged'] > 0): ?>
+                            <div class="trend-grid">
+                                <?php foreach ($macroTrend['macros'] as $m): $n = max(1, $macroTrend['days_logged']); ?>
+                                    <div class="trend-row">
+                                        <span class="nm"><?= htmlspecialchars($m['name']) ?></span>
+                                        <span class="tb" title="Altında / hedefte / üstünde">
+                                            <i class="tr-lo" style="width:<?= round($m['low'] / $n * 100) ?>%"></i><i class="tr-ok" style="width:<?= round($m['ok'] / $n * 100) ?>%"></i><i class="tr-hi" style="width:<?= round($m['high'] / $n * 100) ?>%"></i>
+                                        </span>
+                                        <span class="pc"><?= $m['avg_pct'] !== null ? '%' . (int)$m['avg_pct'] : '—' ?></span>
+                                    </div>
+                                <?php endforeach; ?>
+                                <div class="small mt-1" style="color:var(--muted)"><i class="lg tr-lo"></i> altında <i class="lg tr-ok"></i> hedefte <i class="lg tr-hi"></i> üstünde · ort. hedef yüzdesi</div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
             </section>
         </div>
     </div>
@@ -391,9 +451,62 @@ function renderDashboard(d) {
 
     renderDoses(d.doses);
     renderStockAlerts(d.low_stock || []);
+    renderToday(d);
     renderWater(d.water);
     renderWeight(d.weight);
     renderMeals(d.recent_meals || []);
+}
+
+/* ── Bugünün planı: ilaçlar + antrenman + su + kalan makrolar tek yerde ── */
+function renderToday(d) {
+    const list = document.getElementById('todayList'); if (!list) return;
+    const fmtL = ml => (ml / 1000).toLocaleString('tr-TR', { maximumFractionDigits: 1 }) + ' L';
+    const doses = (d.doses && d.doses.doses) || [];
+    const ws = d.workouts_today || [];
+    const items = [
+        ...doses.map(x => ({ kind: 'dose', time: x.time, done: x.status === 'taken' || x.status === 'skipped', x })),
+        ...ws.map(w => ({ kind: 'workout', time: w.time || '—', done: w.status !== 'open', x: w })),
+    ].sort((a, b) => (a.done - b.done) || String(a.time).localeCompare(String(b.time)));
+    const doneN = items.filter(i => i.done).length;
+    const w = d.water || { consumed_ml: 0, target_ml: 0 };
+    const waterDone = w.target_ml > 0 && w.consumed_ml >= w.target_ml;
+    const total = items.length + 1, finished = doneN + (waterDone ? 1 : 0);
+    document.getElementById('todayChip').textContent = `${finished}/${total} tamam`;
+
+    const rem = d.remaining || {};
+    const pills = [
+        `<a class="tp ${waterDone ? '' : 'warn'}" href="#waterFill"><i class="bi bi-droplet" style="color:var(--c-water)"></i>Su <b>${fmtL(w.consumed_ml)}</b> / ${fmtL(w.target_ml)}</a>`,
+        `<a class="tp" href="nutrition.php"><i class="bi bi-fire" style="color:var(--c-kcal)"></i>${rem.calories >= 0 ? `Kalan <b>${Math.round(rem.calories)}</b> kcal` : `<b>${Math.round(-rem.calories)}</b> kcal fazla`}</a>`,
+        `<a class="tp ${rem.protein_g > 0 ? '' : ''}" href="nutrition.php"><i class="bi bi-egg" style="color:var(--c-protein)"></i>${rem.protein_g > 0 ? `Protein <b>${Math.round(rem.protein_g)} g</b> kaldı` : 'Protein hedefi <b>tamam</b>'}</a>`,
+    ];
+    if ((d.low_stock || []).length) pills.push(`<a class="tp warn" href="reminders.php"><i class="bi bi-box-seam"></i><b>${d.low_stock.length}</b> takviye azaldı</a>`);
+    document.getElementById('todayPills').innerHTML = pills.join('');
+
+    if (!items.length) {
+        list.innerHTML = `<div class="small py-2" style="color:var(--muted)">Bugün planlı ilaç veya antrenman yok. <a href="reminders.php" style="color:var(--accent)">İlaç ekle</a> · <a href="workout.php" style="color:var(--accent)">Antrenman planla</a></div>`;
+    } else {
+        list.innerHTML = items.slice(0, 8).map(i => {
+            if (i.kind === 'dose') {
+                const x = i.x;
+                const tag = x.status === 'missed' ? ' · <span style="color:var(--red)">kaçırıldı</span>' : x.status === 'due' ? ' · <span style="color:var(--accent)">şimdi</span>' : '';
+                return `<div class="today-item ${i.done ? 'done' : ''}"><div class="t">${esc(x.time)}</div><div class="ic"><i class="bi bi-capsule-pill" style="color:var(--red)"></i></div>
+                    <div class="n"><div>${esc(x.name)}</div><div>${esc(x.dose)}${tag}</div></div>
+                    ${i.done ? `<i class="bi ${x.status === 'taken' ? 'bi-check2' : 'bi-dash'}" style="color:var(--green)"></i>` : `<button class="btn-take" onclick="takeDose(${x.supplement_id}, '${x.time}')">Aldım</button>`}</div>`;
+            }
+            const x = i.x;
+            return `<div class="today-item ${i.done ? 'done' : ''}"><div class="t">${esc(x.time || '')}</div><div class="ic"><i class="bi bi-lightning-charge-fill" style="color:var(--purple)"></i></div>
+                <div class="n"><div>${esc(x.type)}</div><div>${esc(x.level)}${x.status === 'skipped' ? ' · yapılmadı' : ''}</div></div>
+                ${i.done ? `<i class="bi ${x.status === 'done' ? 'bi-check2' : 'bi-dash'}" style="color:var(--green)"></i>` : `<button class="btn-take" onclick="workoutDone(${x.id})">Yaptım</button>`}</div>`;
+        }).join('');
+    }
+    const next = items.find(i => !i.done && i.time !== '—');
+    document.getElementById('todayHint').textContent = next ? `Sıradaki: ${next.time} · ${next.kind === 'dose' ? next.x.name : next.x.type}` : (items.length ? 'Bugünün planı tamam 👏' : '');
+}
+
+async function workoutDone(id) {
+    const r = await fetch(`${window.API_BASE}/notify.php`, { method: 'POST', credentials: 'include', body: new URLSearchParams({ action: 'act', do: 'workout_done', ref: JSON.stringify({ workout_id: id }) }) }).then(x => x.json()).catch(() => ({}));
+    if (r.ok) { toast('Tebrikler! Antrenman tamamlandı 💪'); try { if (window.OptiNative && OptiNative.isApp()) OptiNative.syncFromServer(true).catch(() => {}); } catch (_) {} loadDashboard(); }
+    else toast(r.error || 'Kaydedilemedi', 'error');
 }
 
 /* ── Bitmek üzere olan takviyeler ───────────────────────── */

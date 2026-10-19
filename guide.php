@@ -246,6 +246,7 @@ $activePage = 'guide';
             <a href="#mod-dashboard" class="nav-pill-btn"><i class="bi bi-grid-1x2-fill text-info"></i> Dashboard</a>
             <a href="#mod-nutrition" class="nav-pill-btn"><i class="bi bi-egg-fried text-warning"></i> Beslenme & AI</a>
             <a href="#mod-reminders" class="nav-pill-btn"><i class="bi bi-bell-fill text-danger"></i> İlaç & Takviye</a>
+            <a href="#mod-smart" class="nav-pill-btn"><i class="bi bi-stars text-info"></i> Stok & Akıllı Bildirim</a>
             <a href="#mod-workout" class="nav-pill-btn"><i class="bi bi-activity text-success"></i> Spor Planı</a>
             <a href="#mod-bmr" class="nav-pill-btn"><i class="bi bi-calculator text-primary"></i> BMR / TDEE</a>
             <a href="#mod-reports" class="nav-pill-btn"><i class="bi bi-graph-up-arrow text-info"></i> Haftalık Rapor</a>
@@ -430,6 +431,82 @@ $activePage = 'guide';
                 <div>
                     <strong>Tedavi Bitirme:</strong> Süreli kullanılan bir antibiyotik veya takviye bittiğinde <em>"Tamamlandı"</em> butonuna basarak alarmları durdurabilir, kayıt geçmişini saklayabilirsiniz.
                 </div>
+            </div>
+        </div>
+
+        <!-- 1C-2. STOK, AKILLI BİLDİRİMLER, GÜNLÜK DÜZEN -->
+        <div class="module-section guide-item" id="mod-smart">
+            <div class="module-header">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="module-icon-box" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+                        <i class="bi bi-stars"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-light fw-bold mb-1">Stok Takibi, Akıllı Bildirimler & Günlük Düzen</h4>
+                        <span class="text-secondary small">Sayfalar: <code>reminders.php</code> · <code>notifications.php</code> · <code>checkin.php</code> · <code>dashboard.php</code></span>
+                    </div>
+                </div>
+                <a href="notifications.php" class="btn btn-sm btn-outline-info px-3">Bildirim ayarları <i class="bi bi-arrow-right ms-1"></i></a>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-title"><i class="bi bi-box-seam text-warning"></i> Paketteki adet (stok)</div>
+                        <p class="feature-desc">İlaç/takviye eklerken “Paketteki adedi takip et”i açın. Her “Aldım”da kalan adet düşer; kartta “18 tablet kaldı · ~9 gün yeter” görünür ve bitmeden belirlediğiniz gün kadar önce uyarılırsınız. “Yeni paket aldım” stoğu tek dokunuşla yeniler.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-title"><i class="bi bi-arrow-repeat text-info"></i> Yenisi alınacak mı?</div>
+                        <p class="feature-desc">“Bitince yenisini alacağım” kutusu düzenli kullandığınız takviyeler içindir. Hastalıkta kısa süre kullandığınız bir ilaçta boş bırakın: yenisini alma uyarısı gelmez, yalnızca düzenli alım ve kalan adet takip edilir.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-title"><i class="bi bi-magic text-success"></i> Hızlı ekleme önerisi</div>
+                        <p class="feature-desc">Ad yazarken yaygın takviyeler (D3, Magnezyum, Omega-3, Kreatin…) ve daha önce eklediğiniz ilaçlar önerilir; tür, form ve doz kendiliğinden dolar. Dozu paketteki/doktorunuzun önerdiği değere göre kontrol edin.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-title"><i class="bi bi-sunrise text-warning"></i> Sabah özeti</div>
+                        <p class="feature-desc">Her sabah bugün alacağınız ilaçlar, su hedefiniz, antrenmanınız, kalori/protein hedefiniz, azalan takviyeler ve son 7 günün en önemli beslenme eğilimi tek bildirimde gelir.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-title"><i class="bi bi-droplet text-info"></i> Su ve doz takibi</div>
+                        <p class="feature-desc">Gün içinde düzenli aralıklarla su hatırlatması gelir; bildirimdeki +250 ml / +500 ml düğmesi suyu kaydeder. İlaç alarmından sonra hâlâ işaretlenmemiş doz varsa 30 dk sonra “Aldım / Atla” diye tekrar sorulur.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-title"><i class="bi bi-lightning-charge text-success"></i> Antrenman akışı</div>
+                        <p class="feature-desc">Antrenmanı saat ve süresiyle planlayın: öncesinde hatırlatma, saatinde “Antrenman zamanı”, bitince “Yaptın mı?” (Yaptım / Yapmadım) bildirimi gelir.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-title"><i class="bi bi-pie-chart text-danger"></i> Beslenme uyarıları</div>
+                        <p class="feature-desc">Öğle ve akşam protein/kalori durumu kontrol edilir; eksik ya da fazla varsa haber verilir. Özet sayfasındaki “Son 7 gün eğilimi” hangi makronun sürekli eksik/fazla kaldığını gösterir.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-title"><i class="bi bi-moon-stars text-primary"></i> Gün sonu kontrolü</div>
+                        <p class="feature-desc">Akşam işaretlenmemiş doz, onaylanmamış antrenman, eksik su veya hiç girilmemiş öğün varsa son bir kez sorulur. “Gün Sonu” ekranında hepsini tek dokunuşla tamamlarsınız; önceki günlere de dönebilirsiniz.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-title"><i class="bi bi-list-check text-info"></i> Bugünün planı</div>
+                        <p class="feature-desc">Özet sayfasının en üstündeki kart; günün ilaçlarını, antrenmanını, su ve kalan makrolarını sırayla gösterir, “Aldım / Yaptım” ile oradan işaretleyebilirsiniz.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="tip-box">
+                <i class="bi bi-android2 text-success fs-5"></i>
+                <div><strong>Not:</strong> Akıllı bildirimler Android uygulamasında, telefon kapalıyken de gelir. Gece rahatsız etmemesi için sessiz saatler (varsayılan 23:00–07:30) vardır; ilaç alarmları bu saatlerde de çalar. Tüm saat ve sıklıkları <a href="notifications.php">Bildirim ayarları</a> sayfasından değiştirebilirsiniz.</div>
             </div>
         </div>
 

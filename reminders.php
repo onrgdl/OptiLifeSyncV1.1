@@ -551,7 +551,9 @@ $v = '20261019';
             <div class="modal-body">
                 <div class="mb-3">
                     <label class="form-label">Adı</label>
-                    <input type="text" name="name" class="form-control" placeholder="ör. D3 vitamini, Metformin" required>
+                    <input type="text" name="name" id="suppName" class="form-control" placeholder="Yazmaya başlayın: D3, Magnezyum, Omega-3…" required list="suppCatalog" autocomplete="off">
+                    <datalist id="suppCatalog"></datalist>
+                    <div class="form-text d-none" id="suppHint"><i class="bi bi-magic me-1"></i><span></span></div>
                 </div>
                 <div class="row g-2 mb-3">
                     <div class="col-6">
@@ -729,6 +731,55 @@ async function logDose(suppId, time, status) {
     if (res.ok && res.stock) paintStock(suppId, res.stock);
     refreshDoses();
 }
+
+/* ── Takviye kataloğu: ad yazınca tür / form / doz önerisi ─────────── */
+// Doz değerleri yaygın etiket dozlarıdır; reçeteli ilaçlar için öneri yapılmaz.
+const SUPP_CATALOG = [
+    ['D3 vitamini', 'vitamin', 'capsule', 1000, 'IU'], ['D3 + K2 vitamini', 'vitamin', 'capsule', 1000, 'IU'],
+    ['C vitamini', 'vitamin', 'tablet', 1000, 'mg'], ['B12 vitamini', 'vitamin', 'tablet', 1000, 'mcg'],
+    ['B kompleks', 'vitamin', 'tablet', 1, 'adet'], ['Multivitamin', 'vitamin', 'tablet', 1, 'adet'],
+    ['E vitamini', 'vitamin', 'capsule', 400, 'IU'], ['Folik asit', 'vitamin', 'tablet', 400, 'mcg'],
+    ['Biotin', 'vitamin', 'tablet', 5000, 'mcg'],
+    ['Magnezyum sitrat', 'mineral', 'tablet', 200, 'mg'], ['Magnezyum glisinat', 'mineral', 'capsule', 200, 'mg'],
+    ['Çinko', 'mineral', 'tablet', 15, 'mg'], ['Kalsiyum', 'mineral', 'tablet', 500, 'mg'],
+    ['Demir', 'mineral', 'tablet', 1, 'adet'], ['Selenyum', 'mineral', 'tablet', 55, 'mcg'],
+    ['Potasyum', 'mineral', 'tablet', 99, 'mg'], ['Elektrolit', 'mineral', 'powder', 1, 'ölçek'],
+    ['Omega-3 balık yağı', 'supplement', 'capsule', 1000, 'mg'], ['Kreatin monohidrat', 'supplement', 'powder', 5, 'g'],
+    ['Whey protein', 'supplement', 'powder', 30, 'g'], ['Kolajen', 'supplement', 'powder', 10, 'g'],
+    ['Probiyotik', 'supplement', 'capsule', 1, 'adet'], ['Koenzim Q10', 'supplement', 'capsule', 100, 'mg'],
+    ['Glutamin', 'supplement', 'powder', 5, 'g'], ['BCAA', 'supplement', 'powder', 5, 'g'],
+    ['Melatonin', 'supplement', 'tablet', 3, 'mg'], ['L-karnitin', 'supplement', 'liquid', 1000, 'mg'],
+    ['Ashwagandha', 'herb', 'capsule', 600, 'mg'], ['Zerdeçal (kurkumin)', 'herb', 'capsule', 500, 'mg'],
+    ['Ginseng', 'herb', 'capsule', 200, 'mg'], ['Ekinezya', 'herb', 'capsule', 400, 'mg'],
+];
+// Daha önce eklediklerin (kendi dozlarınla) önce gelir
+const MY_SUPPS = <?= json_encode(array_values(array_reduce($supplements, function ($acc, $s) {
+    $k = mb_strtolower(trim((string)$s['name']));
+    if ($k !== '' && !isset($acc[$k])) {
+        $acc[$k] = [$s['name'], $s['type'], $s['form'], (float)$s['dose_amount'], $s['dose_unit']];
+    }
+    return $acc;
+}, [])), JSON_UNESCAPED_UNICODE) ?>;
+(function initSuppCatalog() {
+    const input = document.getElementById('suppName'), dl = document.getElementById('suppCatalog'), hint = document.getElementById('suppHint');
+    if (!input || !dl) return;
+    const all = [...MY_SUPPS.map(x => [...x, true]), ...SUPP_CATALOG.filter(c => !MY_SUPPS.some(m => m[0].toLocaleLowerCase('tr') === c[0].toLocaleLowerCase('tr')))];
+    dl.innerHTML = all.map(x => `<option value="${esc(x[0])}">${x[5] ? 'Önceki kaydın · ' : ''}${esc(x[3])} ${esc(x[4])}</option>`).join('');
+    const form = document.getElementById('addForm');
+    const apply = () => {
+        const v = input.value.trim().toLocaleLowerCase('tr');
+        const hit = all.find(x => x[0].toLocaleLowerCase('tr') === v);
+        if (!hit) { hint.classList.add('d-none'); return; }
+        form.querySelector('[name=type]').value = hit[1];
+        form.querySelector('[name=form]').value = hit[2];
+        form.querySelector('[name=dose_amount]').value = hit[3];
+        form.querySelector('[name=dose_unit]').value = hit[4];
+        hint.querySelector('span').textContent = hit[5] ? 'Önceki kaydındaki tür, form ve doz dolduruldu.' : 'Tür, form ve yaygın etiket dozu dolduruldu — paketteki doza göre düzeltebilirsin.';
+        hint.classList.remove('d-none');
+    };
+    input.addEventListener('change', apply);
+    input.addEventListener('input', () => { if (all.some(x => x[0].toLocaleLowerCase('tr') === input.value.trim().toLocaleLowerCase('tr'))) apply(); });
+})();
 
 /* ── Stok (kalan adet) ───────────────────────────────────── */
 function stockWarn(st) {

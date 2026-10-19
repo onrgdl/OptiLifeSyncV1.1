@@ -409,12 +409,21 @@ final class NotificationPlanner
         foreach (array_slice($s['low_stock'], 0, 2) as $ls) {
             $lines[] = '📦 ' . $ls['name'] . ': ' . ($ls['status'] === 'empty' ? 'paket bitti' : $ls['label']);
         }
+        try {
+            foreach (DashboardService::getMacroTrend($this->db, $userId, 7)['insights'] as $in) {
+                if ($in['level'] === 'warn') {
+                    $lines[] = '📈 ' . $in['text'];
+                    break; // sabah özetinde tek eğilim notu yeter
+                }
+            }
+        } catch (\Throwable) {
+        }
         return self::msg('☀️ Günaydın! Bugünün planı', $lines ? implode("\n", $lines) : 'Bugün için planlı bir şey yok. İyi bir gün geçir!');
     }
 
     private function composeWater(int $userId): array
     {
-        $dash = DashboardService::getDashboardData($this->db, $userId);
+        $dash = DashboardService::getDashboardData($this->db, $userId, null, true);
         $w = $dash['water'];
         $done = (int)$w['consumed_ml'];
         $target = (int)$w['target_ml'];
@@ -434,7 +443,7 @@ final class NotificationPlanner
 
     private function composeMacro(int $userId): array
     {
-        $dash = DashboardService::getDashboardData($this->db, $userId);
+        $dash = DashboardService::getDashboardData($this->db, $userId, null, true);
         $c = $dash['consumed'];
         $t = $dash['target'];
         $hour = (int)date('G');

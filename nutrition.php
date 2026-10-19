@@ -32,7 +32,7 @@ $data = null;
 $meals = [];
 if ($pdo) {
     try {
-        $data = DashboardService::getDashboardData($pdo, (int)$userId, $date);
+        $data = DashboardService::getDashboardData($pdo, (int)$userId, $date, true);
         $stmt = $pdo->prepare("
             SELECT fl.id, fl.food_label, fl.meal_type, fl.calories, fl.protein_g, fl.carbs_g, fl.fat_g, fl.logged_at
             FROM food_logs fl
